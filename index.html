@@ -502,6 +502,7 @@
     <div class="sidebar-nav">
       <div class="nav-item active" data-view="alimentacao">📋 Alimentação</div>
       <div class="nav-item" data-view="dashboard-mg">📊 Dash Projeto Óxido de Magnésio</div>
+      <div class="nav-item" data-view="ladroes-dash">🚩 Ladrões</div>
     </div>
     <div class="sidebar-user">
       <div class="name" id="sbUserName">—</div>
@@ -613,6 +614,23 @@
   </main>
 </div>
     </div>
+
+    <div id="viewLadroes" style="display:none;">
+      <div class="main-header">
+        <h2>🚩 Ladrões de Produtividade</h2>
+        <p class="sub">Talhões com sinaleiro vermelho ou avaliação individual mencionando "queda", e a lista dos 25% piores por fazenda — dados do projeto Máximas Produtividades / Ladrões.</p>
+      </div>
+      <div class="empty-wrap" id="ladroesLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🚩</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="ladroesApp" style="display:none;">
+        <div id="tab-ladroes"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -655,6 +673,7 @@ const PROJETOS_CONFIG = [
       { key:'media_prod', label:'Média', type:'number' },
       { key:'sinaleiro', label:'Sinaleiro', type:'sinaleiro' },
       { key:'avaliacao_individual', label:'Avaliação individual', type:'text' },
+      { key:'ipi', label:'IPI', type:'number' },
     ],
   },
 ];
@@ -1834,7 +1853,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     const view = item.dataset.view;
     document.getElementById('viewAlimentacao').style.display = view==='alimentacao' ? 'block' : 'none';
     document.getElementById('viewDashboardMg').style.display = view==='dashboard-mg' ? 'block' : 'none';
-    if(view==='dashboard-mg' && !dashMgJaCarregado){
+    document.getElementById('viewLadroes').style.display = view==='ladroes-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -1928,6 +1948,9 @@ const state = {
   cronograma: {},       // mapa: chave composta -> {etapa0..etapa4}
   cronogramaPage: 1,
   cronogramaMsg: '',    // feedback após importar
+  ladroesCliente: null,     // cliente selecionado na aba Ladrões
+  ladroesFazenda: null,     // fazenda selecionada dentro do cliente
+  ladroesCriterio: 'prod_25_26', // 'prod_25_26' | 'media_prod' — critério do card 25% piores
 };
 
 function defaultTalhoesFilters(){
@@ -2074,6 +2097,8 @@ function processWorkbook(wb){
 async function carregarDadosDoSupabase(){
   const loadingEl = document.getElementById('dashMgLoading');
   const appEl = document.getElementById('dashMgApp');
+  const ladLoadingEl = document.getElementById('ladroesLoading');
+  const ladAppEl = document.getElementById('ladroesApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
 
@@ -2088,8 +2113,13 @@ async function carregarDadosDoSupabase(){
     if(projRes.error) throw projRes.error;
     const projetoId = projRes.data.id;
 
+    // projeto Máximas Produtividades/Ladrões — busca em paralelo, opcional (não quebra o dash do Óxido se faltar)
+    let projetoIdMax = null;
+    const projResMax = await sb.from('projetos').select('id').eq('slug', 'maximas-produtividades').single();
+    if(!projResMax.error) projetoIdMax = projResMax.data.id;
+
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {};
+    let dadosMap = {}, dadosMapMax = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -2097,16 +2127,24 @@ async function carregarDadosDoSupabase(){
         .select('talhao_id, dados').eq('projeto_id', projetoId).in('talhao_id', bloco);
       if(errD) throw errD;
       if(dados) dados.forEach(d=>{ dadosMap[d.talhao_id] = d.dados || {}; });
+
+      if(projetoIdMax){
+        const { data: dadosMax, error: errDMax } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdMax).in('talhao_id', bloco);
+        if(!errDMax && dadosMax) dadosMax.forEach(d=>{ dadosMapMax[d.talhao_id] = d.dados || {}; });
+      }
     }
 
     const records = [], semArea = [];
     talhoes.forEach(t=>{
       const d = dadosMap[t.id] || {};
+      const dm = dadosMapMax[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (d.mg_solo!=null && d.mg_solo!=='') ? parseFloat(d.mg_solo) : null;
       const estado = t.estado || '';
       const pais = estado.toUpperCase()==='PY' ? 'Paraguai' : 'Brasil';
       const rec = {
+        id: t.id,
         consultor: t.consultor, cliente: t.cliente, estado, pais,
         fazenda: t.fazenda, talhao: t.talhao,
         area: Math.round((areaNum||0)*100)/100,
@@ -2116,6 +2154,18 @@ async function carregarDadosDoSupabase(){
         dose_oxido: (d.dose_oxido!=null && d.dose_oxido!=='') ? parseFloat(d.dose_oxido) : 0,
         dose_calcario: (d.dose_calcario!=null && d.dose_calcario!=='') ? parseFloat(d.dose_calcario) : 0,
         status: d.status || 'Sem Informação',
+        // campos do Máximas Produtividades / Ladrões (jsonb próprio, projeto separado)
+        max_sistema: dm.sistema ?? null,
+        max_prod_20_21: dm.prod_20_21 ?? null,
+        max_prod_21_22: dm.prod_21_22 ?? null,
+        max_prod_22_23: dm.prod_22_23 ?? null,
+        max_prod_23_24: dm.prod_23_24 ?? null,
+        max_prod_24_25: dm.prod_24_25 ?? null,
+        max_prod_25_26: dm.prod_25_26 ?? null,
+        max_media_prod: dm.media_prod ?? null,
+        max_sinaleiro: dm.sinaleiro ?? null,
+        max_avaliacao: dm.avaliacao_individual ?? null,
+        max_ipi: dm.ipi ?? null,
       };
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
     });
@@ -2132,9 +2182,12 @@ async function carregarDadosDoSupabase(){
 
     if(loadingEl) loadingEl.style.display = 'none';
     if(appEl) appEl.style.display = 'block';
+    if(ladLoadingEl) ladLoadingEl.style.display = 'none';
+    if(ladAppEl) ladAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(ladLoadingEl) ladLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -2343,6 +2396,7 @@ function renderAll(){
   renderSemArea();
   renderTalhoesProjeto();
   renderCronograma();
+  renderLadroes();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -4136,6 +4190,236 @@ function renderTalhoesResumoModal(selectedRows){
       <div class="custos-grand-total">Custo total dos talhões selecionados: ${fmtReais(granTotal)}</div>
     </div>
   </div>`;
+}
+
+/* ---------------- TAB LADRÕES DE PRODUTIVIDADE ---------------- */
+function sinaleiroEhVermelho(v){
+  if(v===null || v===undefined || String(v).trim()==='') return false;
+  const n = Number(v);
+  return !isNaN(n) && n > 2;
+}
+function avaliacaoMencionaQueda(texto){
+  return !!(texto && String(texto).toLowerCase().includes('queda'));
+}
+function renderLadroes(){
+  const container = document.getElementById('tab-ladroes');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+
+  // agrupa cliente -> fazenda -> talhões (só entram talhões que têm algum dado do projeto Máximas/Ladrões)
+  const porCliente = {};
+  base.forEach(r=>{
+    const temDadosMax = r.max_sistema!=null || r.max_prod_25_26!=null || r.max_media_prod!=null || r.max_sinaleiro!=null || r.max_avaliacao!=null;
+    if(!temDadosMax) return;
+    if(!porCliente[r.cliente]) porCliente[r.cliente] = {};
+    if(!porCliente[r.cliente][r.fazenda]) porCliente[r.cliente][r.fazenda] = [];
+    porCliente[r.cliente][r.fazenda].push(r);
+  });
+
+  const clientes = Object.keys(porCliente).sort();
+
+  if(!clientes.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Ladrões de Produtividade</div>
+      <h2>Nenhum dado do projeto Máximas Produtividades / Ladrões ainda</h2>
+      <p class="sub">Assim que a Alimentação começar a trazer valores de Sistema, safras, Sinaleiro ou Avaliação individual pra algum talhão, ele aparece aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  // garante seleção válida de cliente/fazenda
+  if(!state.ladroesCliente || !clientes.includes(state.ladroesCliente)) state.ladroesCliente = clientes[0];
+  const fazendasDoCliente = Object.keys(porCliente[state.ladroesCliente]).sort();
+  if(!state.ladroesFazenda || !fazendasDoCliente.includes(state.ladroesFazenda)) state.ladroesFazenda = fazendasDoCliente[0];
+
+  const talhoes = porCliente[state.ladroesCliente][state.ladroesFazenda] || [];
+  const idxFazenda = fazendasDoCliente.indexOf(state.ladroesFazenda);
+
+  // Card 1 — Ladrões: sinaleiro vermelho OU avaliação individual menciona "queda"
+  const ladroesTalhoes = talhoes.filter(r=> sinaleiroEhVermelho(r.max_sinaleiro) || avaliacaoMencionaQueda(r.max_avaliacao));
+
+  // Card 2 — 25% piores, por critério selecionável
+  const crit = state.ladroesCriterio; // 'prod_25_26' | 'media_prod'
+  const comCriterio = talhoes.filter(r => r['max_'+crit]!=null && r['max_'+crit]!=='' && !isNaN(Number(r['max_'+crit])));
+  const ordenados = [...comCriterio].sort((a,b)=> Number(a['max_'+crit]) - Number(b['max_'+crit]));
+  const qtdPiores = Math.max(1, Math.ceil(ordenados.length * 0.25));
+  const piores = ordenados.slice(0, ordenados.length ? qtdPiores : 0);
+
+  function sinaleiroColorLd(v){
+    if(v===null || v===undefined || String(v).trim()==='') return '#d9d9d4';
+    const n = Number(v);
+    if(isNaN(n)) return '#d9d9d4';
+    if(n<=1) return '#2ecc71';
+    if(n===2) return '#f1c40f';
+    return '#e74c3c';
+  }
+  function sinaleiroDotHtml(v){
+    const cor = sinaleiroColorLd(v);
+    return `<span class="sinaleiro-dot-ld" style="background:${cor}" title="Sinaleiro: ${v ?? '—'}"></span>`;
+  }
+
+  function ipiInputHtml(r){
+    const val = r.max_ipi!=null ? String(r.max_ipi).replace('.',',') : '';
+    return `<input type="text" inputmode="decimal" class="ipi-input-ld" data-talhao-id="${r.id}" value="${val}" placeholder="—">`;
+  }
+
+  const cardLadroesHtml = `
+  <div class="card full-card" style="margin-bottom:18px;">
+    <div class="eyebrow">Card · Ladrões (Sinaleiro / Queda)</div>
+    <h2>Talhões-problema desta fazenda</h2>
+    <p class="sub">Entram aqui talhões com <b>Sinaleiro vermelho</b> (≥3 anos de queda) ou cuja <b>Avaliação individual</b> mencione "queda" — <b>${ladroesTalhoes.length}</b> de ${talhoes.length} talhões.</p>
+    ${ladroesTalhoes.length ? `
+    <div class="table-scroll"><table>
+      <thead><tr><th></th><th>Talhão</th><th>Sistema</th><th>Cultura</th><th>Área (ha)</th><th>25/26 (sc/ha)</th><th>Média (sc/ha)</th><th>Avaliação individual</th><th>IPI</th></tr></thead>
+      <tbody>
+        ${ladroesTalhoes.map(r=>`<tr>
+          <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
+          <td>${r.talhao}</td>
+          <td>${r.max_sistema || '—'}</td>
+          <td>${r.cultura}</td>
+          <td class="mono-td">${fmtNum(r.area,1)}</td>
+          <td class="mono-td">${r.max_prod_25_26!=null ? fmtNum(Number(r.max_prod_25_26),1) : '—'}</td>
+          <td class="mono-td">${r.max_media_prod!=null ? fmtNum(Number(r.max_media_prod),1) : '—'}</td>
+          <td style="max-width:260px;">${r.max_avaliacao ? (avaliacaoMencionaQueda(r.max_avaliacao) ? `<span style="color:var(--red);font-weight:600;">${r.max_avaliacao}</span>` : r.max_avaliacao) : '—'}</td>
+          <td>${ipiInputHtml(r)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>` : `<p class="sub">Nenhum talhão-problema nessa fazenda pelo critério atual. 🎉</p>`}
+  </div>`;
+
+  const cardPioresHtml = `
+  <div class="card full-card">
+    <div class="eyebrow">Card · Lista dos 25% piores</div>
+    <h2>Quartil inferior desta fazenda</h2>
+    <div class="criterio-toggle-ld">
+      <button class="crit-btn-ld ${crit==='prod_25_26'?'active':''}" data-crit="prod_25_26">Safra 25/26</button>
+      <button class="crit-btn-ld ${crit==='media_prod'?'active':''}" data-crit="media_prod">Média ponderada</button>
+    </div>
+    <p class="sub" style="margin-top:10px;">${piores.length} de ${comCriterio.length} talhões com valor cadastrado nesse critério (25% do total, arredondado pra cima).</p>
+    ${piores.length ? `
+    <div class="table-scroll"><table>
+      <thead><tr><th></th><th>Talhão</th><th>Sistema</th><th>Cultura</th><th>${crit==='prod_25_26'?'Safra 25/26':'Média ponderada'} (sc/ha)</th><th>Sinaleiro</th></tr></thead>
+      <tbody>
+        ${piores.map((r,i)=>`<tr>
+          <td><span class="rank-badge-ld">${i+1}</span></td>
+          <td>${r.talhao}</td>
+          <td>${r.max_sistema || '—'}</td>
+          <td>${r.cultura}</td>
+          <td class="mono-td">${fmtNum(Number(r['max_'+crit]),1)}</td>
+          <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>` : `<p class="sub">Sem talhões com esse critério preenchido nessa fazenda.</p>`}
+  </div>`;
+
+  container.innerHTML = `
+  <style>
+    .ladroes-selectbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;background:var(--paper);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:18px;}
+    .ladroes-selectbar .fitem{min-width:220px;}
+    .ladroes-selectbar select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--ink);}
+    .ladroes-nav{display:flex;align-items:center;gap:8px;}
+    .ladroes-nav button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink-soft);}
+    .ladroes-nav button:disabled{opacity:.35;cursor:default;}
+    .ladroes-nav .count{font-size:12px;color:var(--ink-soft);white-space:nowrap;}
+    .sinaleiro-dot-ld{display:inline-block;width:13px;height:13px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(0,0,0,.06);}
+    .ipi-input-ld{width:74px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:center;}
+    .ipi-input-ld.saved{border-color:var(--lime);}
+    .ipi-input-ld.erro{border-color:var(--red);}
+    .criterio-toggle-ld{display:inline-flex;background:var(--bg);border-radius:999px;padding:3px;border:1px solid var(--line);}
+    .criterio-toggle-ld button{border:none;background:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;color:var(--ink-soft);}
+    .criterio-toggle-ld button.active{background:var(--green-deep);color:#fff;}
+    .rank-badge-ld{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--amber-soft);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;}
+  </style>
+
+  <div class="ladroes-selectbar">
+    <div class="fitem">
+      <label>Cliente</label>
+      <select id="ladCliSelect">
+        ${clientes.map(c=>`<option value="${encodeURIComponent(c)}" ${c===state.ladroesCliente?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fitem">
+      <label>Fazenda</label>
+      <select id="ladFazSelect">
+        ${fazendasDoCliente.map(f=>`<option value="${encodeURIComponent(f)}" ${f===state.ladroesFazenda?'selected':''}>${f}</option>`).join('')}
+      </select>
+    </div>
+    <div class="ladroes-nav">
+      <button id="ladFazPrev" ${idxFazenda<=0?'disabled':''}>◀ fazenda anterior</button>
+      <span class="count">Fazenda ${idxFazenda+1} de ${fazendasDoCliente.length} · ${talhoes.length} talhões</span>
+      <button id="ladFazNext" ${idxFazenda>=fazendasDoCliente.length-1?'disabled':''}>próxima fazenda ▶</button>
+    </div>
+  </div>
+
+  ${cardLadroesHtml}
+  <div style="height:18px;"></div>
+  ${cardPioresHtml}
+  `;
+
+  container.querySelector('#ladCliSelect').addEventListener('change', e=>{
+    state.ladroesCliente = decodeURIComponent(e.target.value);
+    state.ladroesFazenda = null; // reseta pra pegar a primeira fazenda do novo cliente
+    renderLadroes();
+  });
+  container.querySelector('#ladFazSelect').addEventListener('change', e=>{
+    state.ladroesFazenda = decodeURIComponent(e.target.value);
+    renderLadroes();
+  });
+  const prevBtn = container.querySelector('#ladFazPrev');
+  if(prevBtn) prevBtn.addEventListener('click', ()=>{
+    if(idxFazenda>0){ state.ladroesFazenda = fazendasDoCliente[idxFazenda-1]; renderLadroes(); }
+  });
+  const nextBtn = container.querySelector('#ladFazNext');
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{
+    if(idxFazenda<fazendasDoCliente.length-1){ state.ladroesFazenda = fazendasDoCliente[idxFazenda+1]; renderLadroes(); }
+  });
+  container.querySelectorAll('.crit-btn-ld').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.ladroesCriterio = btn.dataset.crit; renderLadroes(); });
+  });
+  container.querySelectorAll('.ipi-input-ld').forEach(inp=>{
+    inp.addEventListener('change', ()=> salvarIpiLadroes(inp));
+  });
+}
+
+async function salvarIpiLadroes(inp){
+  const talhaoId = inp.dataset.talhaoId;
+  const valorNum = parseInputVal(inp.value);
+  inp.classList.remove('saved','erro');
+
+  const rec = RECORDS.find(r=>r.id===talhaoId) || SEM_AREA.find(r=>r.id===talhaoId);
+  if(!rec || !projetosIds['maximas-produtividades']){
+    inp.classList.add('erro');
+    return;
+  }
+
+  // reconstrói o jsonb inteiro do talhão nesse projeto, preservando os outros campos já preenchidos
+  const dados = {
+    sistema: rec.max_sistema ?? null,
+    prod_20_21: rec.max_prod_20_21 ?? null,
+    prod_21_22: rec.max_prod_21_22 ?? null,
+    prod_22_23: rec.max_prod_22_23 ?? null,
+    prod_23_24: rec.max_prod_23_24 ?? null,
+    prod_24_25: rec.max_prod_24_25 ?? null,
+    prod_25_26: rec.max_prod_25_26 ?? null,
+    media_prod: rec.max_media_prod ?? null,
+    sinaleiro: rec.max_sinaleiro ?? null,
+    avaliacao_individual: rec.max_avaliacao ?? null,
+    ipi: valorNum,
+  };
+
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: talhaoId, projeto_id: projetosIds['maximas-produtividades'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+
+  if(error){ inp.classList.add('erro'); console.error(error); return; }
+
+  rec.max_ipi = valorNum;
+  inp.classList.add('saved');
+  setTimeout(()=> inp.classList.remove('saved'), 1500);
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
