@@ -503,6 +503,7 @@
       <div class="nav-item active" data-view="alimentacao">📋 Alimentação</div>
       <div class="nav-item" data-view="dashboard-mg">📊 Dash Projeto Óxido de Magnésio</div>
       <div class="nav-item" data-view="ladroes-dash">🚩 Ladrões</div>
+      <div class="nav-item" data-view="maximas-dash">🌱 Máximas Produtividades</div>
     </div>
     <div class="sidebar-user">
       <div class="name" id="sbUserName">—</div>
@@ -629,6 +630,23 @@
       </div>
       <div id="ladroesApp" style="display:none;">
         <div id="tab-ladroes"></div>
+      </div>
+    </div>
+
+    <div id="viewMaximas" style="display:none;">
+      <div class="main-header">
+        <h2>🌱 Máximas Produtividades</h2>
+        <p class="sub">Ranking dos talhões que mais superam a média ponderada por área da própria fazenda, ano a ano — por sistema (Sequeiro / Irrigado), numa janela de safras ajustável.</p>
+      </div>
+      <div class="empty-wrap" id="maximasLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🌱</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="maximasApp" style="display:none;">
+        <div id="tab-maximas"></div>
       </div>
     </div>
   </div>
@@ -1058,7 +1076,11 @@ function renderAlimentacaoTable(){
       </div>`;
     }
     const inputMode = campo.type==='number' ? 'decimal' : 'text';
-    return `<input type="text" inputmode="${inputMode}" class="cell-input" data-field="${campo.key}" value="${valor ?? ''}">`;
+    let valorExibido = valor ?? '';
+    if(campo.type==='number' && valor!=null && valor!=='' && !isNaN(Number(valor))){
+      valorExibido = String(Math.round(Number(valor)*100)/100).replace('.', ',');
+    }
+    return `<input type="text" inputmode="${inputMode}" class="cell-input" data-field="${campo.key}" value="${valorExibido}">`;
   }
   function sinaleiroColor(valor){
     if(valor===null || valor===undefined || String(valor).trim()==='') return '#d9d9d4';
@@ -1854,7 +1876,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewAlimentacao').style.display = view==='alimentacao' ? 'block' : 'none';
     document.getElementById('viewDashboardMg').style.display = view==='dashboard-mg' ? 'block' : 'none';
     document.getElementById('viewLadroes').style.display = view==='ladroes-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash') && !dashMgJaCarregado){
+    document.getElementById('viewMaximas').style.display = view==='maximas-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -1951,6 +1974,9 @@ const state = {
   ladroesCliente: null,     // cliente selecionado na aba Ladrões
   ladroesFazenda: null,     // fazenda selecionada dentro do cliente
   ladroesCriterio: 'prod_25_26', // 'prod_25_26' | 'media_prod' — critério do card 25% piores
+  maximasFazenda: null,     // fazenda selecionada na aba Máximas Produtividades
+  maximasCliente: null,     // cliente selecionado na aba Máximas Produtividades
+  maximasJanela: 3,         // quantidade de safras mais recentes consideradas (3 a 6)
 };
 
 function defaultTalhoesFilters(){
@@ -2099,6 +2125,8 @@ async function carregarDadosDoSupabase(){
   const appEl = document.getElementById('dashMgApp');
   const ladLoadingEl = document.getElementById('ladroesLoading');
   const ladAppEl = document.getElementById('ladroesApp');
+  const maxLoadingEl = document.getElementById('maximasLoading');
+  const maxAppEl = document.getElementById('maximasApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
 
@@ -2184,10 +2212,13 @@ async function carregarDadosDoSupabase(){
     if(appEl) appEl.style.display = 'block';
     if(ladLoadingEl) ladLoadingEl.style.display = 'none';
     if(ladAppEl) ladAppEl.style.display = 'block';
+    if(maxLoadingEl) maxLoadingEl.style.display = 'none';
+    if(maxAppEl) maxAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(ladLoadingEl) ladLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(maxLoadingEl) maxLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -2397,6 +2428,7 @@ function renderAll(){
   renderTalhoesProjeto();
   renderCronograma();
   renderLadroes();
+  renderMaximas();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -4420,6 +4452,238 @@ async function salvarIpiLadroes(inp){
   rec.max_ipi = valorNum;
   inp.classList.add('saved');
   setTimeout(()=> inp.classList.remove('saved'), 1500);
+}
+
+/* ---------------- TAB MÁXIMAS PRODUTIVIDADES ---------------- */
+const SAFRA_KEYS_ORDEM = ['prod_20_21','prod_21_22','prod_22_23','prod_23_24','prod_24_25','prod_25_26'];
+const SAFRA_LABELS = { prod_20_21:'20/21', prod_21_22:'21/22', prod_22_23:'22/23', prod_23_24:'23/24', prod_24_25:'24/25', prod_25_26:'25/26' };
+
+function normalizaSistema(v){
+  if(!v) return null;
+  const s = String(v).trim().toLowerCase();
+  if(!s) return null;
+  if(s.startsWith('seq')) return 'Sequeiro';
+  if(s.startsWith('irr')) return 'Irrigado';
+  return null; // grafia não reconhecida → tratado como "sem sistema", fica de fora
+}
+
+function renderMaximas(){
+  const container = document.getElementById('tab-maximas');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const janela = Math.min(6, Math.max(3, state.maximasJanela || 3));
+  const safraKeys = SAFRA_KEYS_ORDEM.slice(SAFRA_KEYS_ORDEM.length - janela); // as N mais recentes
+
+  // agrupa por cliente -> fazenda -> sistema (só entram talhões com Sistema reconhecido)
+  const porCliente = {};
+  base.forEach(r=>{
+    const sist = normalizaSistema(r.max_sistema);
+    if(!sist) return;
+    if(!porCliente[r.cliente]) porCliente[r.cliente] = {};
+    if(!porCliente[r.cliente][r.fazenda]) porCliente[r.cliente][r.fazenda] = { Sequeiro: [], Irrigado: [] };
+    porCliente[r.cliente][r.fazenda][sist].push(r);
+  });
+
+  const clientes = Object.keys(porCliente).sort();
+
+  if(!clientes.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Máximas Produtividades</div>
+      <h2>Nenhum talhão com Sistema cadastrado ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer o campo "Sistema" (Sequeiro/Irrigado) preenchido pra algum talhão do projeto Máximas Produtividades, ele aparece aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  if(!state.maximasCliente || !clientes.includes(state.maximasCliente)) state.maximasCliente = clientes[0];
+  const fazendasDoCliente = Object.keys(porCliente[state.maximasCliente]).sort();
+  if(!state.maximasFazenda || !fazendasDoCliente.includes(state.maximasFazenda)) state.maximasFazenda = fazendasDoCliente[0];
+  const idxFazenda = fazendasDoCliente.indexOf(state.maximasFazenda);
+  const grupos = porCliente[state.maximasCliente][state.maximasFazenda];
+
+  function calcularRanking(lista){
+    // elegibilidade: precisa ter TODAS as safras da janela preenchidas e numéricas
+    const elegiveis = [], incompletos = [];
+    lista.forEach(r=>{
+      const completo = safraKeys.every(k => r['max_'+k]!=null && r['max_'+k]!=='' && !isNaN(Number(r['max_'+k])));
+      if(completo) elegiveis.push(r); else incompletos.push(r);
+    });
+    if(!elegiveis.length) return { elegiveis: [], incompletos, medias: {}, ranking: [] };
+
+    const medias = {};
+    safraKeys.forEach(k=>{
+      let somaProdArea = 0, somaArea = 0;
+      elegiveis.forEach(r=>{
+        const area = Number(r.area)||0;
+        somaProdArea += Number(r['max_'+k]) * area;
+        somaArea += area;
+      });
+      medias[k] = somaArea>0 ? somaProdArea/somaArea : null;
+    });
+
+    const ranking = elegiveis.map(r=>{
+      const saldos = {};
+      let score = 0;
+      safraKeys.forEach(k=>{
+        const saldo = medias[k]!=null ? (Number(r['max_'+k]) - medias[k]) : 0;
+        saldos[k] = saldo;
+        score += saldo;
+      });
+      return { rec:r, saldos, score };
+    }).sort((a,b)=> b.score - a.score);
+
+    return { elegiveis, incompletos, medias, ranking };
+  }
+
+  function cardSistemaHtml(sistemaNome, lista){
+    if(!lista.length) return '';
+    const { incompletos, medias, ranking } = calcularRanking(lista);
+    const top10 = ranking.slice(0,10);
+
+    const mediasLinha = safraKeys.map(k=> `${SAFRA_LABELS[k]}: <b>${medias[k]!=null?fmtNum(medias[k],1):'—'}</b>`).join(' &nbsp;·&nbsp; ');
+
+    return `
+    <div class="demo-card-max">
+      <div class="max-card-head">
+        <div class="eyebrow">Sistema · ${sistemaNome}</div>
+        <h3>🌱 Top 10 — Máximas Produtividades</h3>
+        <p class="sub-sm">${ranking.length} de ${lista.length} talhões elegíveis · janela de ${janela} anos (${SAFRA_LABELS[safraKeys[0]]} → ${SAFRA_LABELS[safraKeys[safraKeys.length-1]]})</p>
+        <p class="medias-linha">Média ponderada por ano: ${mediasLinha}</p>
+      </div>
+      ${top10.length ? `
+      <div class="table-scroll"><table>
+        <thead><tr><th></th><th>Talhão</th><th>Cultura</th><th>Área (ha)</th>${safraKeys.map(k=>`<th>${SAFRA_LABELS[k]}</th>`).join('')}<th>Score</th></tr></thead>
+        <tbody>
+          ${top10.map((item,i)=>`<tr>
+            <td><span class="rank-badge-ld">${i+1}</span></td>
+            <td>${item.rec.talhao}</td>
+            <td>${item.rec.cultura}</td>
+            <td class="mono-td">${fmtNum(item.rec.area,1)}</td>
+            ${safraKeys.map(k=>`<td class="mono-td">${fmtNum(Number(item.rec['max_'+k]),1)}</td>`).join('')}
+            <td class="mono-td" style="font-weight:700;color:${item.score>=0?'var(--green)':'var(--red)'};">${item.score>=0?'+':''}${fmtNum(item.score,1)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+      <button class="ver-todos-max" data-sistema="${sistemaNome}">Ver ranking completo (${ranking.length} talhões) ▾</button>
+      <div class="tabela-completa-max" id="tabelaCompleta-${sistemaNome}" style="display:none;">
+        <div class="table-scroll"><table>
+          <thead><tr><th>Posição</th><th>Talhão</th><th>Cultura</th><th>Área (ha)</th>${safraKeys.map(k=>`<th>${SAFRA_LABELS[k]}</th>`).join('')}<th>Score</th></tr></thead>
+          <tbody>
+            ${ranking.map((item,i)=>`<tr>
+              <td>${i+1}</td>
+              <td>${item.rec.talhao}</td>
+              <td>${item.rec.cultura}</td>
+              <td class="mono-td">${fmtNum(item.rec.area,1)}</td>
+              ${safraKeys.map(k=>`<td class="mono-td">${fmtNum(Number(item.rec['max_'+k]),1)}</td>`).join('')}
+              <td class="mono-td" style="font-weight:700;color:${item.score>=0?'var(--green)':'var(--red)'};">${item.score>=0?'+':''}${fmtNum(item.score,1)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>
+      ` : `<p class="sub">Nenhum talhão elegível (todos incompletos na janela atual).</p>`}
+      ${incompletos.length ? `
+      <div class="alert-max">
+        ⚠ ${incompletos.length} talhão(ões) fora do ranking por dados incompletos na janela de ${janela} anos: ${incompletos.map(r=>r.talhao).join(', ')}.
+      </div>` : ''}
+    </div>`;
+  }
+
+  const temSequeiro = grupos.Sequeiro.length>0;
+  const temIrrigado = grupos.Irrigado.length>0;
+
+  container.innerHTML = `
+  <style>
+    .maximas-selectbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;background:var(--paper);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:18px;}
+    .maximas-selectbar .fitem{min-width:220px;}
+    .maximas-selectbar select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--ink);}
+    .maximas-nav{display:flex;align-items:center;gap:8px;}
+    .maximas-nav button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink-soft);}
+    .maximas-nav button:disabled{opacity:.35;cursor:default;}
+    .maximas-nav .count{font-size:12px;color:var(--ink-soft);white-space:nowrap;}
+    .janela-ctrl{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 14px;}
+    .janela-ctrl span{font-size:12.5px;color:var(--ink-soft);white-space:nowrap;}
+    .janela-ctrl b{color:var(--ink);}
+    .janela-ctrl button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:14px;line-height:1;cursor:pointer;color:var(--green-deep);font-weight:700;}
+    .janela-ctrl button:disabled{opacity:.3;cursor:default;}
+    .sistemas-max-grid{display:grid;grid-template-columns:${temSequeiro && temIrrigado ? '1fr 1fr' : '1fr'};gap:16px;}
+    .demo-card-max{background:var(--paper);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px;}
+    .max-card-head h3{margin:2px 0 3px;font-size:16px;}
+    .max-card-head .sub-sm{font-size:12px;color:var(--ink-soft);margin:0 0 4px;}
+    .medias-linha{font-size:11px;color:var(--teal);margin:0 0 12px;}
+    .rank-badge-ld{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--amber-soft);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;}
+    .ver-todos-max{margin-top:10px;background:none;border:none;color:var(--teal);font-weight:600;font-size:12.5px;cursor:pointer;padding:4px 0;}
+    .tabela-completa-max{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;}
+    .alert-max{background:var(--red-soft);border:1px solid #e0b3ac;border-radius:8px;padding:9px 12px;margin-top:12px;font-size:12px;color:#7a2118;line-height:1.5;}
+  </style>
+
+  <div class="maximas-selectbar">
+    <div class="fitem">
+      <label>Cliente</label>
+      <select id="maxCliSelect">
+        ${clientes.map(c=>`<option value="${encodeURIComponent(c)}" ${c===state.maximasCliente?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fitem">
+      <label>Fazenda</label>
+      <select id="maxFazSelect">
+        ${fazendasDoCliente.map(f=>`<option value="${encodeURIComponent(f)}" ${f===state.maximasFazenda?'selected':''}>${f}</option>`).join('')}
+      </select>
+    </div>
+    <div class="maximas-nav">
+      <button id="maxFazPrev" ${idxFazenda<=0?'disabled':''}>◀ fazenda anterior</button>
+      <span class="count">Fazenda ${idxFazenda+1} de ${fazendasDoCliente.length}</span>
+      <button id="maxFazNext" ${idxFazenda>=fazendasDoCliente.length-1?'disabled':''}>próxima fazenda ▶</button>
+    </div>
+    <div class="janela-ctrl">
+      <span>Janela: <b>${janela} anos</b> (${SAFRA_LABELS[safraKeys[0]]} → ${SAFRA_LABELS[safraKeys[safraKeys.length-1]]})</span>
+      <button id="maxJanelaMenos" ${janela<=3?'disabled':''}>−</button>
+      <button id="maxJanelaMais" ${janela>=6?'disabled':''}>+</button>
+    </div>
+  </div>
+
+  <div class="sistemas-max-grid">
+    ${cardSistemaHtml('Sequeiro', grupos.Sequeiro)}
+    ${cardSistemaHtml('Irrigado', grupos.Irrigado)}
+  </div>
+  ${(!temSequeiro && !temIrrigado) ? '<p class="sub">Nenhum talhão com Sistema reconhecido (Sequeiro/Irrigado) nessa fazenda.</p>' : ''}
+  `;
+
+  container.querySelector('#maxCliSelect').addEventListener('change', e=>{
+    state.maximasCliente = decodeURIComponent(e.target.value);
+    state.maximasFazenda = null; // reseta pra pegar a primeira fazenda do novo cliente
+    renderMaximas();
+  });
+  container.querySelector('#maxFazSelect').addEventListener('change', e=>{
+    state.maximasFazenda = decodeURIComponent(e.target.value);
+    renderMaximas();
+  });
+  const prevBtn = container.querySelector('#maxFazPrev');
+  if(prevBtn) prevBtn.addEventListener('click', ()=>{
+    if(idxFazenda>0){ state.maximasFazenda = fazendasDoCliente[idxFazenda-1]; renderMaximas(); }
+  });
+  const nextBtn = container.querySelector('#maxFazNext');
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{
+    if(idxFazenda<fazendasDoCliente.length-1){ state.maximasFazenda = fazendasDoCliente[idxFazenda+1]; renderMaximas(); }
+  });
+  const menosBtn = container.querySelector('#maxJanelaMenos');
+  if(menosBtn) menosBtn.addEventListener('click', ()=>{
+    if(state.maximasJanela>3){ state.maximasJanela--; renderMaximas(); }
+  });
+  const maisBtn = container.querySelector('#maxJanelaMais');
+  if(maisBtn) maisBtn.addEventListener('click', ()=>{
+    if(state.maximasJanela<6){ state.maximasJanela++; renderMaximas(); }
+  });
+  container.querySelectorAll('.ver-todos-max').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const alvo = container.querySelector(`#tabelaCompleta-${btn.dataset.sistema}`);
+      if(!alvo) return;
+      const aberto = alvo.style.display !== 'none';
+      alvo.style.display = aberto ? 'none' : 'block';
+      btn.textContent = `Ver ranking completo (${alvo.querySelectorAll('tbody tr').length} talhões) ${aberto ? '▾' : '▴'}`;
+    });
+  });
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
