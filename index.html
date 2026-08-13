@@ -2182,6 +2182,12 @@ async function carregarDadosDoSupabase(){
         dose_oxido: (d.dose_oxido!=null && d.dose_oxido!=='') ? parseFloat(d.dose_oxido) : 0,
         dose_calcario: (d.dose_calcario!=null && d.dose_calcario!=='') ? parseFloat(d.dose_calcario) : 0,
         status: d.status || 'Sem Informação',
+        // cronograma (mesmo jsonb do Óxido de Magnésio, campos próprios prefixados)
+        crono_participacao: d.crono_participacao ?? null,
+        crono_etapa1: d.crono_etapa1 ?? null,
+        crono_etapa2: d.crono_etapa2 ?? null,
+        crono_etapa3: d.crono_etapa3 ?? null,
+        crono_etapa4: d.crono_etapa4 ?? null,
         // campos do Máximas Produtividades / Ladrões (jsonb próprio, projeto separado)
         max_sistema: dm.sistema ?? null,
         max_prod_20_21: dm.prod_20_21 ?? null,
@@ -2202,7 +2208,20 @@ async function carregarDadosDoSupabase(){
     state.selectedCulturas = new Set();
     state.drillEstado = null; state.drillCliente = null;
     state.statusNegSel = null; state.statusNegConsultor = 'Todos'; state.statusNegResumoOpen = false;
-    state.cronograma = {}; state.cronogramaPage = 1; state.cronogramaMsg = '';
+    state.cronograma = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = r.crono_participacao!=null || ETAPA_KEYS.some(k=>r['crono_'+k]!=null);
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      state.cronograma[key] = {
+        participacao: r.crono_participacao || 'Pendente',
+        etapa1: r.crono_etapa1 || 'Pendente',
+        etapa2: r.crono_etapa2 || 'Pendente',
+        etapa3: r.crono_etapa3 || 'Pendente',
+        etapa4: r.crono_etapa4 || 'Pendente',
+      };
+    });
+    state.cronogramaPage = 1; state.cronogramaMsg = '';
     state.talhoesSelecionados = new Set(); state.talhoesResumoOpen = false;
 
     const baseInfoEl = document.getElementById('dashMgBaseInfo');
@@ -4687,6 +4706,44 @@ function renderMaximas(){
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
+async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+  if(!rec || !projetosIds['oxido-magnesio']){
+    if(selEl){ selEl.style.outline = '2px solid var(--red)'; setTimeout(()=> selEl.style.outline='', 1500); }
+    return;
+  }
+
+  // reconstrói o jsonb inteiro do talhão nesse projeto, preservando os campos do Óxido já existentes
+  const dados = {
+    mg_solo: rec.mg ?? null,
+    ano_analise: rec.ano ?? null,
+    dose_oxido: rec.dose_oxido ?? null,
+    dose_calcario: rec.dose_calcario ?? null,
+    status: rec.status && rec.status!=='Sem Informação' ? rec.status : null,
+    crono_participacao: etapaKey==='participacao' ? valor : (rec.crono_participacao ?? null),
+    crono_etapa1: etapaKey==='etapa1' ? valor : (rec.crono_etapa1 ?? null),
+    crono_etapa2: etapaKey==='etapa2' ? valor : (rec.crono_etapa2 ?? null),
+    crono_etapa3: etapaKey==='etapa3' ? valor : (rec.crono_etapa3 ?? null),
+    crono_etapa4: etapaKey==='etapa4' ? valor : (rec.crono_etapa4 ?? null),
+  };
+
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+
+  if(error){
+    console.error(error);
+    if(selEl){ selEl.style.outline = '2px solid var(--red)'; setTimeout(()=> selEl.style.outline='', 2000); }
+    return;
+  }
+
+  // atualiza o rec em memória pra próximos saves não perderem o valor
+  rec['crono_'+etapaKey] = valor;
+  if(selEl){ selEl.style.outline = '2px solid var(--lime)'; setTimeout(()=> selEl.style.outline='', 900); }
+}
+
 function renderCronograma(){
   const container = document.getElementById('tab-cronograma');
 
@@ -4786,6 +4843,7 @@ function renderCronograma(){
       const map = kind==='participacao' ? PARTICIPACAO_COLOR_MAP : ETAPA_COLOR_MAP;
       sel.style.cssText += cronoSelectStyle(map, sel.value);
       // não precisa re-renderizar tudo — só recolore o próprio select, mantém posição de scroll
+      salvarCronogramaCampo(key, etapaKey, sel.value, sel);
     });
   });
 
