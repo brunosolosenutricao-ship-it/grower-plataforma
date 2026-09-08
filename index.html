@@ -695,7 +695,6 @@ const GERAL_CAMPOS = [
   { key:'p_meh_20_40', label:'P (Meh-1) 20-40cm', type:'number' },
   { key:'m_20_40', label:'m (%) 20-40cm', type:'number' },
   { key:'ano_analise_solo', label:'Ano da análise de solo', type:'number' },
-  { key:'mg_solo', label:'Mg solo', type:'number' },
   { key:'geral_prod_20_21', label:'20/21', type:'number' },
   { key:'geral_prod_21_22', label:'21/22', type:'number' },
   { key:'geral_prod_22_23', label:'22/23', type:'number' },
@@ -712,7 +711,7 @@ const PROJETOS_CONFIG = [
     slug: 'oxido-magnesio',
     badge: '🏷️ Óxido de Magnésio',
     campos: [
-      { key:'mg_solo', label:'Mg solo', type:'mirror', mirrorFrom:'mg_solo' },
+      { key:'mg_solo', label:'Mg solo', type:'mirror', mirrorFrom:'mg_0_20' },
       { key:'ano_analise', label:'ANO', type:'mirror', mirrorFrom:'ano_analise_solo' },
       { key:'dose_oxido', label:'Dose Óxido', type:'number' },
       { key:'dose_calcario', label:'Dose Calcário', type:'number' },
@@ -2246,7 +2245,7 @@ async function carregarDadosDoSupabase(){
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
     const { data: talhoes, error: errT } = await fetchAllPaginated(
-      'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, mg_solo, ano_analise_solo, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
+      'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, mg_0_20, ano_analise_solo, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
     );
     if(errT) throw errT;
 
@@ -2281,7 +2280,7 @@ async function carregarDadosDoSupabase(){
       const d = dadosMap[t.id] || {};
       const dm = dadosMapMax[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
-      const mgNum = (t.mg_solo!=null && t.mg_solo!=='') ? parseFloat(t.mg_solo) : null;
+      const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
       const pais = estado.toUpperCase()==='PY' ? 'Paraguai' : 'Brasil';
       const rec = {
