@@ -123,8 +123,12 @@
   .group-mestre{background:var(--bg);color:var(--ink-soft);}
   .group-geral{background:#eef0e4;color:var(--ink-soft);}
   .group-projeto{background:var(--lime-soft);color:var(--green-deep);}
-  .group-projeto:nth-of-type(4){background:var(--teal-soft,#d7e8e8);color:var(--teal);}
-  .group-projeto:nth-of-type(5){background:var(--amber-soft);color:#7a5b1c;}
+  .proj-color-0{background:var(--lime-soft);color:var(--green-deep);}
+  .proj-color-1{background:var(--teal-soft,#d7e8e8);color:var(--teal);}
+  .proj-color-2{background:var(--amber-soft);color:#7a5b1c;}
+  .proj-color-3{background:#e3d9f0;color:#5b3d8a;}
+  .proj-color-4{background:#fbdbd3;color:#a4432a;}
+  .proj-color-5{background:#d6e8f7;color:#2c5f8a;}
   .loading-msg{font-size:13px;color:var(--ink-soft);text-align:center;padding:30px 0;}
 
   .cell-input{width:78px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.3px;background:#fff;}
@@ -704,6 +708,13 @@ const GERAL_CAMPOS = [
   { key:'geral_media_prod', label:'Média', type:'number' },
   { key:'geral_sinaleiro', label:'Sinaleiro', type:'sinaleiro' },
   { key:'geral_avaliacao_individual', label:'Avaliação individual', type:'text' },
+  { key:'cidade', label:'Cidade', type:'text' },
+  { key:'cultivar', label:'Cultivar', type:'text' },
+  { key:'historico_produtivo', label:'Histórico produtivo', type:'text' },
+  { key:'tipo_coleta', label:'Tipo de coleta', type:'select', options:['Grid 3','Convencional'] },
+  { key:'forma_inoculacao', label:'Forma de Inoculação', type:'select', options:['JD','TS'] },
+  { key:'producao_onfarm_biologicos', label:'Produção OnFarm Biológicos', type:'select', options:['Sim','Não'] },
+  { key:'data_plantio', label:'Data de plantio', type:'date' },
 ];
 
 const PROJETOS_CONFIG = [
@@ -1166,6 +1177,9 @@ function renderAlimentacaoTable(){
       const cor = sinaleiroColor(v);
       return `<span class="mirror-value" title="Editado no Geral (Cadastro)"><span class="sinaleiro-dot" style="background:${cor};display:inline-block;"></span> ${v ?? '—'}</span>`;
     }
+    if(campo.type==='date'){
+      return `<input type="date" class="cell-input" data-field="${campo.key}" value="${valor ?? ''}">`;
+    }
     if(campo.type==='select'){
       return `<select class="cell-input" data-field="${campo.key}">
         ${campo.options.map(o=>`<option value="${o}" ${valor===o?'selected':''}>${o}</option>`).join('')}
@@ -1206,7 +1220,7 @@ function renderAlimentacaoTable(){
           <tr>
             <th colspan="4" class="group-head group-mestre">Cadastro Mestre</th>
             <th colspan="${1+GERAL_CAMPOS.length}" class="group-head group-geral">Geral</th>
-            ${PROJETOS_CONFIG.map(p=>`<th colspan="${p.campos.length}" class="group-head group-projeto">${p.badge}</th>`).join('')}
+            ${PROJETOS_CONFIG.map((p,i)=>`<th colspan="${p.campos.length}" class="group-head group-projeto proj-color-${i%6}">${p.badge}</th>`).join('')}
             <th></th>
           </tr>
           <tr>
@@ -1349,7 +1363,7 @@ document.getElementById('exportBtn').addEventListener('click', exportarExcel);
 async function exportarExcel(){
   if(!currentConsultor) return;
   const { data: talhoes, error } = await fetchAllPaginated(
-    'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, posicao',
+    'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
     (q)=> q.eq('consultor', currentConsultor).order('posicao', {ascending:true, nullsFirst:false}).order('cliente', {ascending:true})
   );
   if(error){ alert('Erro ao exportar: ' + error.message); return; }
@@ -1372,9 +1386,13 @@ async function exportarExcel(){
       Consultor: t.consultor, Cliente: t.cliente, Estado: t.estado || '', Fazenda: t.fazenda, Talhão: t.talhao,
       'Área (ha)': t.area_ha, Cultura: t.cultura || '',
     };
+    GERAL_CAMPOS.forEach(c=>{ row[c.label] = t[c.key] ?? ''; });
     PROJETOS_CONFIG.forEach(proj=>{
       const d = dadosPorProjeto[proj.slug][t.id] || {};
-      proj.campos.forEach(c=>{ row[c.label] = d[c.key] ?? ''; });
+      proj.campos.forEach(c=>{
+        if(c.type==='mirror' || c.type==='mirror-sinaleiro'){ row[c.label] = t[c.mirrorFrom] ?? ''; return; }
+        row[c.label] = d[c.key] ?? '';
+      });
     });
     return row;
   });
@@ -1420,8 +1438,9 @@ async function processarImportacao(file){
         area: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('area')),
         cultura: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('cultura')),
       };
-      const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos);
+      const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos).filter(c=> c.type!=='mirror' && c.type!=='mirror-sinaleiro');
       todosCampos.forEach(c=>{ idx[c.key] = encontrarColunaPorLabel(headerRow, c.label); });
+      GERAL_CAMPOS.forEach(c=>{ idx[c.key] = encontrarColunaPorLabel(headerRow, c.label); });
 
       if(idx.cliente===-1 || idx.fazenda===-1 || idx.talhao===-1){
         alert('Não encontrei as colunas Cliente/Fazenda/Talhão nesse arquivo.');
@@ -1446,12 +1465,17 @@ async function processarImportacao(file){
           const raw = r[idx[c.key]];
           linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null ? String(raw).trim() : null);
         });
+        GERAL_CAMPOS.forEach(c=>{
+          if(idx[c.key]===-1){ linha[c.key] = undefined; return; }
+          const raw = r[idx[c.key]];
+          linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null ? String(raw).trim() : null);
+        });
         linhasExcel.push(linha);
       }
 
       // base atual no banco pra esse consultor (identidade)
       const { data: talhoesAtuais, error: errT } = await fetchAllPaginated(
-        'talhoes', 'id, cliente, estado, fazenda, talhao, area_ha, cultura, posicao',
+        'talhoes', 'id, cliente, estado, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
         (q)=> q.eq('consultor', currentConsultor)
       );
       if(errT){ alert('Erro ao ler base atual: ' + errT.message); return; }
@@ -1485,6 +1509,7 @@ async function processarImportacao(file){
         if(!existente){
           // campo ausente numa linha nova vira null (não tem valor anterior pra herdar)
           todosCampos.forEach(c=>{ if(l[c.key]===undefined) l[c.key] = null; });
+          GERAL_CAMPOS.forEach(c=>{ if(l[c.key]===undefined) l[c.key] = null; });
           novos.push(l);
         } else {
           // se a coluna não veio no arquivo, preserva o valor que já existe (nunca apaga por ausência de coluna)
@@ -1493,6 +1518,7 @@ async function processarImportacao(file){
           if(idx.cultura===-1) l.cultura = existente.cultura || null;
           const dAtual = dAtualMap[existente.id] || {};
           todosCampos.forEach(c=>{ if(l[c.key]===undefined) l[c.key] = dAtual[c.key] ?? null; });
+          GERAL_CAMPOS.forEach(c=>{ if(l[c.key]===undefined) l[c.key] = existente[c.key] ?? null; });
 
           const mudancas = [];
           if((parseFloat(existente.area_ha)||null) !== (l.area_ha ?? null)) mudancas.push(`Área: ${existente.area_ha ?? '—'} → ${l.area_ha ?? '—'}`);
@@ -1501,6 +1527,9 @@ async function processarImportacao(file){
           if((existente.posicao ?? null) !== (l.__posicao ?? null)) mudancas.push(`Posição na lista mudou (linha ${l.__posicao + 1} do arquivo)`);
           todosCampos.forEach(c=>{
             if((dAtual[c.key] ?? null) !== (l[c.key] ?? null)) mudancas.push(`${c.label}: ${dAtual[c.key] ?? '—'} → ${l[c.key] ?? '—'}`);
+          });
+          GERAL_CAMPOS.forEach(c=>{
+            if((existente[c.key] ?? null) !== (l[c.key] ?? null)) mudancas.push(`${c.label}: ${existente[c.key] ?? '—'} → ${l[c.key] ?? '—'}`);
           });
           if(mudancas.length) atualizados.push({ id: existente.id, linha: l, mudancas });
         }
@@ -1562,10 +1591,14 @@ async function confirmarImportacao(plan){
   try{
     // 1) novos talhões
     if(plan.novos.length){
-      const insertRows = plan.novos.map(l=>({
-        consultor: currentConsultor, cliente: l.cliente, estado: l.estado, fazenda: l.fazenda,
-        talhao: l.talhao, area_ha: l.area_ha, cultura: l.cultura, posicao: l.__posicao,
-      }));
+      const insertRows = plan.novos.map(l=>{
+        const row = {
+          consultor: currentConsultor, cliente: l.cliente, estado: l.estado, fazenda: l.fazenda,
+          talhao: l.talhao, area_ha: l.area_ha, cultura: l.cultura, posicao: l.__posicao,
+        };
+        GERAL_CAMPOS.forEach(c=>{ row[c.key] = l[c.key] ?? null; });
+        return row;
+      });
       const { data: inseridos, error: errIns } = await sb.from('talhoes').insert(insertRows).select('id, cliente, fazenda, talhao');
       if(errIns) throw errIns;
 
@@ -1573,7 +1606,7 @@ async function confirmarImportacao(plan){
         const dadosNovos = inseridos.map(t=>{
           const original = plan.novos.find(l=> normalize(l.cliente)===normalize(t.cliente) && normalize(l.fazenda)===normalize(t.fazenda) && normalize(l.talhao)===normalize(t.talhao));
           const dados = {};
-          proj.campos.forEach(c=>{ dados[c.key] = original[c.key] ?? null; });
+          proj.campos.forEach(c=>{ if(c.type!=='mirror' && c.type!=='mirror-sinaleiro') dados[c.key] = original[c.key] ?? null; });
           return {
             talhao_id: t.id, projeto_id: projetosIds[proj.slug], dados,
             updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
@@ -1588,18 +1621,22 @@ async function confirmarImportacao(plan){
 
     // 2) atualizados
     if(plan.atualizados.length){
-      const updatesTalhoes = plan.atualizados.map(a=>({
-        id: a.id, consultor: currentConsultor, cliente: a.linha.cliente, estado: a.linha.estado,
-        fazenda: a.linha.fazenda, talhao: a.linha.talhao, area_ha: a.linha.area_ha, cultura: a.linha.cultura,
-        posicao: a.linha.__posicao,
-      }));
+      const updatesTalhoes = plan.atualizados.map(a=>{
+        const row = {
+          id: a.id, consultor: currentConsultor, cliente: a.linha.cliente, estado: a.linha.estado,
+          fazenda: a.linha.fazenda, talhao: a.linha.talhao, area_ha: a.linha.area_ha, cultura: a.linha.cultura,
+          posicao: a.linha.__posicao,
+        };
+        GERAL_CAMPOS.forEach(c=>{ row[c.key] = a.linha[c.key] ?? null; });
+        return row;
+      });
       const { error: errUpd } = await sb.from('talhoes').upsert(updatesTalhoes, { onConflict: 'id' });
       if(errUpd) throw errUpd;
 
       for(const proj of PROJETOS_CONFIG){
         const updatesDados = plan.atualizados.map(a=>{
           const dados = {};
-          proj.campos.forEach(c=>{ dados[c.key] = a.linha[c.key] ?? null; });
+          proj.campos.forEach(c=>{ if(c.type!=='mirror' && c.type!=='mirror-sinaleiro') dados[c.key] = a.linha[c.key] ?? null; });
           return {
             talhao_id: a.id, projeto_id: projetosIds[proj.slug], dados,
             updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
@@ -1670,10 +1707,37 @@ async function abrirPainelAddTalhao(){
             ${CULTURA_OPTIONS.map(c=>`<option value="${c}">${c}</option>`).join('')}
           </select></div>
 
+          <div class="form-section-label">Geral (Cadastro) — opcional</div>
+          ${GERAL_CAMPOS.map(c=>{
+            const inputId = 'ft_'+c.key;
+            if(c.type==='select'){
+              return `<div><label>${c.label}</label><select id="${inputId}">
+                <option value="">—</option>
+                ${c.options.map(o=>`<option value="${o}">${o}</option>`).join('')}
+              </select></div>`;
+            }
+            if(c.type==='sinaleiro'){
+              return `<div><label>${c.label}</label>
+                <div class="sinaleiro-wrap">
+                  <input type="text" inputmode="decimal" id="${inputId}" oninput="atualizarSinaleiroDot(this)">
+                  <span class="sinaleiro-dot" style="background:#d9d9d4"></span>
+                </div>
+              </div>`;
+            }
+            if(c.type==='date'){
+              return `<div><label>${c.label}</label><input type="date" id="${inputId}"></div>`;
+            }
+            const inputMode = c.type==='number' ? 'decimal' : 'text';
+            return `<div><label>${c.label}</label><input type="text" inputmode="${inputMode}" id="${inputId}"></div>`;
+          }).join('')}
+
           ${PROJETOS_CONFIG.map(proj=>`
             <div class="form-section-label">${proj.badge} (opcional)</div>
             ${proj.campos.map(c=>{
               const inputId = 'ft_'+c.key;
+              if(c.type==='mirror' || c.type==='mirror-sinaleiro'){
+                return ''; // preenchido no Geral (Cadastro) acima, não duplica input aqui
+              }
               if(c.type==='select'){
                 return `<div><label>${c.label}</label><select id="${inputId}">
                   ${c.options.map(o=>`<option value="${o}">${o}</option>`).join('')}
@@ -1756,9 +1820,21 @@ async function salvarNovoTalhaoRapido(clientesConhecidos, renderPainel){
   }
 
   const { data: { user } } = await sb.auth.getUser();
+
+  // Geral (Cadastro) — colunas reais na tabela talhoes
+  const geralUpdate = {};
+  GERAL_CAMPOS.forEach(c=>{
+    const el = document.getElementById('ft_'+c.key);
+    if(el) geralUpdate[c.key] = c.type==='number' ? parseNum(el.value) : (el.value || null);
+  });
+  if(Object.keys(geralUpdate).length){
+    await sb.from('talhoes').update(geralUpdate).eq('id', inserido.id);
+  }
+
   for(const proj of PROJETOS_CONFIG){
     const dados = {};
     proj.campos.forEach(c=>{
+      if(c.type==='mirror' || c.type==='mirror-sinaleiro') return; // vive no Geral, já gravado acima
       const el = document.getElementById('ft_'+c.key);
       dados[c.key] = c.type==='number' ? parseNum(el.value) : (el.value || null);
     });
@@ -1899,7 +1975,7 @@ function mostrarPreviewImportacaoMassa(plan){
     <div class="modal-panel">
       <h2>Prévia da importação em massa</h2>
       <p class="sub" style="margin-top:-8px;color:var(--red);font-size:13px;font-weight:600;">
-        ⚠️ Isso vai apagar todos os ${totalAtual} registro(s) atuais do projeto Óxido de Magnésio e substituir pelos dados dessa planilha. Nada foi gravado ainda.
+        ⚠️ Isso vai apagar Dose Óxido, Dose Calcário e Status atuais (${totalAtual} registro(s)) e substituir pelos dados dessa planilha. Mg e Ano da análise são gravados direto no Cadastro Geral (não são apagados, só atualizados quando vierem preenchidos na planilha). Nada foi gravado ainda.
       </p>
 
       <div class="diff-section">
@@ -1938,10 +2014,10 @@ async function confirmarImportacaoMassa(plan){
     if(errDel) throw errDel;
 
     // 2) recria em lotes de 500 (evita payload gigante numa chamada só)
+    // Mg solo e Ano da análise NÃO entram mais aqui — moraram pro Geral (Cadastro), atualizados no passo 3
     const novos = plan.encontrados.map(e=>({
       talhao_id: e.talhao_id, projeto_id: projetosIds['oxido-magnesio'],
       dados: {
-        mg_solo: e.linha.mg_solo, ano_analise: e.linha.ano_analise,
         dose_oxido: e.linha.dose_oxido, dose_calcario: e.linha.dose_calcario, status: e.linha.status,
       },
       updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
@@ -1953,16 +2029,21 @@ async function confirmarImportacaoMassa(plan){
       if(errIns) throw errIns;
     }
 
-    // 3) atualiza Cultura em talhoes (só quando a coluna existia no arquivo — nunca apaga por ausência)
-    // usa UPDATE (não upsert) — upsert exigiria as colunas NOT NULL (consultor etc.) mesmo já existindo a linha
-    const culturaUpdates = plan.encontrados
-      .filter(e=> e.linha.cultura != null)
-      .map(e=>({ id: e.talhao_id, cultura: e.linha.cultura }));
+    // 3) atualiza Cultura, Mg (0-20cm) e Ano da análise em talhoes (Geral) — só quando vieram preenchidos na planilha
+    const geralUpdates = plan.encontrados
+      .filter(e=> e.linha.cultura != null || e.linha.mg_solo != null || e.linha.ano_analise != null)
+      .map(e=>{
+        const upd = { id: e.talhao_id };
+        if(e.linha.cultura != null) upd.cultura = e.linha.cultura;
+        if(e.linha.mg_solo != null) upd.mg_0_20 = e.linha.mg_solo;
+        if(e.linha.ano_analise != null) upd.ano_analise_solo = e.linha.ano_analise;
+        return upd;
+      });
     const CONCORRENCIA = 20;
-    for(let i=0;i<culturaUpdates.length;i+=CONCORRENCIA){
-      const bloco = culturaUpdates.slice(i, i+CONCORRENCIA);
+    for(let i=0;i<geralUpdates.length;i+=CONCORRENCIA){
+      const bloco = geralUpdates.slice(i, i+CONCORRENCIA);
       const resultados = await Promise.all(
-        bloco.map(u=> sb.from('talhoes').update({ cultura: u.cultura }).eq('id', u.id))
+        bloco.map(u=>{ const { id, ...campos } = u; return sb.from('talhoes').update(campos).eq('id', id); })
       );
       const comErro = resultados.find(r=>r.error);
       if(comErro) throw comErro.error;
