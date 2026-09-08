@@ -2234,6 +2234,7 @@ const state = {
   maximasJanela: 3,         // quantidade de safras mais recentes consideradas (3 a 6)
   colunasOcultas: new Set(), // slugs de projeto com colunas ocultas na Alimentação (tipo agrupar do Excel)
 };
+window.state = state; // a Alimentação (outro <script>) precisa enxergar esse objeto — let/const não cruza scripts sozinho
 
 function defaultTalhoesFilters(){
   return {
