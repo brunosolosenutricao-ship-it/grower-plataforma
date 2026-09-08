@@ -133,6 +133,13 @@
 
   .cell-input{width:78px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.3px;background:#fff;}
   .mirror-value{display:inline-flex;align-items:center;gap:4px;font-size:12.3px;color:var(--ink-soft);font-style:italic;padding:5px 2px;white-space:nowrap;}
+  .subgroup-head{font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;text-align:center;padding:3px 4px;}
+  .subgroup-solo1{background:#e6efe0;color:#3d6b2e;}
+  .subgroup-solo2{background:#dfeaf3;color:#2c5f8a;}
+  .subgroup-historico{background:#f6ece0;color:#8a5a2c;}
+  .proj-toggle-btn{border:none;background:rgba(0,0,0,.08);color:inherit;border-radius:4px;width:16px;height:16px;font-size:10px;line-height:1;cursor:pointer;margin-right:4px;vertical-align:middle;}
+  .proj-toggle-btn:hover{background:rgba(0,0,0,.18);}
+  .col-oculta{color:var(--ink-soft);text-align:center;font-size:11px;}
   .cell-input:focus{outline:none;border-color:var(--teal);}
   select.cell-input{width:130px;}
   .sinaleiro-wrap{display:flex;align-items:center;gap:6px;}
@@ -673,48 +680,51 @@ const STATUS_OPTIONS = ['Sem Informação','Sem Reunião','Não comprado','Em An
 // Campos do Geral (Cadastro) que viraram colunas reais na tabela talhoes —
 // análise de solo, histórico produtivo e Mg solo. Editados só aqui; Máximas/Óxido
 // só espelham (leitura) os campos que migraram pra cá.
+const SUBGRUPO_LABELS = {
+  solo1: 'Análise de solo 0-20cm',
+  solo2: 'Análise de solo 20-40cm',
+  historico: 'Histórico Produtivo',
+};
 const GERAL_CAMPOS = [
-  { key:'argila_0_20', label:'Argila (%) 0-20cm', type:'number' },
-  { key:'p_resina_0_20', label:'P (resina) 0-20cm', type:'number' },
-  { key:'p_meh_0_20', label:'P (Meh-1) 0-20cm', type:'number' },
-  { key:'k_0_20', label:'K (mg) 0-20cm', type:'number' },
-  { key:'ca_0_20', label:'Ca (cmol) 0-20cm', type:'number' },
-  { key:'mg_0_20', label:'Mg (cmol) 0-20cm', type:'number' },
-  { key:'ctc_0_20', label:'CTC (cmol) 0-20cm', type:'number' },
-  { key:'v_0_20', label:'V (%) 0-20cm', type:'number' },
-  { key:'m_0_20', label:'m % 0-20cm', type:'number' },
-  { key:'s_0_20', label:'S (mg) 0-20cm', type:'number' },
-  { key:'mn_0_20', label:'Mn (mg) 0-20cm', type:'number' },
-  { key:'zn_0_20', label:'Zn (mg) 0-20cm', type:'number' },
-  { key:'cu_0_20', label:'Cu (mg) 0-20cm', type:'number' },
-  { key:'b_0_20', label:'B (mg) 0-20cm', type:'number' },
-  { key:'ph_0_20', label:'pH (CaCl2) 0-20cm', type:'number' },
-  { key:'mos_0_20', label:'MOS 0-20cm', type:'number' },
-  { key:'ca_20_40', label:'Ca (cmol) 20-40cm', type:'number' },
-  { key:'mg_20_40', label:'Mg (cmol) 20-40cm', type:'number' },
-  { key:'ctc_20_40', label:'CTC (cmol) 20-40cm', type:'number' },
-  { key:'v_20_40', label:'V (%) 20-40cm', type:'number' },
-  { key:'s_20_40', label:'S (mg) 20-40cm', type:'number' },
-  { key:'p_resina_20_40', label:'P (resina) 20-40cm', type:'number' },
-  { key:'p_meh_20_40', label:'P (Meh-1) 20-40cm', type:'number' },
-  { key:'m_20_40', label:'m (%) 20-40cm', type:'number' },
-  { key:'ano_analise_solo', label:'Ano da análise de solo', type:'number' },
-  { key:'geral_prod_20_21', label:'20/21', type:'number' },
-  { key:'geral_prod_21_22', label:'21/22', type:'number' },
-  { key:'geral_prod_22_23', label:'22/23', type:'number' },
-  { key:'geral_prod_23_24', label:'23/24', type:'number' },
-  { key:'geral_prod_24_25', label:'24/25', type:'number' },
-  { key:'geral_prod_25_26', label:'25/26', type:'number' },
-  { key:'geral_media_prod', label:'Média', type:'number' },
-  { key:'geral_sinaleiro', label:'Sinaleiro', type:'sinaleiro' },
-  { key:'geral_avaliacao_individual', label:'Avaliação individual', type:'text' },
-  { key:'cidade', label:'Cidade', type:'text' },
   { key:'cultivar', label:'Cultivar', type:'text' },
-  { key:'historico_produtivo', label:'Histórico produtivo', type:'text' },
-  { key:'tipo_coleta', label:'Tipo de coleta', type:'select', options:['Grid 3','Convencional'] },
+  { key:'data_plantio', label:'Data de plantio', type:'date' },
   { key:'forma_inoculacao', label:'Forma de Inoculação', type:'select', options:['JD','TS'] },
   { key:'producao_onfarm_biologicos', label:'Produção OnFarm Biológicos', type:'select', options:['Sim','Não'] },
-  { key:'data_plantio', label:'Data de plantio', type:'date' },
+  { key:'argila_0_20', label:'Argila (%) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'p_resina_0_20', label:'P (resina) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'p_meh_0_20', label:'P (Meh-1) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'k_0_20', label:'K (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'ca_0_20', label:'Ca (cmol) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'mg_0_20', label:'Mg (cmol) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'ctc_0_20', label:'CTC (cmol) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'v_0_20', label:'V (%) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'m_0_20', label:'m % 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'s_0_20', label:'S (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'mn_0_20', label:'Mn (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'zn_0_20', label:'Zn (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'cu_0_20', label:'Cu (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'b_0_20', label:'B (mg) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'ph_0_20', label:'pH (CaCl2) 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'mos_0_20', label:'MOS 0-20cm', type:'number', subgrupo:'solo1' },
+  { key:'ca_20_40', label:'Ca (cmol) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'mg_20_40', label:'Mg (cmol) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'ctc_20_40', label:'CTC (cmol) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'v_20_40', label:'V (%) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'s_20_40', label:'S (mg) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'p_resina_20_40', label:'P (resina) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'p_meh_20_40', label:'P (Meh-1) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'m_20_40', label:'m (%) 20-40cm', type:'number', subgrupo:'solo2' },
+  { key:'ano_analise_solo', label:'Ano da análise de solo', type:'number' },
+  { key:'tipo_coleta', label:'Tipo de coleta', type:'select', options:['Grid 3','Convencional'] },
+  { key:'geral_prod_20_21', label:'20/21', type:'number', subgrupo:'historico' },
+  { key:'geral_prod_21_22', label:'21/22', type:'number', subgrupo:'historico' },
+  { key:'geral_prod_22_23', label:'22/23', type:'number', subgrupo:'historico' },
+  { key:'geral_prod_23_24', label:'23/24', type:'number', subgrupo:'historico' },
+  { key:'geral_prod_24_25', label:'24/25', type:'number', subgrupo:'historico' },
+  { key:'geral_prod_25_26', label:'25/26', type:'number', subgrupo:'historico' },
+  { key:'geral_media_prod', label:'Média', type:'number', subgrupo:'historico' },
+  { key:'geral_sinaleiro', label:'Sinaleiro', type:'sinaleiro', subgrupo:'historico' },
+  { key:'geral_avaliacao_individual', label:'Avaliação individual', type:'text', subgrupo:'historico' },
 ];
 
 const PROJETOS_CONFIG = [
@@ -1034,7 +1044,7 @@ async function loadAlimentacao(){
 
   // busca TODOS os talhões desse consultor de uma vez (uma consulta leve, mesmo pro Felipe com ~925)
   const { data: talhoes, error } = await fetchAllPaginated(
-    'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
+    'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
     (q)=> q.eq('consultor', currentConsultor).order('posicao', {ascending:true, nullsFirst:false}).order('cliente', {ascending:true})
   );
   if(error){
@@ -1064,7 +1074,7 @@ async function loadAlimentacao(){
   // a partir daqui, busca/filtro/paginação são só sobre esse array, sem tocar o banco de novo.
   todosTalhoesConsultor = talhoes.map(t=>{
     const flat = {
-      id: t.id, consultor: t.consultor, cliente: t.cliente, estado: t.estado, fazenda: t.fazenda, talhao: t.talhao,
+      id: t.id, consultor: t.consultor, cliente: t.cliente, estado: t.estado, cidade: t.cidade, fazenda: t.fazenda, talhao: t.talhao,
       area_ha: t.area_ha!=null ? parseFloat(t.area_ha) : null, cultura: t.cultura, posicao: t.posicao ?? null,
     };
     GERAL_CAMPOS.forEach(c=>{ flat[c.key] = t[c.key] ?? null; });
@@ -1164,7 +1174,7 @@ function renderAlimentacaoTable(){
     </div>`;
 
   const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos);
-  const totalColCount = 4 + 1 + GERAL_CAMPOS.length + todosCampos.length + 1;
+  const totalColCount = 4 + 3 + GERAL_CAMPOS.length + todosCampos.length + 1;
 
   function campoInputHtml(campo, valor, rec){
     if(campo.type==='mirror'){
@@ -1212,6 +1222,22 @@ function renderAlimentacaoTable(){
     if(dot) dot.style.background = sinaleiroColor(inp.value);
   };
 
+  function subgrupoCellsHtml(campos){
+    // agrupa colunas contíguas do mesmo subgrupo numa única célula colspan, mantendo alinhamento
+    // (colunas sem subgrupo viram uma célula em branco de colspan 1, pra não desalinhar as linhas de baixo)
+    const cells = [];
+    let i = 0;
+    while(i < campos.length){
+      const sg = campos[i].subgrupo;
+      if(!sg){ cells.push(`<th></th>`); i++; continue; }
+      let j = i;
+      while(j < campos.length && campos[j].subgrupo === sg) j++;
+      cells.push(`<th colspan="${j-i}" class="subgroup-head subgroup-${sg}">${SUBGRUPO_LABELS[sg] || sg}</th>`);
+      i = j;
+    }
+    return cells.join('');
+  }
+
   area.innerHTML = `
     ${filterPanelHtml}
     <div class="table-scroll">
@@ -1219,15 +1245,28 @@ function renderAlimentacaoTable(){
         <thead>
           <tr>
             <th colspan="4" class="group-head group-mestre">Cadastro Mestre</th>
-            <th colspan="${1+GERAL_CAMPOS.length}" class="group-head group-geral">Geral</th>
-            ${PROJETOS_CONFIG.map((p,i)=>`<th colspan="${p.campos.length}" class="group-head group-projeto proj-color-${i%6}">${p.badge}</th>`).join('')}
+            <th colspan="${3+GERAL_CAMPOS.length}" class="group-head group-geral">Geral</th>
+            ${PROJETOS_CONFIG.map((p,i)=>{
+              const oculto = state.colunasOcultas.has(p.slug);
+              return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%6}">
+                <button class="proj-toggle-btn" data-proj-toggle="${p.slug}" title="${oculto?'Mostrar colunas':'Ocultar colunas'}">${oculto?'▶':'▾'}</button>
+                ${oculto ? p.badge.replace(/^\S+\s/,'') : p.badge}
+              </th>`;
+            }).join('')}
+            <th></th>
+          </tr>
+          <tr>
+            <th colspan="4"></th>
+            <th></th><th></th><th></th>
+            ${subgrupoCellsHtml(GERAL_CAMPOS)}
+            ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : `<th colspan="${p.campos.length}"></th>`).join('')}
             <th></th>
           </tr>
           <tr>
             <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
-            <th>Cultura</th>
+            <th>Estado</th><th>Cidade</th><th>Cultura</th>
             ${GERAL_CAMPOS.map(c=>`<th>${c.label}</th>`).join('')}
-            ${todosCampos.map(c=>`<th>${c.label}</th>`).join('')}
+            ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : p.campos.map(c=>`<th>${c.label}</th>`).join('')).join('')}
             <th></th>
           </tr>
         </thead>
@@ -1235,16 +1274,26 @@ function renderAlimentacaoTable(){
           ${pageRows.map(t=>`<tr data-talhao-id="${t.id}">
               <td>${t.cliente}</td><td>${t.fazenda}</td><td>${t.talhao}</td>
               <td class="mono-td">${(t.area_ha||0).toLocaleString('pt-BR',{maximumFractionDigits:1})}</td>
+              <td><input type="text" class="cell-input" data-field="estado" maxlength="2" value="${t.estado||''}" style="width:44px;"></td>
+              <td><input type="text" class="cell-input" data-field="cidade" value="${t.cidade||''}"></td>
               <td><select class="cell-input" data-field="cultura">
                 ${CULTURA_OPTIONS.map(c=>`<option value="${c}" ${t.cultura===c?'selected':''}>${c}</option>`).join('')}
               </select></td>
               ${GERAL_CAMPOS.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
-              ${todosCampos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
+              ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
               <td><button class="row-save">Salvar</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
     </div>`;
+
+  area.querySelectorAll('.proj-toggle-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const slug = btn.dataset.projToggle;
+      if(state.colunasOcultas.has(slug)) state.colunasOcultas.delete(slug); else state.colunasOcultas.add(slug);
+      renderAlimentacaoTable();
+    });
+  });
 
   area.querySelectorAll('.row-save').forEach(btn=> btn.addEventListener('click', ()=> salvarLinha(btn)));
 
@@ -1324,7 +1373,13 @@ async function salvarLinha(btn){
   const { data: { user } } = await sb.auth.getUser();
 
   // Geral (Cadastro) + Cultura — colunas reais na tabela talhoes
-  const geralUpdate = { cultura };
+  const estadoEl = tr.querySelector('[data-field="estado"]');
+  const cidadeEl = tr.querySelector('[data-field="cidade"]');
+  const geralUpdate = {
+    cultura,
+    estado: estadoEl ? (estadoEl.value.trim() || null) : undefined,
+    cidade: cidadeEl ? (cidadeEl.value.trim() || null) : undefined,
+  };
   GERAL_CAMPOS.forEach(c=>{
     const el = tr.querySelector(`[data-field="${c.key}"]`);
     if(el) geralUpdate[c.key] = c.type==='number' ? parseNum(el.value) : (el.value || null);
@@ -1334,6 +1389,7 @@ async function salvarLinha(btn){
   const todosDados = {};
   let erroProjeto = null;
   for(const proj of PROJETOS_CONFIG){
+    if(state.colunasOcultas.has(proj.slug)) continue; // colunas ocultas no momento — não mexe nesse projeto
     const dados = {};
     proj.campos.forEach(c=>{
       if(c.type==='mirror' || c.type==='mirror-sinaleiro') return; // vive no Geral agora, não salva de novo aqui
@@ -1363,7 +1419,7 @@ document.getElementById('exportBtn').addEventListener('click', exportarExcel);
 async function exportarExcel(){
   if(!currentConsultor) return;
   const { data: talhoes, error } = await fetchAllPaginated(
-    'talhoes', 'id, consultor, cliente, estado, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
+    'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
     (q)=> q.eq('consultor', currentConsultor).order('posicao', {ascending:true, nullsFirst:false}).order('cliente', {ascending:true})
   );
   if(error){ alert('Erro ao exportar: ' + error.message); return; }
@@ -1383,7 +1439,7 @@ async function exportarExcel(){
 
   const rows = talhoes.map(t=>{
     const row = {
-      Consultor: t.consultor, Cliente: t.cliente, Estado: t.estado || '', Fazenda: t.fazenda, Talhão: t.talhao,
+      Consultor: t.consultor, Cliente: t.cliente, Estado: t.estado || '', Cidade: t.cidade || '', Fazenda: t.fazenda, Talhão: t.talhao,
       'Área (ha)': t.area_ha, Cultura: t.cultura || '',
     };
     GERAL_CAMPOS.forEach(c=>{ row[c.label] = t[c.key] ?? ''; });
@@ -1433,6 +1489,7 @@ async function processarImportacao(file){
       const idx = {
         cliente: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('cliente')),
         estado: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('estado')),
+        cidade: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('cidade')),
         fazenda: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('fazenda')),
         talhao: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('talhao')),
         area: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('area')),
@@ -1454,6 +1511,7 @@ async function processarImportacao(file){
         const linha = {
           cliente: r[idx.cliente]!=null ? String(r[idx.cliente]).trim() : '',
           estado: idx.estado!==-1 && r[idx.estado]!=null ? String(r[idx.estado]).trim() : null,
+          cidade: idx.cidade!==-1 && r[idx.cidade]!=null ? String(r[idx.cidade]).trim() : null,
           fazenda: r[idx.fazenda]!=null ? String(r[idx.fazenda]).trim() : '',
           talhao: r[idx.talhao]!=null ? String(r[idx.talhao]).trim() : '',
           area_ha: idx.area!==-1 ? parseNum(r[idx.area]) : null,
@@ -1475,7 +1533,7 @@ async function processarImportacao(file){
 
       // base atual no banco pra esse consultor (identidade)
       const { data: talhoesAtuais, error: errT } = await fetchAllPaginated(
-        'talhoes', 'id, cliente, estado, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
+        'talhoes', 'id, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, posicao, ' + GERAL_CAMPOS.map(c=>c.key).join(', '),
         (q)=> q.eq('consultor', currentConsultor)
       );
       if(errT){ alert('Erro ao ler base atual: ' + errT.message); return; }
@@ -1515,6 +1573,7 @@ async function processarImportacao(file){
           // se a coluna não veio no arquivo, preserva o valor que já existe (nunca apaga por ausência de coluna)
           if(idx.area===-1) l.area_ha = parseFloat(existente.area_ha) || null;
           if(idx.estado===-1) l.estado = existente.estado || null;
+          if(idx.cidade===-1) l.cidade = existente.cidade || null;
           if(idx.cultura===-1) l.cultura = existente.cultura || null;
           const dAtual = dAtualMap[existente.id] || {};
           todosCampos.forEach(c=>{ if(l[c.key]===undefined) l[c.key] = dAtual[c.key] ?? null; });
@@ -1523,6 +1582,7 @@ async function processarImportacao(file){
           const mudancas = [];
           if((parseFloat(existente.area_ha)||null) !== (l.area_ha ?? null)) mudancas.push(`Área: ${existente.area_ha ?? '—'} → ${l.area_ha ?? '—'}`);
           if((existente.estado||null) !== (l.estado||null)) mudancas.push(`Estado: ${existente.estado ?? '—'} → ${l.estado ?? '—'}`);
+          if((existente.cidade||null) !== (l.cidade||null)) mudancas.push(`Cidade: ${existente.cidade ?? '—'} → ${l.cidade ?? '—'}`);
           if((existente.cultura||null) !== (l.cultura||null)) mudancas.push(`Cultura: ${existente.cultura ?? '—'} → ${l.cultura ?? '—'}`);
           if((existente.posicao ?? null) !== (l.__posicao ?? null)) mudancas.push(`Posição na lista mudou (linha ${l.__posicao + 1} do arquivo)`);
           todosCampos.forEach(c=>{
@@ -1593,7 +1653,7 @@ async function confirmarImportacao(plan){
     if(plan.novos.length){
       const insertRows = plan.novos.map(l=>{
         const row = {
-          consultor: currentConsultor, cliente: l.cliente, estado: l.estado, fazenda: l.fazenda,
+          consultor: currentConsultor, cliente: l.cliente, estado: l.estado, cidade: l.cidade, fazenda: l.fazenda,
           talhao: l.talhao, area_ha: l.area_ha, cultura: l.cultura, posicao: l.__posicao,
         };
         GERAL_CAMPOS.forEach(c=>{ row[c.key] = l[c.key] ?? null; });
@@ -1623,7 +1683,7 @@ async function confirmarImportacao(plan){
     if(plan.atualizados.length){
       const updatesTalhoes = plan.atualizados.map(a=>{
         const row = {
-          id: a.id, consultor: currentConsultor, cliente: a.linha.cliente, estado: a.linha.estado,
+          id: a.id, consultor: currentConsultor, cliente: a.linha.cliente, estado: a.linha.estado, cidade: a.linha.cidade,
           fazenda: a.linha.fazenda, talhao: a.linha.talhao, area_ha: a.linha.area_ha, cultura: a.linha.cultura,
           posicao: a.linha.__posicao,
         };
@@ -1700,6 +1760,7 @@ async function abrirPainelAddTalhao(){
             <input type="text" id="ftClienteNovo" placeholder="Nome do novo cliente" style="display:none;margin-top:6px;">
           </div>
           <div><label>Estado</label><input type="text" id="ftEstado" maxlength="2" placeholder="ex: GO"></div>
+          <div><label>Cidade</label><input type="text" id="ftCidade"></div>
           <div><label>Fazenda *</label><input type="text" id="ftFazenda"></div>
           <div><label>Talhão *</label><input type="text" id="ftTalhao"></div>
           <div><label>Área (ha)</label><input type="text" inputmode="decimal" id="ftArea"></div>
@@ -1787,6 +1848,7 @@ async function salvarNovoTalhaoRapido(clientesConhecidos, renderPainel){
     ? document.getElementById('ftClienteNovo').value.trim()
     : clienteSelect;
   const estado = document.getElementById('ftEstado').value.trim() || null;
+  const cidade = document.getElementById('ftCidade').value.trim() || null;
   const fazenda = document.getElementById('ftFazenda').value.trim();
   const talhao = document.getElementById('ftTalhao').value.trim();
   const area_ha = parseNum(document.getElementById('ftArea').value);
@@ -1806,7 +1868,7 @@ async function salvarNovoTalhaoRapido(clientesConhecidos, renderPainel){
   const proximaPosicao = (ultimoPos && ultimoPos[0] && ultimoPos[0].posicao!=null) ? ultimoPos[0].posicao + 1 : 1;
 
   const { data: inserido, error: errIns } = await sb.from('talhoes').insert({
-    consultor: currentConsultor, cliente, estado, fazenda, talhao, area_ha, cultura, posicao: proximaPosicao,
+    consultor: currentConsultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, posicao: proximaPosicao,
   }).select('id').single();
 
   btn.disabled = false; btn.textContent = 'Salvar e adicionar outro';
@@ -2170,6 +2232,7 @@ const state = {
   maximasFazenda: null,     // fazenda selecionada na aba Máximas Produtividades
   maximasCliente: null,     // cliente selecionado na aba Máximas Produtividades
   maximasJanela: 3,         // quantidade de safras mais recentes consideradas (3 a 6)
+  colunasOcultas: new Set(), // slugs de projeto com colunas ocultas na Alimentação (tipo agrupar do Excel)
 };
 
 function defaultTalhoesFilters(){
