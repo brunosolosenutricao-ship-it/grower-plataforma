@@ -810,6 +810,16 @@ const PROJETOS_CONFIG = [
 ];
 let projetosIds = {}; // slug -> uuid, preenchido no login
 
+// Alguns campos (ex: "Área do projeto (ha)", "Tipo de teste") se repetem em mais de um
+// projeto novo com o MESMO rótulo — no Excel isso colide (uma coluna sobrescreve a outra).
+// Essa função desambigua só pra fins de Excel (export/import), mantendo o rótulo puro na tela.
+const CONTAGEM_LABELS = {};
+PROJETOS_CONFIG.forEach(p=>p.campos.forEach(c=>{ CONTAGEM_LABELS[c.label] = (CONTAGEM_LABELS[c.label]||0) + 1; }));
+function labelParaExcel(proj, campo){
+  if((CONTAGEM_LABELS[campo.label]||0) <= 1) return campo.label;
+  return `${campo.label} — ${proj.badge.replace(/^\S+\s/,'')}`;
+}
+
 const CULTURA_MAP = {
   'soja':'Soja','soja p':'Soja','soja m':'Soja','soja t':'Soja',
   'milho semente':'Milho Semente','milho s + tamani':'Milho Semente',
@@ -1446,8 +1456,9 @@ async function exportarExcel(){
     PROJETOS_CONFIG.forEach(proj=>{
       const d = dadosPorProjeto[proj.slug][t.id] || {};
       proj.campos.forEach(c=>{
-        if(c.type==='mirror' || c.type==='mirror-sinaleiro'){ row[c.label] = t[c.mirrorFrom] ?? ''; return; }
-        row[c.label] = d[c.key] ?? '';
+        const rotulo = labelParaExcel(proj, c);
+        if(c.type==='mirror' || c.type==='mirror-sinaleiro'){ row[rotulo] = t[c.mirrorFrom] ?? ''; return; }
+        row[rotulo] = d[c.key] ?? '';
       });
     });
     return row;
@@ -1495,8 +1506,10 @@ async function processarImportacao(file){
         area: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('area')),
         cultura: headerRow.findIndex(h=>h!=null && tokensHeader(h).includes('cultura')),
       };
-      const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos).filter(c=> c.type!=='mirror' && c.type!=='mirror-sinaleiro');
-      todosCampos.forEach(c=>{ idx[c.key] = encontrarColunaPorLabel(headerRow, c.label); });
+      const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos
+        .filter(c=> c.type!=='mirror' && c.type!=='mirror-sinaleiro')
+        .map(c=>({ ...c, excelLabel: labelParaExcel(p, c) })));
+      todosCampos.forEach(c=>{ idx[c.key] = encontrarColunaPorLabel(headerRow, c.excelLabel); });
       GERAL_CAMPOS.forEach(c=>{ idx[c.key] = encontrarColunaPorLabel(headerRow, c.label); });
 
       if(idx.cliente===-1 || idx.fazenda===-1 || idx.talhao===-1){
