@@ -1479,11 +1479,14 @@ document.getElementById('importFileInput').addEventListener('change', (e)=>{
 function tokensHeader(s){ return normalize(s).replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).filter(Boolean); }
 
 function encontrarColunaPorLabel(headerRow, label){
+  // exige correspondência EXATA de todos os tokens (não só "contém") — evita que rótulos curtos
+  // como "B%", "Mn%" batam por engano em colunas maiores que também tenham aquela letra solta
+  // (ex: "B (mg) 0-20cm" da análise de solo)
   const alvo = tokensHeader(label);
   return headerRow.findIndex(h=>{
     if(h==null) return false;
     const t = tokensHeader(h);
-    return alvo.every(tok=>t.includes(tok));
+    return t.length === alvo.length && alvo.every((tok,i)=>t[i]===tok);
   });
 }
 
@@ -5002,6 +5005,33 @@ async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
   // atualiza o rec em memória pra próximos saves não perderem o valor
   rec['crono_'+etapaKey] = valor;
   if(selEl){ selEl.style.outline = '2px solid var(--lime)'; setTimeout(()=> selEl.style.outline='', 900); }
+}
+
+// Salva participação + as 4 etapas de uma vez só num único talhão — usada pela importação em massa do Cronograma
+async function salvarCronogramaEntradaCompleta(rec, entry, user){
+  if(!rec || !projetosIds['oxido-magnesio']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = {
+    dose_oxido: rec.dose_oxido ?? null,
+    dose_calcario: rec.dose_calcario ?? null,
+    status: rec.status && rec.status!=='Sem Informação' ? rec.status : null,
+    crono_participacao: entry.participacao ?? null,
+    crono_etapa1: entry.etapa1 ?? null,
+    crono_etapa2: entry.etapa2 ?? null,
+    crono_etapa3: entry.etapa3 ?? null,
+    crono_etapa4: entry.etapa4 ?? null,
+  };
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    rec.crono_participacao = entry.participacao ?? null;
+    rec.crono_etapa1 = entry.etapa1 ?? null;
+    rec.crono_etapa2 = entry.etapa2 ?? null;
+    rec.crono_etapa3 = entry.etapa3 ?? null;
+    rec.crono_etapa4 = entry.etapa4 ?? null;
+  }
+  return { error };
 }
 
 function renderCronograma(){
