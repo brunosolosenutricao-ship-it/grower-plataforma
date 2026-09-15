@@ -1534,12 +1534,12 @@ async function processarImportacao(file){
         todosCampos.forEach(c=>{
           if(idx[c.key]===-1){ linha[c.key] = undefined; return; } // undefined = coluna ausente (preserva depois)
           const raw = r[idx[c.key]];
-          linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null ? String(raw).trim() : null);
+          linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null && String(raw).trim()!=='' ? String(raw).trim() : null);
         });
         GERAL_CAMPOS.forEach(c=>{
           if(idx[c.key]===-1){ linha[c.key] = undefined; return; }
           const raw = r[idx[c.key]];
-          linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null ? String(raw).trim() : null);
+          linha[c.key] = c.type==='number' ? parseNum(raw) : (raw!=null && String(raw).trim()!=='' ? String(raw).trim() : null);
         });
         linhasExcel.push(linha);
       }
