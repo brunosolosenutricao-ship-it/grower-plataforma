@@ -140,6 +140,20 @@
   .proj-toggle-btn{border:none;background:rgba(0,0,0,.08);color:inherit;border-radius:4px;width:16px;height:16px;font-size:10px;line-height:1;cursor:pointer;margin-right:4px;vertical-align:middle;}
   .proj-toggle-btn:hover{background:rgba(0,0,0,.18);}
   .col-oculta{color:var(--ink-soft);text-align:center;font-size:11px;}
+  .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:14px;border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;}
+  .table-scroll-top > div{height:1px;}
+  .freeze-col{position:sticky !important;background:var(--paper);z-index:2;}
+  thead .freeze-col{z-index:4;}
+  tbody .freeze-col{background:#fff;}
+  tbody tr:hover .freeze-col{background:var(--bg);}
+  .freeze-1{left:0px;width:120px;min-width:120px;max-width:120px;}
+  .freeze-mestre-header{left:0px;width:385px;min-width:385px;max-width:385px;}
+  .freeze-2{left:120px;width:120px;min-width:120px;max-width:120px;}
+  .freeze-3{left:240px;width:70px;min-width:70px;max-width:70px;}
+  .freeze-4{left:310px;width:75px;min-width:75px;max-width:75px;}
+  .freeze-5{left:385px;width:55px;min-width:55px;max-width:55px;}
+  .freeze-6{left:440px;width:100px;min-width:100px;max-width:100px;}
+  .freeze-7{left:540px;width:110px;min-width:110px;max-width:110px;box-shadow:2px 0 4px rgba(0,0,0,.08);}
   .cell-input:focus{outline:none;border-color:var(--teal);}
   select.cell-input{width:130px;}
   .sinaleiro-wrap{display:flex;align-items:center;gap:6px;}
@@ -1242,20 +1256,45 @@ function renderAlimentacaoTable(){
       if(!sg){ cells.push(`<th></th>`); i++; continue; }
       let j = i;
       while(j < campos.length && campos[j].subgrupo === sg) j++;
-      cells.push(`<th colspan="${j-i}" class="subgroup-head subgroup-${sg}">${SUBGRUPO_LABELS[sg] || sg}</th>`);
+      const soloOculto = state.colunasOcultas.has('solo-analise');
+      let label = SUBGRUPO_LABELS[sg] || sg;
+      if(sg==='solo1' || sg==='solo2'){
+        // botão único: aparece na primeira faixa (0-20cm) e controla as duas faixas de solo juntas
+        if(sg==='solo1'){
+          label = `<button class="proj-toggle-btn" data-solo-toggle="1" title="${soloOculto?'Mostrar Análise de Solo':'Ocultar Análise de Solo'}">${soloOculto?'▶':'▾'}</button> Análise de Solo`;
+        }
+      }
+      cells.push(`<th colspan="${j-i}" class="subgroup-head subgroup-${sg}">${label}</th>`);
       i = j;
     }
     return cells.join('');
   }
 
+  // lista "efetiva" dos campos do Geral pra renderizar — quando a Análise de Solo está oculta,
+  // as 24 colunas (0-20cm + 20-40cm) viram 1 coluna só de placeholder, pra não perder alinhamento
+  const soloOculto = state.colunasOcultas.has('solo-analise');
+  const geralCamposVisiveis = (()=>{
+    if(!soloOculto) return GERAL_CAMPOS;
+    const out = []; let inserido = false;
+    GERAL_CAMPOS.forEach(c=>{
+      if(c.subgrupo==='solo1' || c.subgrupo==='solo2'){
+        if(!inserido){ out.push({ key:'__solo_oculto__', label:'···', subgrupo:'solo-oculta', __placeholder:true }); inserido = true; }
+        return;
+      }
+      out.push(c);
+    });
+    return out;
+  })();
+
   area.innerHTML = `
     ${filterPanelHtml}
-    <div class="table-scroll">
+    <div class="table-scroll-top" id="alimScrollTop"><div id="alimScrollTopInner"></div></div>
+    <div class="table-scroll" id="alimScrollMain">
       <table>
         <thead>
           <tr>
-            <th colspan="4" class="group-head group-mestre">Cadastro Mestre</th>
-            <th colspan="${3+GERAL_CAMPOS.length}" class="group-head group-geral">Geral</th>
+            <th colspan="4" class="group-head group-mestre freeze-col freeze-mestre-header">Cadastro Mestre</th>
+            <th colspan="${3+geralCamposVisiveis.length}" class="group-head group-geral">Geral</th>
             ${PROJETOS_CONFIG.map((p,i)=>{
               const oculto = state.colunasOcultas.has(p.slug);
               return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%6}">
@@ -1266,30 +1305,30 @@ function renderAlimentacaoTable(){
             <th></th>
           </tr>
           <tr>
-            <th colspan="4"></th>
-            <th></th><th></th><th></th>
-            ${subgrupoCellsHtml(GERAL_CAMPOS)}
+            <th class="freeze-col freeze-1"></th><th class="freeze-col freeze-2"></th><th class="freeze-col freeze-3"></th><th class="freeze-col freeze-4"></th>
+            <th class="freeze-col freeze-5"></th><th class="freeze-col freeze-6"></th><th class="freeze-col freeze-7"></th>
+            ${subgrupoCellsHtml(geralCamposVisiveis)}
             ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : `<th colspan="${p.campos.length}"></th>`).join('')}
             <th></th>
           </tr>
           <tr>
-            <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
-            <th>Estado</th><th>Cidade</th><th>Cultura</th>
-            ${GERAL_CAMPOS.map(c=>`<th>${c.label}</th>`).join('')}
+            <th class="freeze-col freeze-1">Cliente</th><th class="freeze-col freeze-2">Fazenda</th><th class="freeze-col freeze-3">Talhão</th><th class="freeze-col freeze-4">Área (ha)</th>
+            <th class="freeze-col freeze-5">Estado</th><th class="freeze-col freeze-6">Cidade</th><th class="freeze-col freeze-7">Cultura</th>
+            ${geralCamposVisiveis.map(c=>`<th>${c.label}</th>`).join('')}
             ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : p.campos.map(c=>`<th>${c.label}</th>`).join('')).join('')}
             <th></th>
           </tr>
         </thead>
         <tbody>
           ${pageRows.map(t=>`<tr data-talhao-id="${t.id}">
-              <td>${t.cliente}</td><td>${t.fazenda}</td><td>${t.talhao}</td>
-              <td class="mono-td">${(t.area_ha||0).toLocaleString('pt-BR',{maximumFractionDigits:1})}</td>
-              <td><input type="text" class="cell-input" data-field="estado" maxlength="2" value="${t.estado||''}" style="width:44px;"></td>
-              <td><input type="text" class="cell-input" data-field="cidade" value="${t.cidade||''}"></td>
-              <td><select class="cell-input" data-field="cultura">
+              <td class="freeze-col freeze-1">${t.cliente}</td><td class="freeze-col freeze-2">${t.fazenda}</td><td class="freeze-col freeze-3">${t.talhao}</td>
+              <td class="mono-td freeze-col freeze-4">${(t.area_ha||0).toLocaleString('pt-BR',{maximumFractionDigits:1})}</td>
+              <td class="freeze-col freeze-5"><input type="text" class="cell-input" data-field="estado" maxlength="2" value="${t.estado||''}" style="width:44px;"></td>
+              <td class="freeze-col freeze-6"><input type="text" class="cell-input" data-field="cidade" value="${t.cidade||''}"></td>
+              <td class="freeze-col freeze-7"><select class="cell-input" data-field="cultura">
                 ${CULTURA_OPTIONS.map(c=>`<option value="${c}" ${t.cultura===c?'selected':''}>${c}</option>`).join('')}
               </select></td>
-              ${GERAL_CAMPOS.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
+              ${geralCamposVisiveis.map(c=> c.__placeholder ? `<td class="col-oculta">···</td>` : `<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
               ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
               <td><button class="row-save">Salvar</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
@@ -1297,13 +1336,30 @@ function renderAlimentacaoTable(){
       </table>
     </div>`;
 
-  area.querySelectorAll('.proj-toggle-btn').forEach(btn=>{
+  area.querySelectorAll('.proj-toggle-btn[data-proj-toggle]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const slug = btn.dataset.projToggle;
       if(state.colunasOcultas.has(slug)) state.colunasOcultas.delete(slug); else state.colunasOcultas.add(slug);
       renderAlimentacaoTable();
     });
   });
+  area.querySelectorAll('[data-solo-toggle]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(state.colunasOcultas.has('solo-analise')) state.colunasOcultas.delete('solo-analise'); else state.colunasOcultas.add('solo-analise');
+      renderAlimentacaoTable();
+    });
+  });
+
+  // scroll horizontal duplicado (uma barra em cima, sincronizada com a de baixo)
+  const scrollTopEl = area.querySelector('#alimScrollTop');
+  const scrollTopInner = area.querySelector('#alimScrollTopInner');
+  const scrollMainEl = area.querySelector('#alimScrollMain');
+  if(scrollTopEl && scrollMainEl){
+    scrollTopInner.style.width = scrollMainEl.scrollWidth + 'px';
+    let sincronizando = false;
+    scrollTopEl.addEventListener('scroll', ()=>{ if(sincronizando) return; sincronizando=true; scrollMainEl.scrollLeft = scrollTopEl.scrollLeft; sincronizando=false; });
+    scrollMainEl.addEventListener('scroll', ()=>{ if(sincronizando) return; sincronizando=true; scrollTopEl.scrollLeft = scrollMainEl.scrollLeft; sincronizando=false; });
+  }
 
   area.querySelectorAll('.row-save').forEach(btn=> btn.addEventListener('click', ()=> salvarLinha(btn)));
 
