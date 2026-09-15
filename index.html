@@ -530,6 +530,7 @@
       <div class="nav-item" data-view="dashboard-mg">📊 Dash Projeto Óxido de Magnésio</div>
       <div class="nav-item" data-view="ladroes-dash">🚩 Ladrões</div>
       <div class="nav-item" data-view="maximas-dash">🌱 Máximas Produtividades</div>
+      <div class="nav-item" data-view="condicionador-dash">🧪 Projeto Condicionador</div>
     </div>
     <div class="sidebar-user">
       <div class="name" id="sbUserName">—</div>
@@ -673,6 +674,23 @@
       </div>
       <div id="maximasApp" style="display:none;">
         <div id="tab-maximas"></div>
+      </div>
+    </div>
+
+    <div id="viewCondicionador" style="display:none;">
+      <div class="main-header">
+        <h2>🧪 Projeto Condicionador</h2>
+        <p class="sub">Consumo e cobertura do Condicionador de Solo — mapa por estado, volume aplicado, adoção por consultor/produto e tipo de teste.</p>
+      </div>
+      <div class="empty-wrap" id="condicionadorLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🧪</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="condicionadorApp" style="display:none;">
+        <div id="tab-condicionador"></div>
       </div>
     </div>
   </div>
@@ -2204,7 +2222,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewDashboardMg').style.display = view==='dashboard-mg' ? 'block' : 'none';
     document.getElementById('viewLadroes').style.display = view==='ladroes-dash' ? 'block' : 'none';
     document.getElementById('viewMaximas').style.display = view==='maximas-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash') && !dashMgJaCarregado){
+    document.getElementById('viewCondicionador').style.display = view==='condicionador-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2456,6 +2475,8 @@ async function carregarDadosDoSupabase(){
   const ladAppEl = document.getElementById('ladroesApp');
   const maxLoadingEl = document.getElementById('maximasLoading');
   const maxAppEl = document.getElementById('maximasApp');
+  const condLoadingEl = document.getElementById('condicionadorLoading');
+  const condAppEl = document.getElementById('condicionadorApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
 
@@ -2475,8 +2496,13 @@ async function carregarDadosDoSupabase(){
     const projResMax = await sb.from('projetos').select('id').eq('slug', 'maximas-produtividades').single();
     if(!projResMax.error) projetoIdMax = projResMax.data.id;
 
+    // projeto Condicionador de Solo — mesma lógica, opcional
+    let projetoIdCond = null;
+    const projResCond = await sb.from('projetos').select('id').eq('slug', 'condicionador-de-solo').single();
+    if(!projResCond.error) projetoIdCond = projResCond.data.id;
+
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {}, dadosMapMax = {};
+    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -2490,12 +2516,18 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdMax).in('talhao_id', bloco);
         if(!errDMax && dadosMax) dadosMax.forEach(d=>{ dadosMapMax[d.talhao_id] = d.dados || {}; });
       }
+      if(projetoIdCond){
+        const { data: dadosCond, error: errDCond } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdCond).in('talhao_id', bloco);
+        if(!errDCond && dadosCond) dadosCond.forEach(d=>{ dadosMapCond[d.talhao_id] = d.dados || {}; });
+      }
     }
 
     const records = [], semArea = [];
     talhoes.forEach(t=>{
       const d = dadosMap[t.id] || {};
       const dm = dadosMapMax[t.id] || {};
+      const dc = dadosMapCond[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
@@ -2530,6 +2562,11 @@ async function carregarDadosDoSupabase(){
         max_sinaleiro: t.geral_sinaleiro ?? null,
         max_avaliacao: t.geral_avaliacao_individual ?? null,
         max_ipi: dm.ipi ?? null,
+        // campos do Condicionador de Solo (jsonb próprio, projeto separado)
+        cond_area_projeto: dc.area_projeto_cond ?? null,
+        cond_tipo_teste: dc.tipo_teste_cond ?? null,
+        cond_dose: dc.dose_condicionador ?? null,
+        cond_produto: dc.produto_utilizado_cond ?? null,
       };
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
     });
@@ -2563,11 +2600,14 @@ async function carregarDadosDoSupabase(){
     if(ladAppEl) ladAppEl.style.display = 'block';
     if(maxLoadingEl) maxLoadingEl.style.display = 'none';
     if(maxAppEl) maxAppEl.style.display = 'block';
+    if(condLoadingEl) condLoadingEl.style.display = 'none';
+    if(condAppEl) condAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(ladLoadingEl) ladLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(maxLoadingEl) maxLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(condLoadingEl) condLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -2778,6 +2818,7 @@ function renderAll(){
   renderCronograma();
   renderLadroes();
   renderMaximas();
+  renderCondicionador();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -5024,6 +5065,241 @@ function renderMaximas(){
       btn.textContent = `Ver ranking completo (${alvo.querySelectorAll('tbody tr').length} talhões) ${aberto ? '▾' : '▴'}`;
     });
   });
+}
+
+/* ---------------- TAB PROJETO CONDICIONADOR ---------------- */
+// grid aproximado do Brasil (col,row) — cartograma simplificado, não é geografia exata
+const ESTADOS_GRID = {
+  RR:{col:2,row:0}, AP:{col:4,row:0},
+  AM:{col:1,row:1}, PA:{col:3,row:1}, MA:{col:5,row:1}, CE:{col:6,row:1}, RN:{col:7,row:1},
+  AC:{col:1,row:2}, RO:{col:2,row:2}, TO:{col:4,row:2}, PI:{col:5,row:2}, PB:{col:7,row:2},
+  MT:{col:2,row:3}, BA:{col:5,row:3}, PE:{col:6,row:3}, AL:{col:7,row:3},
+  MS:{col:2,row:4}, GO:{col:3,row:4}, DF:{col:4,row:4}, MG:{col:5,row:4}, SE:{col:7,row:4},
+  SP:{col:4,row:5}, RJ:{col:5,row:5}, ES:{col:6,row:5},
+  PR:{col:3,row:6},
+  SC:{col:3,row:7},
+  RS:{col:3,row:8},
+};
+let condicionadorCharts = {};
+function condicionadorCorIntensidade(valor, max){
+  if(!valor || valor<=0 || !max) return '#e3e3dc';
+  const t = Math.min(1, valor/max);
+  // interpola de verde claro pra verde escuro
+  const c1 = [217,230,196], c2 = [34,60,44]; // --lime-soft -> --green-deep
+  const r = Math.round(c1[0] + (c2[0]-c1[0])*t);
+  const g = Math.round(c1[1] + (c2[1]-c1[1])*t);
+  const b = Math.round(c1[2] + (c2[2]-c1[2])*t);
+  return `rgb(${r},${g},${b})`;
+}
+function condicionadorMapaSvg(porEstado){
+  const max = Math.max(0, ...Object.values(porEstado));
+  const cell = 42, gap = 4, pad = 6;
+  const maxCol = Math.max(...Object.values(ESTADOS_GRID).map(p=>p.col));
+  const maxRow = Math.max(...Object.values(ESTADOS_GRID).map(p=>p.row));
+  const w = (maxCol+1)*(cell+gap)+pad*2, h = (maxRow+1)*(cell+gap)+pad*2;
+  const cells = Object.entries(ESTADOS_GRID).map(([uf,pos])=>{
+    const valor = porEstado[uf] || 0;
+    const cor = condicionadorCorIntensidade(valor, max);
+    const x = pad + pos.col*(cell+gap), y = pad + pos.row*(cell+gap);
+    const textColor = valor/max > 0.55 ? '#fff' : 'var(--ink)';
+    return `<g>
+      <rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="7" fill="${cor}" stroke="#fff" stroke-width="1.5">
+        <title>${uf}: ${valor.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</title>
+      </rect>
+      <text x="${x+cell/2}" y="${y+cell/2+4}" text-anchor="middle" font-size="11" font-weight="700" fill="${textColor}" style="pointer-events:none;">${uf}</text>
+    </g>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:380px;height:auto;">${cells}</svg>`;
+}
+function renderCondicionador(){
+  const container = document.getElementById('tab-condicionador');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const comDose = base.filter(r=> r.cond_dose!=null && Number(r.cond_dose)>0);
+  const comTeste = base.filter(r=> (r.cond_tipo_teste==='Faixa' || r.cond_tipo_teste==='Lado a lado') && r.cond_area_projeto!=null && Number(r.cond_area_projeto)>0);
+
+  if(!comDose.length && !comTeste.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Projeto Condicionador</div>
+      <h2>Nenhum dado do Condicionador de Solo ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer Dose do condicionador (ou Área do projeto + Tipo de teste) preenchidos, os gráficos aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  // 1) mapa — soma área do talhão por estado (só dose>0)
+  const areaPorEstado = {};
+  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaPorEstado[uf]=(areaPorEstado[uf]||0)+(r.area||0); });
+
+  // 2) volume (L) por estado = dose x área
+  const volumePorEstado = {};
+  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; volumePorEstado[uf]=(volumePorEstado[uf]||0)+(Number(r.cond_dose)*(r.area||0)); });
+
+  // 3) volume por cliente — top 10
+  const volumePorCliente = {};
+  comDose.forEach(r=>{ volumePorCliente[r.cliente]=(volumePorCliente[r.cliente]||0)+(Number(r.cond_dose)*(r.area||0)); });
+  const top10Clientes = Object.entries(volumePorCliente).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // 4) área tratada por consultor
+  const areaPorConsultor = {};
+  comDose.forEach(r=>{ areaPorConsultor[r.consultor]=(areaPorConsultor[r.consultor]||0)+(r.area||0); });
+
+  // 5) área tratada por produto
+  const areaPorProduto = {};
+  comDose.forEach(r=>{ const p=r.cond_produto||'Não informado'; areaPorProduto[p]=(areaPorProduto[p]||0)+(r.area||0); });
+
+  // 6) tipo de teste x estado (Área do projeto, só Faixa/Lado a lado) — barras empilhadas
+  const tipos = ['Faixa','Lado a lado'];
+  const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
+  const tipoEstado = {}; // tipo -> estado -> area
+  tipos.forEach(tp=> tipoEstado[tp] = {});
+  comTeste.forEach(r=>{
+    const uf = (r.estado||'').toUpperCase();
+    tipoEstado[r.cond_tipo_teste][uf] = (tipoEstado[r.cond_tipo_teste][uf]||0) + Number(r.cond_area_projeto);
+  });
+
+  // 7) KPI + pizza — área de projeto (Faixa/Lado a lado) por estado
+  const areaProjetoPorEstado = {};
+  comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaProjetoPorEstado[uf]=(areaProjetoPorEstado[uf]||0)+Number(r.cond_area_projeto); });
+  const areaProjetoTotal = Object.values(areaProjetoPorEstado).reduce((a,b)=>a+b,0);
+
+  const CORES_ESTADO = ['#35533f','#2e6e76','#c99a3d','#7a5b8a','#b8352a','#4d7ea8','#8a9b4f','#a4432a','#5b7a99','#9a6c3f'];
+  const coresPorEstado = {}; estadosComTeste.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO[i%CORES_ESTADO.length]);
+
+  container.innerHTML = `
+  <style>
+    .cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+    .cond-card{background:var(--paper);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px;}
+    .cond-card h3{margin:2px 0 3px;font-size:15px;}
+    .cond-card .sub-sm{font-size:11.5px;color:var(--ink-soft);margin:0 0 12px;}
+    .cond-kpi{display:flex;align-items:baseline;gap:10px;background:var(--paper);border-radius:16px;box-shadow:var(--shadow);padding:18px 22px;margin-bottom:16px;}
+    .cond-kpi .v{font-size:32px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--green-deep);}
+    .cond-kpi .l{font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+    .cond-map-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:10.5px;color:var(--ink-soft);}
+    .cond-map-legend .bar{flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,#d9e6c4,#223c2c);}
+  </style>
+
+  <div class="cond-kpi">
+    <div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</div>
+    <div class="l">Área total de projeto (Faixa + Lado a lado)</div>
+  </div>
+
+  <div class="cond-grid">
+    <div class="cond-card">
+      <h3>🗺️ Área tratada por Estado</h3>
+      <p class="sub-sm">Soma da área do talhão, só onde há Dose do condicionador &gt; 0</p>
+      ${condicionadorMapaSvg(areaPorEstado)}
+      <div class="cond-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>
+    </div>
+    <div class="cond-card">
+      <h3>🥧 Área de projeto por Estado</h3>
+      <p class="sub-sm">Só Faixa / Lado a lado — cada fatia é um estado</p>
+      <canvas id="condPieEstado" style="max-height:280px;"></canvas>
+    </div>
+  </div>
+
+  <div class="cond-grid">
+    <div class="cond-card">
+      <h3>💧 Volume consumido por Estado (L)</h3>
+      <p class="sub-sm">Dose (L/ha) × Área do talhão, somado por estado</p>
+      <canvas id="condVolumeEstado" style="max-height:280px;"></canvas>
+    </div>
+    <div class="cond-card">
+      <h3>💧 Volume consumido por Cliente — Top 10 (L)</h3>
+      <p class="sub-sm">Mesma conta, agrupada por cliente</p>
+      <canvas id="condVolumeCliente" style="max-height:280px;"></canvas>
+    </div>
+  </div>
+
+  <div class="cond-grid">
+    <div class="cond-card">
+      <h3>👤 Área tratada por Consultor</h3>
+      <p class="sub-sm">Soma da área do talhão (dose &gt; 0), por consultor</p>
+      <canvas id="condAreaConsultor" style="max-height:280px;"></canvas>
+    </div>
+    <div class="cond-card">
+      <h3>🧪 Área tratada por Produto Utilizado</h3>
+      <p class="sub-sm">Soma da área do talhão (dose &gt; 0), por produto</p>
+      <canvas id="condAreaProduto" style="max-height:280px;"></canvas>
+    </div>
+  </div>
+
+  <div class="cond-card full-card">
+    <h3>📊 Tipo de Teste por Estado</h3>
+    <p class="sub-sm">Área do projeto — Faixa vs Lado a lado, empilhado por estado (cor = estado)</p>
+    <canvas id="condTipoEstado" style="max-height:320px;"></canvas>
+  </div>
+  `;
+
+  // destrói instâncias anteriores antes de recriar (evita vazamento/duplicação em re-render)
+  Object.values(condicionadorCharts).forEach(c=>{ if(c) c.destroy(); });
+  condicionadorCharts = {};
+
+  const canvasVolEstado = container.querySelector('#condVolumeEstado');
+  if(canvasVolEstado){
+    const entradas = Object.entries(volumePorEstado).sort((a,b)=>b[1]-a[1]);
+    condicionadorCharts.volEstado = new Chart(canvasVolEstado.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'Litros', data: entradas.map(e=>Math.round(e[1])), backgroundColor:'#35533f', borderRadius:4 }] },
+      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasVolCliente = container.querySelector('#condVolumeCliente');
+  if(canvasVolCliente){
+    condicionadorCharts.volCliente = new Chart(canvasVolCliente.getContext('2d'), {
+      type:'bar',
+      data:{ labels: top10Clientes.map(e=>e[0]), datasets:[{ label:'Litros', data: top10Clientes.map(e=>Math.round(e[1])), backgroundColor:'#2e6e76', borderRadius:4 }] },
+      options:{ responsive:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasAreaConsultor = container.querySelector('#condAreaConsultor');
+  if(canvasAreaConsultor){
+    const entradas = Object.entries(areaPorConsultor).sort((a,b)=>b[1]-a[1]);
+    condicionadorCharts.areaConsultor = new Chart(canvasAreaConsultor.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#c99a3d', borderRadius:4 }] },
+      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasAreaProduto = container.querySelector('#condAreaProduto');
+  if(canvasAreaProduto){
+    const entradas = Object.entries(areaPorProduto).sort((a,b)=>b[1]-a[1]);
+    condicionadorCharts.areaProduto = new Chart(canvasAreaProduto.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#7a5b8a', borderRadius:4 }] },
+      options:{ responsive:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasPie = container.querySelector('#condPieEstado');
+  if(canvasPie){
+    condicionadorCharts.pie = new Chart(canvasPie.getContext('2d'), {
+      type:'pie',
+      data:{ labels: estadosComTeste, datasets:[{ data: estadosComTeste.map(uf=>Math.round((areaProjetoPorEstado[uf]||0)*10)/10), backgroundColor: estadosComTeste.map(uf=>coresPorEstado[uf]) }] },
+      options:{ responsive:true, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}} }
+    });
+  }
+
+  const canvasTipo = container.querySelector('#condTipoEstado');
+  if(canvasTipo){
+    condicionadorCharts.tipoEstado = new Chart(canvasTipo.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: tipos,
+        datasets: estadosComTeste.map(uf=>({
+          label: uf,
+          data: tipos.map(tp=> Math.round((tipoEstado[tp][uf]||0)*10)/10),
+          backgroundColor: coresPorEstado[uf],
+        })),
+      },
+      options:{ responsive:true, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}} }
+    });
+  }
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
