@@ -552,6 +552,7 @@
         <div class="nav-item" data-view="estruturacao-dash">🌾 Projeto Estruturação</div>
       <div class="nav-item" data-view="oxidoconsumo-dash">🧪 Óxido de Magnésio</div>
       <div class="nav-item" data-view="microsolo-dash">🔬 Projeto Micro Solo</div>
+      <div class="nav-item" data-view="ladroesmaximas-mapa-dash">📍 Ladrões/Máximas</div>
       </div>
     </div>
     <div class="sidebar-user">
@@ -805,6 +806,26 @@
         <div id="tab-micro-solo"></div>
       </div>
     </div>
+
+    <div id="viewLadroesMaximasMapa" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>📍 Ladrões/Máximas</h2>
+          <p class="sub">Mapa de pontos (Latitude/Longitude) dos talhões marcados na coluna "Seleção" — azul para Máximas, vermelho para Ladrões.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="ladroesMaximasMapaLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">📍</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="ladroesMaximasMapaApp" style="display:none;">
+        <div id="tab-ladroesmaximas-mapa"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -889,6 +910,8 @@ const PROJETOS_CONFIG = [
     campos: [
       { key:'sistema', label:'Sistema', type:'text' },
       { key:'selecao', label:'Seleção', type:'select', options:['Nenhum','Ladrões','Máximas'] },
+      { key:'latitude', label:'Latitude', type:'number' },
+      { key:'longitude', label:'Longitude', type:'number' },
       { key:'prod_20_21', label:'20/21', type:'mirror', mirrorFrom:'geral_prod_20_21' },
       { key:'prod_21_22', label:'21/22', type:'mirror', mirrorFrom:'geral_prod_21_22' },
       { key:'prod_22_23', label:'22/23', type:'mirror', mirrorFrom:'geral_prod_22_23' },
@@ -2424,7 +2447,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewEstruturacao').style.display = view==='estruturacao-dash' ? 'block' : 'none';
     document.getElementById('viewOxidoConsumo').style.display = view==='oxidoconsumo-dash' ? 'block' : 'none';
     document.getElementById('viewMicroSolo').style.display = view==='microsolo-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash') && !dashMgJaCarregado){
+    document.getElementById('viewLadroesMaximasMapa').style.display = view==='ladroesmaximas-mapa-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2696,6 +2720,8 @@ async function carregarDadosDoSupabase(){
   const oxcAppEl = document.getElementById('oxidoConsumoApp');
   const microLoadingEl = document.getElementById('microSoloLoading');
   const microAppEl = document.getElementById('microSoloApp');
+  const lmMapaLoadingEl = document.getElementById('ladroesMaximasMapaLoading');
+  const lmMapaAppEl = document.getElementById('ladroesMaximasMapaApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
   if(ladLoadingEl) ladLoadingEl.style.display = 'flex';
@@ -2712,6 +2738,8 @@ async function carregarDadosDoSupabase(){
   if(oxcAppEl) oxcAppEl.style.display = 'none';
   if(microLoadingEl) microLoadingEl.style.display = 'flex';
   if(microAppEl) microAppEl.style.display = 'none';
+  if(lmMapaLoadingEl) lmMapaLoadingEl.style.display = 'flex';
+  if(lmMapaAppEl) lmMapaAppEl.style.display = 'none';
 
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
@@ -2829,6 +2857,9 @@ async function carregarDadosDoSupabase(){
         max_sinaleiro: t.geral_sinaleiro ?? null,
         max_avaliacao: t.geral_avaliacao_individual ?? null,
         max_ipi: dm.ipi ?? null,
+        max_selecao: dm.selecao ?? null,
+        max_latitude: dm.latitude ?? null,
+        max_longitude: dm.longitude ?? null,
         // campos do Condicionador de Solo (jsonb próprio, projeto separado)
         cond_area_projeto: dc.area_projeto_cond ?? null,
         cond_tipo_teste: dc.tipo_teste_cond ?? null,
@@ -2922,6 +2953,8 @@ async function carregarDadosDoSupabase(){
     if(oxcAppEl) oxcAppEl.style.display = 'block';
     if(microLoadingEl) microLoadingEl.style.display = 'none';
     if(microAppEl) microAppEl.style.display = 'block';
+    if(lmMapaLoadingEl) lmMapaLoadingEl.style.display = 'none';
+    if(lmMapaAppEl) lmMapaAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
@@ -2932,6 +2965,7 @@ async function carregarDadosDoSupabase(){
     if(estrLoadingEl) estrLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(oxcLoadingEl) oxcLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(microLoadingEl) microLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(lmMapaLoadingEl) lmMapaLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -3147,6 +3181,7 @@ function renderAll(){
   renderEstruturacao();
   renderOxidoConsumo();
   renderMicroSolo();
+  renderLadroesMaximasMapa();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -6889,7 +6924,7 @@ function renderOxidoConsumo(){
 /* ---------------- TAB PROJETO MICRO SOLO ---------------- */
 let microSoloCharts = {};
 function criarFaixas(breakpoints){
-  const paleta = ['#c0392b','#e67e22','#f1c40f','#8bc34a','#4caf50','#1b5e20'];
+  const paleta = ['#c0392b','#e67e22','#f1c40f','#8bc34a','#4caf50','#2c5f8a'];
   const faixas = breakpoints.map((max,i)=> ({ max, cor: paleta[i] }));
   faixas.push({ max: Infinity, cor: paleta[paleta.length-1] });
   // rótulos
@@ -7251,6 +7286,183 @@ function renderMicroSolo(){
         })),
       },
       options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_MICRO, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:microTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
+    });
+  }
+}
+
+/* ---------------- TAB LADRÕES/MÁXIMAS — MAPA DE PONTOS ---------------- */
+// mesma projeção equiretangular usada pra desenhar os estados (ESTADOS_BR_PATHS/ESTADOS_BR_VIEWBOX) —
+// bounding box exata usada na geração do mapa, pra os pontos lat/long baterem certinho com os contornos
+const LM_MIN_LON = -73.990238, LM_MAX_LON = -34.793112, LM_MIN_LAT = -33.748346, LM_MAX_LAT = 5.270972;
+const LM_W = 500, LM_H = 520;
+function lmProjetarPonto(lat, lon){
+  const x = (lon - LM_MIN_LON) / (LM_MAX_LON - LM_MIN_LON) * LM_W;
+  const y = (LM_MAX_LAT - lat) / (LM_MAX_LAT - LM_MIN_LAT) * LM_H;
+  return { x, y };
+}
+let ladroesMaximasMapaCharts = {};
+function abrirModalLadroesMaximasTalhao(rec){
+  const modalRoot = document.getElementById('modalRoot');
+  const soloCampos = GERAL_CAMPOS.filter(c=> c.subgrupo==='solo1' || c.subgrupo==='solo2');
+  const corBadge = rec.max_selecao==='Ladrões' ? 'var(--red)' : 'var(--teal)';
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="lmModalOverlay">
+    <div class="modal-panel" style="max-width:1000px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · <span style="color:${corBadge};font-weight:700;">${rec.max_selecao}</span></div>
+          <h2 style="margin:2px 0;">${rec.fazenda} — Talhão ${rec.talhao}</h2>
+          <p class="sub" style="margin:0;">${rec.cliente} · ${rec.consultor} · ${rec.cidade||''}/${rec.estado||''}</p>
+        </div>
+        <button class="backbtn" id="lmModalFechar">✕ Fechar</button>
+      </div>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Dados gerais</h3>
+      <table class="datatable-modal" style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;">
+        <tbody>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Consultor</td><td style="padding:4px 8px;">${rec.consultor||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cliente</td><td style="padding:4px 8px;">${rec.cliente||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Fazenda</td><td style="padding:4px 8px;">${rec.fazenda||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Talhão</td><td style="padding:4px 8px;">${rec.talhao||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Área (ha)</td><td style="padding:4px 8px;">${fmtNum(rec.area,1)}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cultura</td><td style="padding:4px 8px;">${rec.cultura||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Estado</td><td style="padding:4px 8px;">${rec.estado||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cidade</td><td style="padding:4px 8px;">${rec.cidade||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Cultivar</td><td style="padding:4px 8px;" colspan="3">${rec.cultivar||'—'}</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Análise de solo (0-20cm e 20-40cm)</h3>
+      <div class="table-scroll" style="margin-bottom:16px;">
+        <table>
+          <thead><tr>${soloCampos.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
+          <tbody><tr>${soloCampos.map(c=>`<td class="mono-td">${rec[c.key]!=null?fmtNum(Number(rec[c.key]),2):'—'}</td>`).join('')}</tr></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Histórico produtivo</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>20/21</th><th>21/22</th><th>22/23</th><th>23/24</th><th>24/25</th><th>25/26</th><th>Média</th><th>Sinaleiro</th><th>Avaliação</th></tr></thead>
+          <tbody><tr>
+            <td class="mono-td">${rec.max_prod_20_21!=null?fmtNum(Number(rec.max_prod_20_21),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_21_22!=null?fmtNum(Number(rec.max_prod_21_22),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_22_23!=null?fmtNum(Number(rec.max_prod_22_23),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_23_24!=null?fmtNum(Number(rec.max_prod_23_24),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_24_25!=null?fmtNum(Number(rec.max_prod_24_25),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_25_26!=null?fmtNum(Number(rec.max_prod_25_26),1):'—'}</td>
+            <td class="mono-td">${rec.max_media_prod!=null?fmtNum(Number(rec.max_media_prod),1):'—'}</td>
+            <td>${rec.max_sinaleiro ?? '—'}</td>
+            <td>${rec.max_avaliacao || '—'}</td>
+          </tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('lmModalFechar').addEventListener('click', fechar);
+  document.getElementById('lmModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmModalOverlay') fechar(); });
+}
+function renderLadroesMaximasMapa(){
+  const container = document.getElementById('tab-ladroesmaximas-mapa');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const selecionados = base.filter(r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas');
+  const comCoordenada = selecionados.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
+  const semCoordenada = selecionados.length - comCoordenada.length;
+
+  if(!selecionados.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Ladrões/Máximas</div>
+      <h2>Nenhum talhão marcado em "Seleção" ainda</h2>
+      <p class="sub">Assim que algum talhão for marcado como "Ladrões" ou "Máximas" (coluna Seleção, dentro do bloco Máximas Produtividades na Alimentação) e tiver Latitude/Longitude preenchidas, ele aparece aqui.</p>
+    </div>`;
+    return;
+  }
+
+  const areaLadroes = selecionados.filter(r=>r.max_selecao==='Ladrões').reduce((a,r)=>a+(r.area||0),0);
+  const areaMaximas = selecionados.filter(r=>r.max_selecao==='Máximas').reduce((a,r)=>a+(r.area||0),0);
+  const areaPorEstadoLadroes = {}, areaPorEstadoMaximas = {};
+  selecionados.forEach(r=>{
+    const uf = (r.estado||'').toUpperCase(); if(!uf) return;
+    if(r.max_selecao==='Ladrões') areaPorEstadoLadroes[uf] = (areaPorEstadoLadroes[uf]||0)+(r.area||0);
+    else areaPorEstadoMaximas[uf] = (areaPorEstadoMaximas[uf]||0)+(r.area||0);
+  });
+  const estadosTodos = [...new Set([...Object.keys(areaPorEstadoLadroes), ...Object.keys(areaPorEstadoMaximas)])].sort();
+
+  const pontosSvg = comCoordenada.map(r=>{
+    const { x, y } = lmProjetarPonto(Number(r.max_latitude), Number(r.max_longitude));
+    const cor = r.max_selecao==='Ladrões' ? '#b8352a' : '#2e6e76';
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${cor}" stroke="#fff" stroke-width="1.2" data-talhao-id="${r.id}" style="cursor:pointer;">
+      <title>${r.fazenda} — Talhão ${r.talhao} (${r.max_selecao})</title>
+    </circle>`;
+  }).join('');
+  const estadosSvg = Object.entries(ESTADOS_BR_PATHS).map(([uf,d])=>`<path d="${d}" fill="#e3e3dc" stroke="#c8ccb9" stroke-width="1"></path>`).join('');
+  const mapaCompletoSvg = `<svg viewBox="${ESTADOS_BR_VIEWBOX}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;margin:0 auto;">${estadosSvg}${pontosSvg}</svg>`;
+
+  container.innerHTML = `
+  <style>
+    .lm-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;height:560px;}
+    .lm-map-card{grid-column:span 3;display:flex;flex-direction:column;min-height:0;}
+    .lm-map-card svg{flex:1;min-height:0;}
+    .lm-side-card{grid-column:span 2;display:flex;flex-direction:column;min-height:0;}
+    .lm-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;display:flex;flex-direction:column;min-height:0;}
+    .lm-card canvas{flex:1;min-height:0;width:100% !important;}
+    .lm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+    .lm-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;}
+    .lm-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1.15;}
+    .lm-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
+    .lm-legenda{display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:var(--ink-soft);justify-content:center;}
+    .lm-legenda span{display:inline-flex;align-items:center;gap:5px;}
+    .lm-dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+    @media (max-width:1100px){ .lm-layout{grid-template-columns:1fr;height:auto;} .lm-map-card{grid-column:1;height:440px;} .lm-side-card{grid-column:1;} .lm-kpis{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="lm-kpis">
+    <div class="lm-kpi" style="animation-delay:.02s"><div class="v" style="color:#b8352a;">${areaLadroes.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha em Ladrões</div></div>
+    <div class="lm-kpi" style="animation-delay:.06s"><div class="v" style="color:#2e6e76;">${areaMaximas.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha em Máximas</div></div>
+    <div class="lm-kpi" style="animation-delay:.1s"><div class="v" style="color:var(--ink);">${comCoordenada.length}</div><div class="l">Talhões plotados no mapa</div></div>
+    <div class="lm-kpi" style="animation-delay:.14s"><div class="v" style="color:var(--ink-soft);">${semCoordenada}</div><div class="l">Selecionados sem coordenada (fora do mapa)</div></div>
+  </div>
+
+  <div class="lm-layout">
+    <div class="lm-card lm-map-card" style="animation-delay:.05s;">
+      <h3 style="margin:0 0 6px;font-size:12.5px;">🗺️ Mapa de pontos</h3>
+      ${mapaCompletoSvg}
+      <div class="lm-legenda">
+        <span><span class="lm-dot" style="background:#2e6e76;"></span> Máximas</span>
+        <span><span class="lm-dot" style="background:#b8352a;"></span> Ladrões</span>
+      </div>
+    </div>
+    <div class="lm-side-card">
+      <div class="lm-card" style="animation-delay:.1s;">
+        <h3 style="margin:0 0 2px;font-size:12.5px;">📊 Área por Estado</h3>
+        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 6px;">Ladrões vs Máximas, por estado</p>
+        <canvas id="lmAreaEstado"></canvas>
+      </div>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('circle[data-talhao-id]').forEach(circle=>{
+    circle.addEventListener('click', ()=>{
+      const rec = comCoordenada.find(r=>r.id===circle.dataset.talhaoId);
+      if(rec) abrirModalLadroesMaximasTalhao(rec);
+    });
+  });
+
+  Object.values(ladroesMaximasMapaCharts).forEach(c=>{ if(c) c.destroy(); });
+  ladroesMaximasMapaCharts = {};
+  const canvasLmArea = container.querySelector('#lmAreaEstado');
+  if(canvasLmArea){
+    ladroesMaximasMapaCharts.areaEstado = new Chart(canvasLmArea.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: estadosTodos,
+        datasets:[
+          { label:'Ladrões', data: estadosTodos.map(uf=>Math.round((areaPorEstadoLadroes[uf]||0)*10)/10), backgroundColor:'#b8352a', borderRadius:4 },
+          { label:'Máximas', data: estadosTodos.map(uf=>Math.round((areaPorEstadoMaximas[uf]||0)*10)/10), backgroundColor:'#2e6e76', borderRadius:4 },
+        ],
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}}, scales:{ y:{beginAtZero:true} } }
     });
   }
 }
