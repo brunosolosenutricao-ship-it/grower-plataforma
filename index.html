@@ -1866,6 +1866,21 @@ async function processarImportacao(file){
       talhoesAtuais.forEach(t=> mapaAtual.set(chave(t.cliente,t.fazenda,t.talhao), t));
       const chavesExcel = new Set(linhasExcel.map(l=> chave(l.cliente,l.fazenda,l.talhao)));
 
+      // detecta duplicatas dentro do próprio arquivo (mesmo Cliente+Fazenda+Talhão em mais de uma linha) —
+      // se deixar passar, o Supabase recusa com um erro técnico confuso ("ON CONFLICT... affect row a second time")
+      const gruposPorChave = {};
+      linhasExcel.forEach(l=>{
+        const k = chave(l.cliente, l.fazenda, l.talhao);
+        if(!gruposPorChave[k]) gruposPorChave[k] = { label: `${l.cliente} / ${l.fazenda} / ${l.talhao}`, linhas: [] };
+        gruposPorChave[k].linhas.push(l.__posicao + 2); // +1 base 1, +1 pelo cabeçalho
+      });
+      const duplicadas = Object.values(gruposPorChave).filter(g=> g.linhas.length > 1);
+      if(duplicadas.length){
+        const mensagem = duplicadas.map(g=> `• ${g.label} — linhas ${g.linhas.join(', ')} do arquivo`).join('\n');
+        alert(`Esse arquivo tem talhão(ões) duplicado(s) — mesma combinação Cliente + Fazenda + Talhão aparece em mais de uma linha. Corrija (apague a linha repetida) e importe de novo:\n\n${mensagem}`);
+        return;
+      }
+
       const novos = [], atualizados = [], excluidos = [];
 
       linhasExcel.forEach(l=>{
