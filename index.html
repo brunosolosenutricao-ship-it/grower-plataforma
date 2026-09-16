@@ -2759,7 +2759,7 @@ async function carregarDadosDoSupabase(){
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
     const { data: talhoes, error: errT } = await fetchAllPaginated(
-      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, mg_0_20, p_resina_0_20, b_0_20, mn_0_20, zn_0_20, cu_0_20, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
+      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual, ' + GERAL_CAMPOS.filter(c=>c.subgrupo==='solo1'||c.subgrupo==='solo2').map(c=>c.key).join(', ')
     );
     if(errT) throw errT;
 
@@ -2912,6 +2912,9 @@ async function carregarDadosDoSupabase(){
         micro_natureza: dmicro.natureza_produto_micro ?? null,
         micro_status: dmicro.status_recomendacao_micro ?? null,
       };
+      // copia todos os campos de análise de solo (0-20/20-40) com a MESMA chave do GERAL_CAMPOS —
+      // usado pelo modal do Ladrões/Máximas, que lê genericamente por c.key
+      GERAL_CAMPOS.forEach(c=>{ if(c.subgrupo==='solo1' || c.subgrupo==='solo2') rec[c.key] = t[c.key] ?? null; });
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
     });
 
