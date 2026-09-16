@@ -86,7 +86,9 @@
   .app-shell{display:none;min-height:100vh;background:var(--bg);}
   .sidebar{width:230px;flex-shrink:0;background:var(--green-deep);color:#fff;display:flex;flex-direction:column;padding:20px 16px;}
   .sidebar .brand{justify-content:flex-start;margin-bottom:28px;}
-  .sidebar-nav{flex:1;display:flex;flex-direction:column;gap:4px;}
+  .sidebar-nav{flex:1;display:flex;flex-direction:column;gap:14px;}
+  .nav-group{background:rgba(255,255,255,.05);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:3px;}
+  .nav-group-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#9fb08f;padding:4px 8px 6px;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#c9d6c0;font-size:13.5px;font-weight:500;cursor:pointer;transition:.15s;}
   .nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
   .nav-item.active{background:var(--lime);color:var(--green-deep);font-weight:700;}
@@ -97,7 +99,10 @@
   .logout-btn:hover{background:rgba(255,255,255,.08);}
 
   .main{flex:1;min-width:0;padding:28px 32px;}
-  .main-header{margin-bottom:20px;}
+  .main-header{margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+  .atualizar-dash-btn{flex-shrink:0;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background .15s;}
+  .atualizar-dash-btn:hover{background:var(--bg);}
+  .atualizar-dash-btn:disabled{opacity:.6;cursor:default;}
   .main-header h2{margin:0 0 4px;font-size:20px;}
   .main-header .sub{margin:0;font-size:13px;color:var(--ink-soft);}
 
@@ -529,12 +534,23 @@
       <div class="brand-text"><h1>Grower</h1></div>
     </div>
     <div class="sidebar-nav">
-      <div class="nav-item active" data-view="alimentacao">📋 Alimentação</div>
-      <div class="nav-item" data-view="dashboard-mg">📊 Dash Projeto Óxido de Magnésio</div>
-      <div class="nav-item" data-view="ladroes-dash">🚩 Ladrões</div>
-      <div class="nav-item" data-view="maximas-dash">🌱 Máximas Produtividades</div>
-      <div class="nav-item" data-view="condicionador-dash">🧪 Projeto Condicionador</div>
-      <div class="nav-item" data-view="otimizacaop-dash">⚡ Otimização de P</div>
+      <div class="nav-group">
+        <div class="nav-group-label">Alimentação</div>
+        <div class="nav-item active" data-view="alimentacao">📋 Alimentação</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Trabalho</div>
+        <div class="nav-item" data-view="dashboard-mg">📊 Dash Projeto Óxido de Magnésio</div>
+        <div class="nav-item" data-view="ladroes-dash">🚩 Ladrões</div>
+        <div class="nav-item" data-view="maximas-dash">🌱 Máximas Produtividades</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Dash de Acompanhamento</div>
+        <div class="nav-item" data-view="condicionador-dash">🧪 Projeto Condicionador</div>
+        <div class="nav-item" data-view="otimizacaop-dash">⚡ Otimização de P</div>
+        <div class="nav-item" data-view="estruturacao-dash">🌾 Projeto Estruturação</div>
+      <div class="nav-item" data-view="oxidoconsumo-dash">🧪 Óxido de Magnésio</div>
+      </div>
     </div>
     <div class="sidebar-user">
       <div class="name" id="sbUserName">—</div>
@@ -599,6 +615,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:14px;">
     <div class="base-info" id="dashMgBaseInfo"></div>
+    <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
   </div>
 </header>
 
@@ -649,8 +666,11 @@
 
     <div id="viewLadroes" style="display:none;">
       <div class="main-header">
-        <h2>🚩 Ladrões de Produtividade</h2>
-        <p class="sub">Talhões com sinaleiro vermelho ou avaliação individual mencionando "queda", e a lista dos 25% piores por fazenda — dados do projeto Máximas Produtividades / Ladrões.</p>
+        <div>
+          <h2>🚩 Ladrões de Produtividade</h2>
+          <p class="sub">Talhões com sinaleiro vermelho ou avaliação individual mencionando "queda", e a lista dos 25% piores por fazenda — dados do projeto Máximas Produtividades / Ladrões.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
       </div>
       <div class="empty-wrap" id="ladroesLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -666,8 +686,11 @@
 
     <div id="viewMaximas" style="display:none;">
       <div class="main-header">
-        <h2>🌱 Máximas Produtividades</h2>
-        <p class="sub">Ranking dos talhões que mais superam a média ponderada por área da própria fazenda, ano a ano — por sistema (Sequeiro / Irrigado), numa janela de safras ajustável.</p>
+        <div>
+          <h2>🌱 Máximas Produtividades</h2>
+          <p class="sub">Ranking dos talhões que mais superam a média ponderada por área da própria fazenda, ano a ano — por sistema (Sequeiro / Irrigado), numa janela de safras ajustável.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
       </div>
       <div class="empty-wrap" id="maximasLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -683,8 +706,11 @@
 
     <div id="viewCondicionador" style="display:none;">
       <div class="main-header">
-        <h2>🧪 Projeto Condicionador</h2>
-        <p class="sub">Consumo e cobertura do Condicionador de Solo — mapa por estado, volume aplicado, adoção por consultor/produto e tipo de teste.</p>
+        <div>
+          <h2>🧪 Projeto Condicionador</h2>
+          <p class="sub">Consumo e cobertura do Condicionador de Solo — mapa por estado, volume aplicado, adoção por consultor/produto e tipo de teste.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
       </div>
       <div class="empty-wrap" id="condicionadorLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -700,8 +726,11 @@
 
     <div id="viewOtimizacaoP" style="display:none;">
       <div class="main-header">
-        <h2>⚡ Otimização de P</h2>
-        <p class="sub">Cobertura e consumo do projeto Otimização de P — mapa modulável, volume com solubilizador, adoção por consultor/produto e tipo de teste.</p>
+        <div>
+          <h2>⚡ Otimização de P</h2>
+          <p class="sub">Cobertura e consumo do projeto Otimização de P — mapa modulável, volume com solubilizador, adoção por consultor/produto e tipo de teste.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
       </div>
       <div class="empty-wrap" id="otimizacaoPLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -712,6 +741,46 @@
       </div>
       <div id="otimizacaoPApp" style="display:none;">
         <div id="tab-otimizacao-p"></div>
+      </div>
+    </div>
+
+    <div id="viewEstruturacao" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🌾 Projeto Estruturação</h2>
+          <p class="sub">Histórico de acamamento, adoção da tecnologia e oportunidades por estado — mapa modulável e ranking de oportunidade.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="estruturacaoLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🌾</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="estruturacaoApp" style="display:none;">
+        <div id="tab-estruturacao"></div>
+      </div>
+    </div>
+
+    <div id="viewOxidoConsumo" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🧪 Óxido de Magnésio</h2>
+          <p class="sub">Consumo de Óxido por estado — mapa modulável (dose média, teor de Mg médio, área tratada), volume aplicado e adoção por consultor.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="oxidoConsumoLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🧪</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="oxidoConsumoApp" style="display:none;">
+        <div id="tab-oxido-consumo"></div>
       </div>
     </div>
   </div>
@@ -776,8 +845,8 @@ const GERAL_CAMPOS = [
   { key:'geral_prod_24_25', label:'24/25', type:'number', subgrupo:'historico' },
   { key:'geral_prod_25_26', label:'25/26', type:'number', subgrupo:'historico' },
   { key:'geral_media_prod', label:'Média', type:'number', subgrupo:'historico' },
-  { key:'geral_sinaleiro', label:'Sinaleiro', type:'sinaleiro', subgrupo:'historico' },
-  { key:'geral_avaliacao_individual', label:'Avaliação individual', type:'text', subgrupo:'historico' },
+  { key:'geral_sinaleiro', label:'Sinaleiro', type:'calc-sinaleiro', subgrupo:'historico' },
+  { key:'geral_avaliacao_individual', label:'Avaliação individual (Queda)', type:'calc', subgrupo:'historico' },
 ];
 
 const PROJETOS_CONFIG = [
@@ -1148,6 +1217,20 @@ async function loadAlimentacao(){
     return flat;
   });
 
+  // Sinaleiro e Queda calculados automaticamente (ignora o que estiver gravado), por Fazenda + Sistema
+  if(window.calcularSinaleiroQuedaGrupo){
+    const calcMap = window.calcularSinaleiroQuedaGrupo(todosTalhoesConsultor.map(f=>({
+      id: f.id, fazenda: f.fazenda, sistema: f.sistema,
+      s1: f.geral_prod_23_24, s2: f.geral_prod_24_25, s3: f.geral_prod_25_26,
+      area: f.area_ha,
+    })));
+    todosTalhoesConsultor.forEach(f=>{
+      const calc = calcMap.get(f.id);
+      f.geral_sinaleiro = calc ? calc.sinaleiro : null;
+      f.geral_avaliacao_individual = calc && calc.queda ? 'Queda' : null;
+    });
+  }
+
   renderAlimentacaoTable();
 }
 
@@ -1249,6 +1332,13 @@ function renderAlimentacaoTable(){
       const v = rec ? rec[campo.mirrorFrom] : null;
       const cor = sinaleiroColor(v);
       return `<span class="mirror-value" title="Editado no Geral (Cadastro)"><span class="sinaleiro-dot" style="background:${cor};display:inline-block;"></span> ${v ?? '—'}</span>`;
+    }
+    if(campo.type==='calc'){
+      return `<span class="mirror-value" title="Calculado automaticamente (Fazenda + Sistema, 3 últimas safras)">${valor || '—'}</span>`;
+    }
+    if(campo.type==='calc-sinaleiro'){
+      const cor = sinaleiroColor(valor);
+      return `<span class="mirror-value" title="Calculado automaticamente (Fazenda + Sistema, 3 últimas safras)"><span class="sinaleiro-dot" style="background:${cor};display:inline-block;"></span> ${valor ?? '—'}</span>`;
     }
     if(campo.type==='date'){
       return `<input type="date" class="cell-input" data-field="${campo.key}" value="${valor ?? ''}">`;
@@ -1920,6 +2010,9 @@ async function abrirPainelAddTalhao(){
           <div class="form-section-label">Geral (Cadastro) — opcional</div>
           ${GERAL_CAMPOS.map(c=>{
             const inputId = 'ft_'+c.key;
+            if(c.type==='calc' || c.type==='calc-sinaleiro'){
+              return ''; // Sinaleiro/Queda são calculados automaticamente, não faz sentido pedir na criação
+            }
             if(c.type==='select'){
               return `<div><label>${c.label}</label><select id="${inputId}">
                 <option value="">—</option>
@@ -2283,7 +2376,9 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewMaximas').style.display = view==='maximas-dash' ? 'block' : 'none';
     document.getElementById('viewCondicionador').style.display = view==='condicionador-dash' ? 'block' : 'none';
     document.getElementById('viewOtimizacaoP').style.display = view==='otimizacaop-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash') && !dashMgJaCarregado){
+    document.getElementById('viewEstruturacao').style.display = view==='estruturacao-dash' ? 'block' : 'none';
+    document.getElementById('viewOxidoConsumo').style.display = view==='oxidoconsumo-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2386,6 +2481,9 @@ const state = {
   maximasJanela: 3,         // quantidade de safras mais recentes consideradas (3 a 6)
   colunasOcultas: new Set(), // slugs de projeto com colunas ocultas na Alimentação (tipo agrupar do Excel)
   otimizacaoPMapModo: 'p_resina', // 'p_resina' | 'dose_p2o5' | 'solubilizador' | 'area_projeto'
+  estruturacaoMapModo: 'acamamento', // 'acamamento' | 'adocao' | 'area_projeto'
+  oxidoConsumoMapModo: 'dose_media', // 'dose_media' | 'mg_medio' | 'area_tratada'
+  oxidoConsumoStatus: null, // Set de status marcados (null = ainda não inicializado, vira "todos" no primeiro render)
 };
 window.state = state; // a Alimentação (outro <script>) precisa enxergar esse objeto — let/const não cruza scripts sozinho
 
@@ -2541,8 +2639,24 @@ async function carregarDadosDoSupabase(){
   const condAppEl = document.getElementById('condicionadorApp');
   const opLoadingEl = document.getElementById('otimizacaoPLoading');
   const opAppEl = document.getElementById('otimizacaoPApp');
+  const estrLoadingEl = document.getElementById('estruturacaoLoading');
+  const estrAppEl = document.getElementById('estruturacaoApp');
+  const oxcLoadingEl = document.getElementById('oxidoConsumoLoading');
+  const oxcAppEl = document.getElementById('oxidoConsumoApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
+  if(ladLoadingEl) ladLoadingEl.style.display = 'flex';
+  if(ladAppEl) ladAppEl.style.display = 'none';
+  if(maxLoadingEl) maxLoadingEl.style.display = 'flex';
+  if(maxAppEl) maxAppEl.style.display = 'none';
+  if(condLoadingEl) condLoadingEl.style.display = 'flex';
+  if(condAppEl) condAppEl.style.display = 'none';
+  if(opLoadingEl) opLoadingEl.style.display = 'flex';
+  if(opAppEl) opAppEl.style.display = 'none';
+  if(estrLoadingEl) estrLoadingEl.style.display = 'flex';
+  if(estrAppEl) estrAppEl.style.display = 'none';
+  if(oxcLoadingEl) oxcLoadingEl.style.display = 'flex';
+  if(oxcAppEl) oxcAppEl.style.display = 'none';
 
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
@@ -2570,8 +2684,13 @@ async function carregarDadosDoSupabase(){
     const projResOp = await sb.from('projetos').select('id').eq('slug', 'otimizacao-de-p').single();
     if(!projResOp.error) projetoIdOp = projResOp.data.id;
 
+    // projeto Estruturação — mesma lógica, opcional
+    let projetoIdEstr = null;
+    const projResEstr = await sb.from('projetos').select('id').eq('slug', 'projeto-estruturacao').single();
+    if(!projResEstr.error) projetoIdEstr = projResEstr.data.id;
+
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {};
+    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -2595,6 +2714,11 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdOp).in('talhao_id', bloco);
         if(!errDOp && dadosOp) dadosOp.forEach(d=>{ dadosMapOp[d.talhao_id] = d.dados || {}; });
       }
+      if(projetoIdEstr){
+        const { data: dadosEstr, error: errDEstr } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdEstr).in('talhao_id', bloco);
+        if(!errDEstr && dadosEstr) dadosEstr.forEach(d=>{ dadosMapEstr[d.talhao_id] = d.dados || {}; });
+      }
     }
 
     const records = [], semArea = [];
@@ -2603,6 +2727,7 @@ async function carregarDadosDoSupabase(){
       const dm = dadosMapMax[t.id] || {};
       const dc = dadosMapCond[t.id] || {};
       const dop = dadosMapOp[t.id] || {};
+      const destr = dadosMapEstr[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
@@ -2652,8 +2777,29 @@ async function carregarDadosDoSupabase(){
         op_produto: dop.produto_recomendado_p ?? null,
         op_tipo_teste: dop.tipo_teste_p ?? null,
         op_dose_solub: dop.dose_solubilizador_recomendado_p ?? null,
+        // campos do Projeto Estruturação (jsonb próprio, projeto separado)
+        estr_area_projeto: destr.area_projeto_estr ?? null,
+        estr_tipo_teste: destr.tipo_teste_estr ?? null,
+        estr_produto: destr.nome_produto_estr ?? null,
+        estr_dose_padrao: destr.dose_padrao_fazenda_estr ?? null,
+        estr_uso_tecnologia: destr.historico_uso_tecnologia_estr ?? null,
+        estr_acamamento: destr.historico_acamamento_estr ?? null,
       };
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
+    });
+
+    // Sinaleiro e Queda são calculados aqui, ignorando qualquer valor antigo já gravado no banco —
+    // por Fazenda + Sistema, com base nas 3 safras mais recentes (20/21 em diante, sempre as 3 últimas: 23/24, 24/25, 25/26)
+    const todosParaCalculo = [...records, ...semArea];
+    const calcMap = calcularSinaleiroQuedaGrupo(todosParaCalculo.map(r=>({
+      id: r.id, fazenda: r.fazenda, sistema: r.max_sistema,
+      s1: r.max_prod_23_24, s2: r.max_prod_24_25, s3: r.max_prod_25_26,
+      area: r.area,
+    })));
+    todosParaCalculo.forEach(r=>{
+      const calc = calcMap.get(r.id);
+      r.max_sinaleiro = calc ? calc.sinaleiro : null;
+      r.max_avaliacao = calc && calc.queda ? 'Queda' : null;
     });
 
     RECORDS = records; SEM_AREA = semArea;
@@ -2689,6 +2835,10 @@ async function carregarDadosDoSupabase(){
     if(condAppEl) condAppEl.style.display = 'block';
     if(opLoadingEl) opLoadingEl.style.display = 'none';
     if(opAppEl) opAppEl.style.display = 'block';
+    if(estrLoadingEl) estrLoadingEl.style.display = 'none';
+    if(estrAppEl) estrAppEl.style.display = 'block';
+    if(oxcLoadingEl) oxcLoadingEl.style.display = 'none';
+    if(oxcAppEl) oxcAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
@@ -2696,6 +2846,8 @@ async function carregarDadosDoSupabase(){
     if(maxLoadingEl) maxLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(condLoadingEl) condLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(opLoadingEl) opLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(estrLoadingEl) estrLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(oxcLoadingEl) oxcLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -2908,6 +3060,8 @@ function renderAll(){
   renderMaximas();
   renderCondicionador();
   renderOtimizacaoP();
+  renderEstruturacao();
+  renderOxidoConsumo();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -4748,15 +4902,8 @@ function renderLadroes(){
   const talhoes = porCliente[state.ladroesCliente][state.ladroesFazenda] || [];
   const idxFazenda = fazendasDoCliente.indexOf(state.ladroesFazenda);
 
-  // Card 1 — Ladrões: sinaleiro vermelho OU avaliação individual menciona "queda"
-  const ladroesTalhoes = talhoes.filter(r=> sinaleiroEhVermelho(r.max_sinaleiro) || avaliacaoMencionaQueda(r.max_avaliacao));
-
-  // Card 2 — 25% piores, por critério selecionável
+  // Card 2 — 25% piores, por critério selecionável (calculado por sistema, dentro de subCardPioresHtml)
   const crit = state.ladroesCriterio; // 'prod_25_26' | 'media_prod'
-  const comCriterio = talhoes.filter(r => r['max_'+crit]!=null && r['max_'+crit]!=='' && !isNaN(Number(r['max_'+crit])));
-  const ordenados = [...comCriterio].sort((a,b)=> Number(a['max_'+crit]) - Number(b['max_'+crit]));
-  const qtdPiores = Math.max(1, Math.ceil(ordenados.length * 0.25));
-  const piores = ordenados.slice(0, ordenados.length ? qtdPiores : 0);
 
   function sinaleiroColorLd(v){
     if(v===null || v===undefined || String(v).trim()==='') return '#d9d9d4';
@@ -4776,28 +4923,98 @@ function renderLadroes(){
     return `<input type="text" inputmode="decimal" class="ipi-input-ld" data-talhao-id="${r.id}" value="${val}" placeholder="—">`;
   }
 
+  // médias ponderadas por sistema, usadas no cálculo do Sinaleiro/Queda — só pra exibir de referência
+  function calcularMediasPorSistema(lista){
+    const porSistema = { Sequeiro: [], Irrigado: [] };
+    lista.forEach(r=>{
+      const sist = normalizaSistema(r.max_sistema);
+      if(!sist) return;
+      const completo = [r.max_prod_23_24, r.max_prod_24_25, r.max_prod_25_26].every(v=> v!=null && v!=='' && !isNaN(Number(v)));
+      if(completo) porSistema[sist].push(r);
+    });
+    const medias = {};
+    ['Sequeiro','Irrigado'].forEach(sist=>{
+      const grupo = porSistema[sist];
+      if(!grupo.length){ medias[sist] = null; return; }
+      medias[sist] = ['max_prod_23_24','max_prod_24_25','max_prod_25_26'].map(k=>{
+        let somaProdArea=0, somaArea=0;
+        grupo.forEach(r=>{ const area=Number(r.area)||0; somaProdArea += Number(r[k])*area; somaArea += area; });
+        return somaArea>0 ? somaProdArea/somaArea : null;
+      });
+    });
+    return medias;
+  }
+
+  // agrupa os talhões da fazenda por Sistema (só os sistemas reconhecidos: Sequeiro/Irrigado)
+  const talhoesPorSistema = { Sequeiro: [], Irrigado: [] };
+  talhoes.forEach(r=>{ const s = normalizaSistema(r.max_sistema); if(s) talhoesPorSistema[s].push(r); });
+  const sistemasPresentes = ['Sequeiro','Irrigado'].filter(s=>talhoesPorSistema[s].length>0);
+
+  function subCardLadroesHtml(sistema, listaSistema){
+    const ladroesDoSistema = listaSistema.filter(r=> sinaleiroEhVermelho(r.max_sinaleiro) || avaliacaoMencionaQueda(r.max_avaliacao));
+    const medias = calcularMediasPorSistema(listaSistema)[sistema];
+    return `
+    <div class="ladroes-system-col">
+      <div class="ladroes-system-label">${sistema}</div>
+      <p class="sub" style="margin:0 0 8px;">${ladroesDoSistema.length} de ${listaSistema.length} talhões neste sistema.</p>
+      ${medias ? `<p class="sub" style="margin:0 0 10px;font-size:11.5px;">
+        <b>Médias consideradas:</b> 23/24: <b>${medias[0]!=null?fmtNum(medias[0],1):'—'}</b> · 24/25: <b>${medias[1]!=null?fmtNum(medias[1],1):'—'}</b> · 25/26: <b>${medias[2]!=null?fmtNum(medias[2],1):'—'}</b>
+      </p>` : ''}
+      ${ladroesDoSistema.length ? `
+      <div class="table-scroll"><table>
+        <thead><tr><th></th><th>Talhão</th><th>Cultura</th><th>Área (ha)</th><th>23/24</th><th>24/25</th><th>25/26</th><th>Média</th><th>Avaliação</th><th>IPI</th></tr></thead>
+        <tbody>
+          ${ladroesDoSistema.map(r=>`<tr>
+            <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
+            <td>${r.talhao}</td>
+            <td>${r.cultura}</td>
+            <td class="mono-td">${fmtNum(r.area,1)}</td>
+            <td class="mono-td">${r.max_prod_23_24!=null ? fmtNum(Number(r.max_prod_23_24),1) : '—'}</td>
+            <td class="mono-td">${r.max_prod_24_25!=null ? fmtNum(Number(r.max_prod_24_25),1) : '—'}</td>
+            <td class="mono-td">${r.max_prod_25_26!=null ? fmtNum(Number(r.max_prod_25_26),1) : '—'}</td>
+            <td class="mono-td">${r.max_media_prod!=null ? fmtNum(Number(r.max_media_prod),1) : '—'}</td>
+            <td style="max-width:200px;">${r.max_avaliacao ? (avaliacaoMencionaQueda(r.max_avaliacao) ? `<span style="color:var(--red);font-weight:600;">${r.max_avaliacao}</span>` : r.max_avaliacao) : '—'}</td>
+            <td>${ipiInputHtml(r)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : `<p class="sub">Nenhum talhão-problema neste sistema. 🎉</p>`}
+    </div>`;
+  }
+
+  function subCardPioresHtml(sistema, listaSistema){
+    const comCriterioSist = listaSistema.filter(r => r['max_'+crit]!=null && r['max_'+crit]!=='' && !isNaN(Number(r['max_'+crit])));
+    const ordenadosSist = [...comCriterioSist].sort((a,b)=> Number(a['max_'+crit]) - Number(b['max_'+crit]));
+    const qtdSist = Math.max(1, Math.ceil(ordenadosSist.length * 0.25));
+    const pioresSist = ordenadosSist.slice(0, ordenadosSist.length ? qtdSist : 0);
+    return `
+    <div class="ladroes-system-col">
+      <div class="ladroes-system-label">${sistema}</div>
+      <p class="sub" style="margin:0 0 10px;">${pioresSist.length} de ${comCriterioSist.length} talhões com valor cadastrado (25% do total, arredondado pra cima).</p>
+      ${pioresSist.length ? `
+      <div class="table-scroll"><table>
+        <thead><tr><th></th><th>Talhão</th><th>Cultura</th><th>${crit==='prod_25_26'?'Safra 25/26':'Média'} (sc/ha)</th><th>Sinaleiro</th></tr></thead>
+        <tbody>
+          ${pioresSist.map((r,i)=>`<tr>
+            <td><span class="rank-badge-ld">${i+1}</span></td>
+            <td>${r.talhao}</td>
+            <td>${r.cultura}</td>
+            <td class="mono-td">${fmtNum(Number(r['max_'+crit]),1)}</td>
+            <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : `<p class="sub">Sem talhões com esse critério preenchido neste sistema.</p>`}
+    </div>`;
+  }
+
   const cardLadroesHtml = `
   <div class="card full-card" style="margin-bottom:18px;">
     <div class="eyebrow">Card · Ladrões (Sinaleiro / Queda)</div>
     <h2>Talhões-problema desta fazenda</h2>
-    <p class="sub">Entram aqui talhões com <b>Sinaleiro vermelho</b> (≥3 anos de queda) ou cuja <b>Avaliação individual</b> mencione "queda" — <b>${ladroesTalhoes.length}</b> de ${talhoes.length} talhões.</p>
-    ${ladroesTalhoes.length ? `
-    <div class="table-scroll"><table>
-      <thead><tr><th></th><th>Talhão</th><th>Sistema</th><th>Cultura</th><th>Área (ha)</th><th>25/26 (sc/ha)</th><th>Média (sc/ha)</th><th>Avaliação individual</th><th>IPI</th></tr></thead>
-      <tbody>
-        ${ladroesTalhoes.map(r=>`<tr>
-          <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
-          <td>${r.talhao}</td>
-          <td>${r.max_sistema || '—'}</td>
-          <td>${r.cultura}</td>
-          <td class="mono-td">${fmtNum(r.area,1)}</td>
-          <td class="mono-td">${r.max_prod_25_26!=null ? fmtNum(Number(r.max_prod_25_26),1) : '—'}</td>
-          <td class="mono-td">${r.max_media_prod!=null ? fmtNum(Number(r.max_media_prod),1) : '—'}</td>
-          <td style="max-width:260px;">${r.max_avaliacao ? (avaliacaoMencionaQueda(r.max_avaliacao) ? `<span style="color:var(--red);font-weight:600;">${r.max_avaliacao}</span>` : r.max_avaliacao) : '—'}</td>
-          <td>${ipiInputHtml(r)}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>` : `<p class="sub">Nenhum talhão-problema nessa fazenda pelo critério atual. 🎉</p>`}
+    <p class="sub">Entram aqui talhões com <b>Sinaleiro vermelho</b> (≥3 anos de queda) ou cuja <b>Avaliação individual</b> mencione "queda" — separado por Sistema.</p>
+    <div class="ladroes-systems ${sistemasPresentes.length<2?'single':''}">
+      ${sistemasPresentes.map(s=>subCardLadroesHtml(s, talhoesPorSistema[s])).join('')}
+    </div>
+    ${!sistemasPresentes.length ? `<p class="sub">Nenhum talhão com Sistema reconhecido nessa fazenda.</p>` : ''}
   </div>`;
 
   const cardPioresHtml = `
@@ -4808,21 +5025,10 @@ function renderLadroes(){
       <button class="crit-btn-ld ${crit==='prod_25_26'?'active':''}" data-crit="prod_25_26">Safra 25/26</button>
       <button class="crit-btn-ld ${crit==='media_prod'?'active':''}" data-crit="media_prod">Média ponderada</button>
     </div>
-    <p class="sub" style="margin-top:10px;">${piores.length} de ${comCriterio.length} talhões com valor cadastrado nesse critério (25% do total, arredondado pra cima).</p>
-    ${piores.length ? `
-    <div class="table-scroll"><table>
-      <thead><tr><th></th><th>Talhão</th><th>Sistema</th><th>Cultura</th><th>${crit==='prod_25_26'?'Safra 25/26':'Média ponderada'} (sc/ha)</th><th>Sinaleiro</th></tr></thead>
-      <tbody>
-        ${piores.map((r,i)=>`<tr>
-          <td><span class="rank-badge-ld">${i+1}</span></td>
-          <td>${r.talhao}</td>
-          <td>${r.max_sistema || '—'}</td>
-          <td>${r.cultura}</td>
-          <td class="mono-td">${fmtNum(Number(r['max_'+crit]),1)}</td>
-          <td>${sinaleiroDotHtml(r.max_sinaleiro)}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>` : `<p class="sub">Sem talhões com esse critério preenchido nessa fazenda.</p>`}
+    <div class="ladroes-systems ${sistemasPresentes.length<2?'single':''}" style="margin-top:14px;">
+      ${sistemasPresentes.map(s=>subCardPioresHtml(s, talhoesPorSistema[s])).join('')}
+    </div>
+    ${!sistemasPresentes.length ? `<p class="sub">Nenhum talhão com Sistema reconhecido nessa fazenda.</p>` : ''}
   </div>`;
 
   container.innerHTML = `
@@ -4842,6 +5048,11 @@ function renderLadroes(){
     .criterio-toggle-ld button{border:none;background:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;color:var(--ink-soft);}
     .criterio-toggle-ld button.active{background:var(--green-deep);color:#fff;}
     .rank-badge-ld{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--amber-soft);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;}
+    .ladroes-systems{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:14px;min-width:0;}
+    .ladroes-systems.single{grid-template-columns:1fr;}
+    .ladroes-system-col{padding:0 18px;min-width:0;overflow:hidden;}
+    .ladroes-system-col + .ladroes-system-col{border-left:1px solid var(--line);}
+    .ladroes-system-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--teal);margin-bottom:6px;}
   </style>
 
   <div class="ladroes-selectbar">
@@ -4935,6 +5146,44 @@ function normalizaSistema(v){
   if(s.startsWith('seq')) return 'Sequeiro';
   if(s.startsWith('irr')) return 'Irrigado';
   return null; // grafia não reconhecida → tratado como "sem sistema", fica de fora
+}
+
+// Calcula Sinaleiro e Queda automaticamente, por Fazenda + Sistema, com base nas 3 safras mais recentes.
+// itens: [{ id, fazenda, sistema, s1, s2, s3, area }] onde s1=antepenúltima, s2=penúltima, s3=última safra.
+// Retorna um Map: id -> { sinaleiro: 0-3 ou null, queda: true/false ou null } — null quando não dá pra calcular
+// (sistema não reconhecido ou faltando alguma das 3 safras).
+function calcularSinaleiroQuedaGrupo(itens){
+  const resultado = new Map();
+  const grupos = {};
+  itens.forEach(it=>{
+    const sist = normalizaSistema(it.sistema);
+    if(!sist){ resultado.set(it.id, { sinaleiro:null, queda:null }); return; }
+    const completo = [it.s1,it.s2,it.s3].every(v=> v!=null && v!=='' && !isNaN(Number(v)));
+    if(!completo){ resultado.set(it.id, { sinaleiro:null, queda:null }); return; }
+    const chave = it.fazenda + '||' + sist;
+    if(!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push(it);
+  });
+  Object.values(grupos).forEach(lista=>{
+    const medias = [1,2,3].map(n=>{
+      let somaProdArea=0, somaArea=0;
+      lista.forEach(it=>{
+        const area = Number(it.area)||0;
+        somaProdArea += Number(it['s'+n]) * area;
+        somaArea += area;
+      });
+      return somaArea>0 ? somaProdArea/somaArea : null;
+    });
+    lista.forEach(it=>{
+      let sinaleiro = 0;
+      [1,2,3].forEach(n=>{
+        if(medias[n-1]!=null && Number(it['s'+n]) < medias[n-1]) sinaleiro++;
+      });
+      const queda = Number(it.s3) < Number(it.s2) && Number(it.s2) < Number(it.s1);
+      resultado.set(it.id, { sinaleiro, queda });
+    });
+  });
+  return resultado;
 }
 
 function renderMaximas(){
@@ -5197,11 +5446,28 @@ function condicionadorCorIntensidade(valor, max, cores){
   const b = Math.round(c1[2] + (c2[2]-c1[2])*t);
   return `rgb(${r},${g},${b})`;
 }
-function condicionadorMapaSvg(porEstado, unidade='ha', cores){
+// faixas de fertilidade do Mg solo (cmolc/dm³) — cores fixas por faixa, não gradiente contínuo
+const FAIXAS_MG = [
+  { max:0.2, cor:'#c0392b', label:'(≤ 0,2)' },
+  { max:0.5, cor:'#e67e22', label:'(0,2 – 0,5)' },
+  { max:1.0, cor:'#f1c40f', label:'(0,5 – 1,0)' },
+  { max:1.5, cor:'#8bc34a', label:'(1,0 – 1,5)' },
+  { max:2.0, cor:'#4caf50', label:'(1,5 – 2,0)' },
+  { max:Infinity, cor:'#1b5e20', label:'(≥ 2,0)' },
+];
+function corFaixaMg(valor){
+  if(valor==null) return '#e3e3dc';
+  const v = Number(valor);
+  if(isNaN(v)) return '#e3e3dc';
+  const faixa = FAIXAS_MG.find(f=> v<=f.max);
+  return faixa ? faixa.cor : FAIXAS_MG[FAIXAS_MG.length-1].cor;
+}
+function condicionadorMapaSvg(porEstado, unidade='ha', cores, corFn){
   const max = Math.max(0, ...Object.values(porEstado));
   const paths = Object.entries(ESTADOS_BR_PATHS).map(([uf,d])=>{
+    const temDado = porEstado[uf]!=null;
     const valor = porEstado[uf] || 0;
-    const cor = condicionadorCorIntensidade(valor, max, cores);
+    const cor = corFn ? corFn(temDado ? valor : null) : condicionadorCorIntensidade(valor, max, cores);
     return `<path d="${d}" fill="${cor}" stroke="#1a2019" stroke-width="1.1">
       <title>${uf}: ${valor.toLocaleString('pt-BR',{maximumFractionDigits:1})} ${unidade}</title>
     </path>`;
@@ -5786,6 +6052,607 @@ function renderOtimizacaoP(){
   }
 }
 
+/* ---------------- TAB PROJETO ESTRUTURAÇÃO ---------------- */
+let estruturacaoCharts = {};
+const ESTR_MAPA_MODOS = [
+  { key:'acamamento', label:'Histórico de acamamento' },
+  { key:'adocao', label:'% Adoção da tecnologia' },
+  { key:'area_projeto', label:'Área do projeto' },
+];
+function abrirModalEstruturacaoEstado(uf, comTeste){
+  const linhas = comTeste.filter(r=> (r.estado||'').toUpperCase()===uf);
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="estrModalOverlay">
+    <div class="modal-panel" style="max-width:1100px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Projeto Estruturação</div>
+          <h2 style="margin:2px 0;">Talhões em ${uf}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões) com teste (Faixa ou Lado a lado)</p>
+        </div>
+        <button class="backbtn" id="estrModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Consultor</th><th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
+            <th>Estado</th><th>Cidade</th><th>Cultura</th><th>Cultivar</th>
+            <th>Área do projeto (ha)</th><th>Tipo de teste</th><th>Nome do produto</th>
+            <th>Dose padrão Fazenda</th><th>Já usa tecnologia</th><th>Histórico de acamamento (ha)</th>
+          </tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.consultor||''}</td><td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td>${r.estado||''}</td><td>${r.cidade||''}</td><td>${r.cultura||''}</td><td>${r.cultivar||''}</td>
+              <td class="mono-td">${r.estr_area_projeto!=null?fmtNum(Number(r.estr_area_projeto),1):'—'}</td>
+              <td>${r.estr_tipo_teste||'—'}</td>
+              <td>${r.estr_produto||'—'}</td>
+              <td class="mono-td">${r.estr_dose_padrao!=null?fmtNum(Number(r.estr_dose_padrao),1):'—'}</td>
+              <td>${r.estr_uso_tecnologia||'—'}</td>
+              <td class="mono-td">${r.estr_acamamento!=null?fmtNum(Number(r.estr_acamamento),1):'—'}</td>
+            </tr>`).join('') || `<tr><td colspan="14">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('estrModalFechar').addEventListener('click', fechar);
+  document.getElementById('estrModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='estrModalOverlay') fechar(); });
+}
+function renderEstruturacao(){
+  const container = document.getElementById('tab-estruturacao');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const comTeste = base.filter(r=> (r.estr_tipo_teste==='Faixa' || r.estr_tipo_teste==='Lado a lado') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0);
+  const comUsoInfo = base.filter(r=> r.estr_uso_tecnologia==='Sim' || r.estr_uso_tecnologia==='Não');
+  const comProduto = base.filter(r=> r.estr_produto!=null && r.estr_produto!=='');
+  const oportunidade = base.filter(r=> r.estr_uso_tecnologia==='Não' && r.estr_acamamento!=null && Number(r.estr_acamamento)>0);
+
+  if(!comTeste.length && !comUsoInfo.length && !comProduto.length && !oportunidade.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Projeto Estruturação</div>
+      <h2>Nenhum dado do Projeto Estruturação ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer Área do projeto, Histórico de acamamento ou Histórico de uso da tecnologia preenchidos, os gráficos aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  function calcularMapaPorModo(modo){
+    if(modo==='acamamento'){
+      const out = {};
+      base.forEach(r=>{
+        if(r.estr_acamamento==null || Number(r.estr_acamamento)<=0) return;
+        const uf=(r.estado||'').toUpperCase(); if(!uf) return;
+        out[uf]=(out[uf]||0)+Number(r.estr_acamamento);
+      });
+      return { valores: out, unidade: 'ha (histórico total)' };
+    }
+    if(modo==='adocao'){
+      const simN = {}, totalN = {};
+      comUsoInfo.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; totalN[uf]=(totalN[uf]||0)+1; if(r.estr_uso_tecnologia==='Sim') simN[uf]=(simN[uf]||0)+1; });
+      const out = {}; Object.keys(totalN).forEach(uf=> out[uf]=Math.round(((simN[uf]||0)/totalN[uf])*1000)/10);
+      return { valores: out, unidade: '% adoção' };
+    }
+    const out = {};
+    comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; out[uf]=(out[uf]||0)+Number(r.estr_area_projeto); });
+    return { valores: out, unidade: 'ha de projeto' };
+  }
+  const modoAtivo = state.estruturacaoMapModo;
+  const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
+
+  const areaPorProduto = {};
+  comProduto.forEach(r=>{ areaPorProduto[r.estr_produto]=(areaPorProduto[r.estr_produto]||0)+(r.area||0); });
+
+  const adocaoPorConsultor = {}; // consultor -> {sim, total}
+  comUsoInfo.forEach(r=>{
+    if(!adocaoPorConsultor[r.consultor]) adocaoPorConsultor[r.consultor] = {sim:0, total:0};
+    adocaoPorConsultor[r.consultor].total++;
+    if(r.estr_uso_tecnologia==='Sim') adocaoPorConsultor[r.consultor].sim++;
+  });
+  const adocaoConsultorPct = Object.entries(adocaoPorConsultor).map(([c,v])=>[c, Math.round((v.sim/v.total)*1000)/10]).sort((a,b)=>b[1]-a[1]);
+
+  const tipos = ['Faixa','Lado a lado'];
+  const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
+  const tipoEstado = {};
+  tipos.forEach(tp=> tipoEstado[tp] = {});
+  comTeste.forEach(r=>{
+    const uf = (r.estado||'').toUpperCase();
+    tipoEstado[r.estr_tipo_teste][uf] = (tipoEstado[r.estr_tipo_teste][uf]||0) + Number(r.estr_area_projeto);
+  });
+
+  const areaProjetoPorEstado = {};
+  comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaProjetoPorEstado[uf]=(areaProjetoPorEstado[uf]||0)+Number(r.estr_area_projeto); });
+  const areaProjetoTotal = Object.values(areaProjetoPorEstado).reduce((a,b)=>a+b,0);
+
+  const oportunidadePorEstado = {};
+  oportunidade.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; oportunidadePorEstado[uf]=(oportunidadePorEstado[uf]||0)+Number(r.estr_acamamento); });
+  const estadosOportunidade = Object.keys(oportunidadePorEstado).sort((a,b)=>oportunidadePorEstado[b]-oportunidadePorEstado[a]);
+
+  const qtdEstadosTeste = new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean)).size;
+  const qtdFazendasTeste = new Set(comTeste.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdProdutoresTeste = new Set(comTeste.map(r=>r.cliente)).size;
+  const pctAdocaoGeral = comUsoInfo.length ? Math.round((comUsoInfo.filter(r=>r.estr_uso_tecnologia==='Sim').length / comUsoInfo.length) * 1000)/10 : 0;
+
+  const CORES_ESTADO_ESTR = ['#a4432a','#6b7a3f','#a68a2e','#7a5b3f','#8a5a4a','#5b7a5f','#9a6c3f','#7a4a3a','#6b8a9f','#a4823a'];
+  const coresPorEstadoEstr = {}; estadosComTeste.forEach((uf,i)=> coresPorEstadoEstr[uf]=CORES_ESTADO_ESTR[i%CORES_ESTADO_ESTR.length]);
+  const coresOportunidade = {}; estadosOportunidade.forEach((uf,i)=> coresOportunidade[uf]=CORES_ESTADO_ESTR[i%CORES_ESTADO_ESTR.length]);
+
+  container.innerHTML = `
+  <style>
+    .estr-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;}
+    .estr-map-card{grid-column:span 2;display:flex;flex-direction:column;}
+    .estr-chart-grid{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:12px;}
+    .estr-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;transition:box-shadow .2s, transform .2s;}
+    .estr-card:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .estr-card h3{margin:0 0 2px;font-size:12.5px;}
+    .estr-card .sub-sm{font-size:10px;color:var(--ink-soft);margin:0 0 6px;line-height:1.3;}
+    .estr-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+    .estr-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;transition:box-shadow .2s, transform .2s;}
+    .estr-kpi:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .estr-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#a4432a;line-height:1.15;}
+    .estr-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
+    .estr-map-legend{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
+    .estr-map-legend .bar{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#f0ddd3,#5c2410);}
+    .estr-card canvas{max-height:150px !important;}
+    .estr-map-card svg{flex:1;}
+    .estr-map-card path{transition:filter .15s, transform .15s, stroke-width .15s;transform-box:fill-box;transform-origin:center;cursor:pointer;}
+    .estr-map-card path:hover{filter:brightness(1.18) saturate(1.15);transform:scale(1.015);stroke:#5c2410;stroke-width:1.6;}
+    .estr-mapa-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+    .estr-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .estr-mapa-pill.active{background:#5c2410;color:#fff;border-color:#5c2410;}
+    @media (max-width:1100px){ .estr-layout{grid-template-columns:1fr;} .estr-map-card{grid-column:1;} .estr-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .estr-kpis{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="estr-kpis">
+    <div class="estr-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
+    <div class="estr-kpi" style="animation-delay:.06s"><div class="v">${qtdEstadosTeste}</div><div class="l">Estados com teste</div></div>
+    <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
+    <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div></div>
+    <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia</div></div>
+  </div>
+
+  <div class="estr-layout">
+    <div class="estr-card estr-map-card" style="animation-delay:.05s;">
+      <h3>🗺️ Mapa modulável</h3>
+      <p class="sub-sm">Escolha o que o mapa mostra:</p>
+      <div class="estr-mapa-pills">
+        ${ESTR_MAPA_MODOS.map(m=>`<button class="estr-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
+      </div>
+      ${condicionadorMapaSvg(mapaValores, mapaUnidade, [[240,221,211],[92,36,16]])}
+      <div class="estr-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>
+      <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>
+    </div>
+    <div class="estr-chart-grid">
+      <div class="estr-card" style="animation-delay:.1s;">
+        <h3>🥧 Área de projeto por Estado</h3>
+        <p class="sub-sm">Só Faixa / Lado a lado</p>
+        <canvas id="estrPieEstado"></canvas>
+      </div>
+      <div class="estr-card" style="animation-delay:.14s;">
+        <h3>🧪 Área tratada por Produto</h3>
+        <p class="sub-sm">Área do talhão, por Nome do produto</p>
+        <canvas id="estrAreaProduto"></canvas>
+      </div>
+      <div class="estr-card" style="animation-delay:.18s;">
+        <h3>👤 Adoção por Consultor</h3>
+        <p class="sub-sm">% de talhões com tecnologia adotada</p>
+        <canvas id="estrAdocaoConsultor"></canvas>
+      </div>
+      <div class="estr-card" style="animation-delay:.22s;">
+        <h3>📊 Tipo de Teste por Estado</h3>
+        <p class="sub-sm">Faixa vs Lado a lado (cor = estado)</p>
+        <canvas id="estrTipoEstado"></canvas>
+      </div>
+      <div class="estr-card" style="animation-delay:.26s;grid-column:span 2;">
+        <h3>⭐ Oportunidade — Brasil</h3>
+        <p class="sub-sm">Histórico de acamamento em talhões que ainda NÃO usam a tecnologia, empilhado por estado</p>
+        <canvas id="estrOportunidadeBrasil"></canvas>
+      </div>
+      <div class="estr-card" style="animation-delay:.3s;grid-column:span 2;">
+        <h3>⭐ Oportunidade por Estado</h3>
+        <p class="sub-sm">Mesmo critério, detalhado por estado</p>
+        <canvas id="estrOportunidadeEstado"></canvas>
+      </div>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('.estr-mapa-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.estruturacaoMapModo = btn.dataset.mapaModo;
+      renderEstruturacao();
+    });
+  });
+
+  Object.values(estruturacaoCharts).forEach(c=>{ if(c) c.destroy(); });
+  estruturacaoCharts = {};
+
+  const CHART_ANIMACAO_ESTR = { duration: 850, easing: 'easeOutQuart' };
+  const estrTooltip = (extra={}) => ({
+    backgroundColor:'#1a2019', titleColor:'#fff', bodyColor:'#eef1e6',
+    padding:10, cornerRadius:8, displayColors:false, titleFont:{size:11.5,weight:'700'}, bodyFont:{size:11.5},
+    ...extra,
+  });
+  const estrDataLabelBase = { color:'#1a2019', font:{size:9.5,weight:'700'}, anchor:'end', align:'end', offset:2 };
+
+  const canvasEstrPie = container.querySelector('#estrPieEstado');
+  if(canvasEstrPie){
+    estruturacaoCharts.pie = new Chart(canvasEstrPie.getContext('2d'), {
+      type:'pie',
+      data:{ labels: estadosComTeste, datasets:[{ data: estadosComTeste.map(uf=>Math.round((areaProjetoPorEstado[uf]||0)*10)/10), backgroundColor: estadosComTeste.map(uf=>coresPorEstadoEstr[uf]), hoverOffset:10, borderColor:'#fbfaf4', borderWidth:2 }] },
+      options:{
+        responsive:true, animation:{...CHART_ANIMACAO_ESTR, animateRotate:true, animateScale:true},
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const uf = estadosComTeste[elements[0].index];
+          abrirModalEstruturacaoEstado(uf, comTeste);
+        },
+        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.label}: ${c.formattedValue} ha`}})}
+      }
+    });
+  }
+
+  const canvasEstrAreaProduto = container.querySelector('#estrAreaProduto');
+  if(canvasEstrAreaProduto){
+    const entradas = Object.entries(areaPorProduto).sort((a,b)=>b[1]-a[1]);
+    estruturacaoCharts.areaProduto = new Chart(canvasEstrAreaProduto.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#a4432a', hoverBackgroundColor:'#bc5a3f', borderRadius:4 }] },
+      options:{ responsive:true, indexAxis:'y', animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasEstrAdocao = container.querySelector('#estrAdocaoConsultor');
+  if(canvasEstrAdocao){
+    estruturacaoCharts.adocaoConsultor = new Chart(canvasEstrAdocao.getContext('2d'), {
+      type:'bar',
+      data:{ labels: adocaoConsultorPct.map(e=>e[0]), datasets:[{ label:'% adoção', data: adocaoConsultorPct.map(e=>e[1]), backgroundColor:'#6b7a3f', hoverBackgroundColor:'#85944f', borderRadius:4 }] },
+      options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue}%`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v+'%'}}, scales:{ y:{beginAtZero:true, max:100} } }
+    });
+  }
+
+  const canvasEstrTipo = container.querySelector('#estrTipoEstado');
+  if(canvasEstrTipo){
+    estruturacaoCharts.tipoEstado = new Chart(canvasEstrTipo.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: tipos,
+        datasets: estadosComTeste.map(uf=>({
+          label: uf,
+          data: tipos.map(tp=> Math.round((tipoEstado[tp][uf]||0)*10)/10),
+          backgroundColor: coresPorEstadoEstr[uf],
+          hoverBackgroundColor: coresPorEstadoEstr[uf],
+          borderRadius:3,
+        })),
+      },
+      options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
+    });
+  }
+
+  const canvasOportBrasil = container.querySelector('#estrOportunidadeBrasil');
+  if(canvasOportBrasil){
+    estruturacaoCharts.oportBrasil = new Chart(canvasOportBrasil.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: ['🇧🇷 Brasil'],
+        datasets: estadosOportunidade.map(uf=>({
+          label: uf,
+          data: [Math.round((oportunidadePorEstado[uf]||0)*10)/10],
+          backgroundColor: coresOportunidade[uf],
+          hoverBackgroundColor: coresOportunidade[uf],
+        })),
+      },
+      options:{ responsive:true, indexAxis:'y', animation:CHART_ANIMACAO_ESTR, scales:{ x:{stacked:true, beginAtZero:true}, y:{stacked:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
+    });
+  }
+
+  const canvasOportEstado = container.querySelector('#estrOportunidadeEstado');
+  if(canvasOportEstado){
+    estruturacaoCharts.oportEstado = new Chart(canvasOportEstado.getContext('2d'), {
+      type:'bar',
+      data:{ labels: estadosOportunidade, datasets:[{ label:'ha', data: estadosOportunidade.map(uf=>Math.round((oportunidadePorEstado[uf]||0)*10)/10), backgroundColor: estadosOportunidade.map(uf=>coresOportunidade[uf]), borderRadius:4 }] },
+      options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+}
+
+/* ---------------- TAB ÓXIDO DE MAGNÉSIO — CONSUMO ---------------- */
+let oxidoConsumoCharts = {};
+const OXC_MAPA_MODOS = [
+  { key:'dose_media', label:'Dose de óxido média' },
+  { key:'mg_medio', label:'Teor de Mg médio 0-20cm' },
+  { key:'area_tratada', label:'Área tratada' },
+];
+function abrirModalOxidoConsumoEstado(uf, comDose){
+  const linhas = comDose.filter(r=> (r.estado||'').toUpperCase()===uf);
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="oxcModalOverlay">
+    <div class="modal-panel" style="max-width:1100px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Óxido de Magnésio</div>
+          <h2 style="margin:2px 0;">Talhões em ${uf}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões) com Dose de óxido &gt; 0</p>
+        </div>
+        <button class="backbtn" id="oxcModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Consultor</th><th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
+            <th>Estado</th><th>Cidade</th><th>Cultura</th>
+            <th>Mg solo</th><th>Dose Óxido</th><th>Dose Calcário</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.consultor||''}</td><td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td>${r.estado||''}</td><td>${r.cidade||''}</td><td>${r.cultura||''}</td>
+              <td class="mono-td">${r.mg_valido?fmtNum(r.mg,2):'—'}</td>
+              <td class="mono-td">${fmtNum(r.dose_oxido,1)}</td>
+              <td class="mono-td">${fmtNum(r.dose_calcario,1)}</td>
+              <td>${r.status||'—'}</td>
+            </tr>`).join('') || `<tr><td colspan="12">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('oxcModalFechar').addEventListener('click', fechar);
+  document.getElementById('oxcModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='oxcModalOverlay') fechar(); });
+}
+function renderOxidoConsumo(){
+  const container = document.getElementById('tab-oxido-consumo');
+  if(!container) return;
+
+  // fixo em Brasil nessa aba, independente do filtro de país usado nas outras abas do Óxido
+  const base = RECORDS.filter(r=>r.pais==='Brasil');
+  const comDoseBruto = base.filter(r=> r.dose_oxido!=null && Number(r.dose_oxido)>0);
+  const comMg = base.filter(r=> r.mg_valido && r.mg!=null);
+
+  // Status disponíveis — só os que realmente aparecem entre quem já tem Dose > 0 (não os 6 fixos do cadastro)
+  const statusDisponiveis = [...new Set(comDoseBruto.map(r=>r.status||'Sem Informação'))].sort();
+  if(!state.oxidoConsumoStatus) state.oxidoConsumoStatus = new Set(statusDisponiveis); // por padrão, todos marcados
+  const comDose = comDoseBruto.filter(r=> state.oxidoConsumoStatus.has(r.status||'Sem Informação'));
+
+  if(!comDoseBruto.length && !comMg.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Óxido de Magnésio</div>
+      <h2>Nenhum dado de consumo ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer Dose Óxido ou Mg solo preenchidos, os gráficos aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  function calcularMapaPorModo(modo){
+    if(modo==='dose_media'){
+      const somaN = {}, contN = {};
+      comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.dose_oxido); contN[uf]=(contN[uf]||0)+1; });
+      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
+      return { valores: out, unidade: 'ton/ha (média)' };
+    }
+    if(modo==='mg_medio'){
+      const somaN = {}, contN = {};
+      comMg.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.mg); contN[uf]=(contN[uf]||0)+1; });
+      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
+      return { valores: out, unidade: 'cmolc/dm³ (média)' };
+    }
+    const out = {};
+    comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; out[uf]=(out[uf]||0)+(r.area||0); });
+    return { valores: out, unidade: 'ha tratados' };
+  }
+  const modoAtivo = state.oxidoConsumoMapModo;
+  const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
+
+  const areaPorEstado = {};
+  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaPorEstado[uf]=(areaPorEstado[uf]||0)+(r.area||0); });
+  const areaTotal = Object.values(areaPorEstado).reduce((a,b)=>a+b,0);
+
+  const volumePorEstado = {};
+  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; volumePorEstado[uf]=(volumePorEstado[uf]||0)+(Number(r.dose_oxido)*(r.area||0)); });
+
+  const volumePorCliente = {};
+  comDose.forEach(r=>{ volumePorCliente[r.cliente]=(volumePorCliente[r.cliente]||0)+(Number(r.dose_oxido)*(r.area||0)); });
+  const top10Clientes = Object.entries(volumePorCliente).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  const areaPorConsultor = {};
+  comDose.forEach(r=>{ areaPorConsultor[r.consultor]=(areaPorConsultor[r.consultor]||0)+(r.area||0); });
+
+  const estadosComDose = new Set(comDose.map(r=>(r.estado||'').toUpperCase()).filter(Boolean));
+  const qtdEstados = estadosComDose.size;
+  const qtdFazendas = new Set(comDose.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdProdutores = new Set(comDose.map(r=>r.cliente)).size;
+  const volumeTotal = Object.values(volumePorEstado).reduce((a,b)=>a+b,0);
+
+  const estadosPizza = [...estadosComDose].sort();
+  const CORES_ESTADO_OXC = ['#5c2410','#2c4a7a','#6b7a3f','#a68a2e','#7a5b8a','#3f8891','#8a3a3a','#9a6c3f','#5b7a99','#a4432a'];
+  const coresPorEstado = {}; estadosPizza.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO_OXC[i%CORES_ESTADO_OXC.length]);
+
+  container.innerHTML = `
+  <style>
+    .oxc-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;height:560px;}
+    .oxc-map-card{grid-column:span 2;display:flex;flex-direction:column;min-height:0;}
+    .oxc-chart-grid{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(2,1fr);gap:12px;min-height:0;}
+    .oxc-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;transition:box-shadow .2s, transform .2s;display:flex;flex-direction:column;min-height:0;}
+    .oxc-card:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .oxc-card h3{margin:0 0 2px;font-size:12.5px;}
+    .oxc-card .sub-sm{font-size:10px;color:var(--ink-soft);margin:0 0 6px;line-height:1.3;}
+    .oxc-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+    .oxc-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;transition:box-shadow .2s, transform .2s;}
+    .oxc-kpi:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .oxc-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#5c2410;line-height:1.15;}
+    .oxc-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
+    .oxc-map-legend{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
+    .oxc-map-legend .bar{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#f0ddd3,#5c2410);}
+    .oxc-faixas-legend{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;margin-top:8px;}
+    .oxc-faixa-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--ink-soft);}
+    .oxc-faixa-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+    .oxc-card canvas{flex:1;min-height:0;width:100% !important;}
+    .oxc-card-wrap{position:relative;flex:1;min-height:0;}
+    .oxc-map-card svg{flex:1;}
+    .oxc-map-card path{transition:filter .15s, transform .15s, stroke-width .15s;transform-box:fill-box;transform-origin:center;cursor:pointer;}
+    .oxc-map-card path:hover{filter:brightness(1.18) saturate(1.15);transform:scale(1.015);stroke:#5c2410;stroke-width:1.6;}
+    .oxc-mapa-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+    .oxc-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .oxc-mapa-pill.active{background:#5c2410;color:#fff;border-color:#5c2410;}
+    .oxc-status-pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+    .oxc-status-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;opacity:.5;}
+    .oxc-status-pill.active{background:var(--amber-soft);color:#7a5b1c;border-color:var(--amber);opacity:1;}
+    .oxc-status-action{border:none;background:none;font-size:10px;font-weight:600;color:var(--teal);cursor:pointer;font-family:inherit;padding:5px 6px;text-decoration:underline;}
+    @media (max-width:1100px){ .oxc-layout{grid-template-columns:1fr;} .oxc-map-card{grid-column:1;} .oxc-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .oxc-kpis{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="oxc-card" style="margin-bottom:12px;opacity:1;animation:none;">
+    <h3 style="margin-bottom:8px;">Filtrar por Status</h3>
+    <div class="oxc-status-pills">
+      ${statusDisponiveis.map(s=>`<button class="oxc-status-pill ${state.oxidoConsumoStatus.has(s)?'active':''}" data-status="${encodeURIComponent(s)}">${s}</button>`).join('')}
+      <button class="oxc-status-action" data-acao="todos">Marcar todos</button>
+      <button class="oxc-status-action" data-acao="limpar">Limpar</button>
+    </div>
+  </div>
+
+  <div class="oxc-kpis">
+    <div class="oxc-kpi" style="animation-delay:.02s"><div class="v">${areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha tratados (dose &gt; 0)</div></div>
+    <div class="oxc-kpi" style="animation-delay:.06s"><div class="v">${qtdEstados}</div><div class="l">Estados com dose &gt; 0</div></div>
+    <div class="oxc-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendas}</div><div class="l">Fazendas (dose &gt; 0)</div></div>
+    <div class="oxc-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutores}</div><div class="l">Produtores (dose &gt; 0)</div></div>
+    <div class="oxc-kpi" style="animation-delay:.18s"><div class="v">${volumeTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">Volume total (ton)</div></div>
+  </div>
+
+  <div class="oxc-layout">
+    <div class="oxc-card oxc-map-card" style="animation-delay:.05s;">
+      <h3>🗺️ Mapa modulável</h3>
+      <p class="sub-sm">Escolha o que o mapa mostra:</p>
+      <div class="oxc-mapa-pills">
+        ${OXC_MAPA_MODOS.map(m=>`<button class="oxc-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
+      </div>
+      ${modoAtivo==='mg_medio'
+        ? condicionadorMapaSvg(mapaValores, mapaUnidade, null, corFaixaMg)
+        : condicionadorMapaSvg(mapaValores, mapaUnidade, [[240,221,211],[92,36,16]])}
+      ${modoAtivo==='mg_medio'
+        ? `<div class="oxc-faixas-legend">${FAIXAS_MG.map(f=>`<span class="oxc-faixa-item"><span class="oxc-faixa-dot" style="background:${f.cor}"></span>${f.label}</span>`).join('')}</div>`
+        : `<div class="oxc-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`}
+      <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>
+    </div>
+    <div class="oxc-chart-grid">
+      <div class="oxc-card" style="animation-delay:.1s;">
+        <h3>🥧 Área de projeto por Estado</h3>
+        <p class="sub-sm">Área do talhão, só onde Dose Óxido &gt; 0</p>
+        <div class="oxc-card-wrap"><canvas id="oxcPieEstado"></canvas></div>
+      </div>
+      <div class="oxc-card" style="animation-delay:.14s;">
+        <h3>💧 Volume por Estado (ton)</h3>
+        <p class="sub-sm">Dose (ton/ha) × Área do talhão</p>
+        <div class="oxc-card-wrap"><canvas id="oxcVolumeEstado"></canvas></div>
+      </div>
+      <div class="oxc-card" style="animation-delay:.18s;">
+        <h3>💧 Volume por Cliente — Top 10 (ton)</h3>
+        <p class="sub-sm">Mesma conta, por cliente</p>
+        <div class="oxc-card-wrap"><canvas id="oxcVolumeCliente"></canvas></div>
+      </div>
+      <div class="oxc-card" style="animation-delay:.22s;">
+        <h3>👤 Área tratada por Consultor</h3>
+        <p class="sub-sm">Área do talhão (dose &gt; 0)</p>
+        <div class="oxc-card-wrap"><canvas id="oxcAreaConsultor"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="oxc-card full-card" style="margin-top:12px;animation-delay:.26s;">
+    <h3>📊 Tipo de Teste por Estado</h3>
+    <p class="sub-sm">Aguardando cadastro da coluna "Tipo de teste" nesse projeto — assim que existir, esse card entra em funcionamento igual os outros dashboards (Faixa vs Lado a lado, empilhado por estado).</p>
+  </div>
+  `;
+
+  container.querySelectorAll('.oxc-mapa-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.oxidoConsumoMapModo = btn.dataset.mapaModo;
+      renderOxidoConsumo();
+    });
+  });
+  container.querySelectorAll('.oxc-status-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const s = decodeURIComponent(btn.dataset.status);
+      if(state.oxidoConsumoStatus.has(s)) state.oxidoConsumoStatus.delete(s); else state.oxidoConsumoStatus.add(s);
+      renderOxidoConsumo();
+    });
+  });
+  container.querySelectorAll('.oxc-status-action').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(btn.dataset.acao==='todos') state.oxidoConsumoStatus = new Set(statusDisponiveis);
+      else state.oxidoConsumoStatus = new Set();
+      renderOxidoConsumo();
+    });
+  });
+
+  Object.values(oxidoConsumoCharts).forEach(c=>{ if(c) c.destroy(); });
+  oxidoConsumoCharts = {};
+
+  const CHART_ANIMACAO_OXC = { duration: 850, easing: 'easeOutQuart' };
+  const oxcTooltip = (extra={}) => ({
+    backgroundColor:'#1a2019', titleColor:'#fff', bodyColor:'#eef1e6',
+    padding:10, cornerRadius:8, displayColors:false, titleFont:{size:11.5,weight:'700'}, bodyFont:{size:11.5},
+    ...extra,
+  });
+  const oxcDataLabelBase = { color:'#1a2019', font:{size:9.5,weight:'700'}, anchor:'end', align:'end', offset:2 };
+
+  const canvasOxcPie = container.querySelector('#oxcPieEstado');
+  if(canvasOxcPie){
+    oxidoConsumoCharts.pie = new Chart(canvasOxcPie.getContext('2d'), {
+      type:'pie',
+      data:{ labels: estadosPizza, datasets:[{ data: estadosPizza.map(uf=>Math.round((areaPorEstado[uf]||0)*10)/10), backgroundColor: estadosPizza.map(uf=>coresPorEstado[uf]), hoverOffset:10, borderColor:'#fbfaf4', borderWidth:2 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{...CHART_ANIMACAO_OXC, animateRotate:true, animateScale:true},
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const uf = estadosPizza[elements[0].index];
+          abrirModalOxidoConsumoEstado(uf, comDose);
+        },
+        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.label}: ${c.formattedValue} ha`}})}
+      }
+    });
+  }
+
+  const canvasOxcVolEstado = container.querySelector('#oxcVolumeEstado');
+  if(canvasOxcVolEstado){
+    const entradas = Object.entries(volumePorEstado).sort((a,b)=>b[1]-a[1]);
+    oxidoConsumoCharts.volEstado = new Chart(canvasOxcVolEstado.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ton', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#5c2410', hoverBackgroundColor:'#7a3a1e', borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_OXC, plugins:{legend:{display:false}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.formattedValue} ton`}}), datalabels:{...oxcDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasOxcVolCliente = container.querySelector('#oxcVolumeCliente');
+  if(canvasOxcVolCliente){
+    oxidoConsumoCharts.volCliente = new Chart(canvasOxcVolCliente.getContext('2d'), {
+      type:'bar',
+      data:{ labels: top10Clientes.map(e=>e[0]), datasets:[{ label:'ton', data: top10Clientes.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#2c4a7a', hoverBackgroundColor:'#3f63a0', borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:CHART_ANIMACAO_OXC, plugins:{legend:{display:false}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.formattedValue} ton`}}), datalabels:{...oxcDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasOxcAreaConsultor = container.querySelector('#oxcAreaConsultor');
+  if(canvasOxcAreaConsultor){
+    const entradas = Object.entries(areaPorConsultor).sort((a,b)=>b[1]-a[1]);
+    oxidoConsumoCharts.areaConsultor = new Chart(canvasOxcAreaConsultor.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#6b7a3f', hoverBackgroundColor:'#85944f', borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_OXC, plugins:{legend:{display:false}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...oxcDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+}
+
 /* ---------------- TAB CRONOGRAMA ---------------- */
 async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
@@ -6053,6 +6920,23 @@ function importCronogramaExcel(file){
 
 
 window.dashMgCarregarDados = carregarDadosDoSupabase;
+
+// Botão "🔄 Atualizar" — existe em cada dashboard, mas todos chamam a mesma busca
+// (todos os dashboards compartilham o mesmo RECORDS), então atualizar um atualiza todos.
+async function atualizarTodosDashboards(btn){
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Atualizando…';
+  try{
+    await carregarDadosDoSupabase();
+    btn.textContent = '✓ Atualizado';
+  }catch(err){
+    btn.textContent = '✕ Erro';
+    console.error(err);
+  }
+  setTimeout(()=>{ btn.textContent = textoOriginal; btn.disabled = false; }, 1400);
+}
+window.atualizarTodosDashboards = atualizarTodosDashboards;
+window.calcularSinaleiroQuedaGrupo = calcularSinaleiroQuedaGrupo;
 window.dashMgInitCustosSimulador = initCustosSimulador;
 })();
 
