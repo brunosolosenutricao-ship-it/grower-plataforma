@@ -793,7 +793,7 @@ const SUPABASE_URL = 'https://oapzjdpteufggdxzyyui.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_bfkO2q05szBCJDoWeLhSpg_ByYOaKz7';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const PAGE_SIZE = 50;
-const STATUS_OPTIONS = ['Sem Informação','Sem Reunião','Não comprado','Em Análise','Comprado','Aplicado'];
+const STATUS_OPTIONS = ['Sem Informação','Sem Reunião','Sem recomendação','Não comprado','Em Análise','Comprado','Aplicado'];
 
 // Config de todos os projetos da plataforma e seus campos específicos.
 // Pra criar um projeto novo: (1) cadastra ele na tabela `projetos` do Supabase (nome+slug),
@@ -5466,6 +5466,24 @@ function corFaixaMg(valor){
   const faixa = FAIXAS_MG.find(f=> v<=f.max);
   return faixa ? faixa.cor : FAIXAS_MG[FAIXAS_MG.length-1].cor;
 }
+// faixas de fertilidade do P resina (mg/dm³) — cores fixas por faixa
+const FAIXAS_P = [
+  { max:8.0,  cor:'#c0392b', label:'(≤ 8,0)' },
+  { max:15.0, cor:'#e67e22', label:'(8,0 – 15,0)' },
+  { max:21.0, cor:'#f1c40f', label:'(15,0 – 21,0)' },
+  { max:35.0, cor:'#8bc34a', label:'(21,0 – 35,0)' },
+  { max:50.0, cor:'#2e9e8f', label:'(35,0 – 50,0)' },
+  { max:70.0, cor:'#3498db', label:'(50,0 – 70,0)' },
+  { max:90.0, cor:'#2c4a7a', label:'(70,0 – 90,0)' },
+  { max:Infinity, cor:'#1a2c52', label:'(≥ 90,0)' },
+];
+function corFaixaP(valor){
+  if(valor==null) return '#e3e3dc';
+  const v = Number(valor);
+  if(isNaN(v)) return '#e3e3dc';
+  const faixa = FAIXAS_P.find(f=> v<=f.max);
+  return faixa ? faixa.cor : FAIXAS_P[FAIXAS_P.length-1].cor;
+}
 function condicionadorMapaSvg(porEstado, unidade='ha', cores, corFn){
   const max = Math.max(0, ...Object.values(porEstado));
   const paths = Object.entries(ESTADOS_BR_PATHS).map(([uf,d])=>{
@@ -5922,8 +5940,12 @@ function renderOtimizacaoP(){
       <div class="op-mapa-pills">
         ${OP_MAPA_MODOS.map(m=>`<button class="op-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
       </div>
-      ${condicionadorMapaSvg(mapaValores, mapaUnidade, [[205,219,235],[24,44,74]])}
-      <div class="op-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>
+      ${modoAtivo==='p_resina'
+        ? condicionadorMapaSvg(mapaValores, mapaUnidade, null, corFaixaP)
+        : condicionadorMapaSvg(mapaValores, mapaUnidade, [[205,219,235],[24,44,74]])}
+      ${modoAtivo==='p_resina'
+        ? `<div class="oxc-faixas-legend">${FAIXAS_P.map(f=>`<span class="oxc-faixa-item"><span class="oxc-faixa-dot" style="background:${f.cor}"></span>${f.label}</span>`).join('')}</div>`
+        : `<div class="op-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`}
       <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaSufixo}</p>
     </div>
     <div class="op-chart-grid">
