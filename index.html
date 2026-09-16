@@ -135,6 +135,7 @@
   .proj-color-3{background:#e3d9f0;color:#5b3d8a;}
   .proj-color-4{background:#fbdbd3;color:#a4432a;}
   .proj-color-5{background:#d6e8f7;color:#2c5f8a;}
+  .proj-color-6{background:#dce8d4;color:#4a6b2f;}
   .loading-msg{font-size:13px;color:var(--ink-soft);text-align:center;padding:30px 0;}
 
   .cell-input{width:78px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.3px;background:#fff;}
@@ -929,6 +930,28 @@ const PROJETOS_CONFIG = [
       { key:'dose_solubilizador_recomendado_p', label:'Dose do solubilizador recomendado', type:'number' },
     ],
   },
+  {
+    slug: 'vida-no-solo',
+    badge: '🦠 Vida no Solo',
+    campos: [
+      { key:'area_projeto_vns', label:'Área do projeto (ha)', type:'number' },
+      { key:'tipo_teste_vns', label:'Tipo de teste', type:'select', options:['Faixa','Lado a lado','Área total'] },
+      { key:'nematoide_lesoes_radiculares', label:'Nematoide das lesões radiculares', type:'select', options:['Sim','Não'] },
+      { key:'nematoide_galhas', label:'Nematoide de galhas', type:'select', options:['Sim','Não'] },
+      { key:'nematoide_cisto', label:'Nematoides de cisto', type:'select', options:['Sim','Não'] },
+      { key:'nematoide_reniforme', label:'Nematoide reniforme', type:'select', options:['Sim','Não'] },
+      { key:'nematoide_espiralado', label:'Nematoide espiralado', type:'select', options:['Sim','Não'] },
+      { key:'doenca_fusarium', label:'Doença Fusarium', type:'select', options:['Sim','Não'] },
+      { key:'doenca_macrophomina', label:'Doença Macrophomina', type:'select', options:['Sim','Não'] },
+      { key:'doenca_mofo_branco', label:'Doença Mofo Branco', type:'select', options:['Sim','Não'] },
+      { key:'doenca_rhizoctonia', label:'Doença Rhizoctonia', type:'select', options:['Sim','Não'] },
+      { key:'morte_plantas', label:'Morte de plantas', type:'select', options:['Sim','Não'] },
+      { key:'nematicida_biologico', label:'Nematicida biológico', type:'text' },
+      { key:'fungicida_biologico', label:'Fungicida biológico', type:'text' },
+      { key:'fungicida_quimico', label:'Fungicida químico', type:'text' },
+      { key:'nematicida_quimico', label:'Nematicida químico', type:'text' },
+    ],
+  },
 ];
 let projetosIds = {}; // slug -> uuid, preenchido no login
 
@@ -1426,7 +1449,7 @@ function renderAlimentacaoTable(){
             <th colspan="${3+geralCamposVisiveis.length}" class="group-head group-geral">Geral</th>
             ${PROJETOS_CONFIG.map((p,i)=>{
               const oculto = state.colunasOcultas.has(p.slug);
-              return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%6}">
+              return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%7}">
                 <button class="proj-toggle-btn" data-proj-toggle="${p.slug}" title="${oculto?'Mostrar colunas':'Ocultar colunas'}">${oculto?'▶':'▾'}</button>
                 ${oculto ? p.badge.replace(/^\S+\s/,'') : p.badge}
               </th>`;
