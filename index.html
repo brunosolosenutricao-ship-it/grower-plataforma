@@ -2484,6 +2484,10 @@ const state = {
   estruturacaoMapModo: 'acamamento', // 'acamamento' | 'adocao' | 'area_projeto'
   oxidoConsumoMapModo: 'dose_media', // 'dose_media' | 'mg_medio' | 'area_tratada'
   oxidoConsumoStatus: null, // Set de status marcados (null = ainda não inicializado, vira "todos" no primeiro render)
+  oxidoConsumoBusca: '',   // texto de busca do card de Acompanhamento
+  oxidoConsumoPagina: 1,   // página atual do card de Acompanhamento
+  oxidoConsumoFiltroConsultor: 'Todos',
+  oxidoConsumoFiltroCliente: 'Todos',
 };
 window.state = state; // a Alimentação (outro <script>) precisa enxergar esse objeto — let/const não cruza scripts sozinho
 
@@ -2661,7 +2665,7 @@ async function carregarDadosDoSupabase(){
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
     const { data: talhoes, error: errT } = await fetchAllPaginated(
-      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, mg_0_20, p_resina_0_20, ano_analise_solo, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
+      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, mg_0_20, p_resina_0_20, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
     );
     if(errT) throw errT;
 
@@ -2735,7 +2739,7 @@ async function carregarDadosDoSupabase(){
       const rec = {
         id: t.id,
         consultor: t.consultor, cliente: t.cliente, estado, pais,
-        cidade: t.cidade || '', cultivar: t.cultivar || '',
+        cidade: t.cidade || '', cultivar: t.cultivar || '', data_plantio: t.data_plantio || null,
         fazenda: t.fazenda, talhao: t.talhao,
         area: Math.round((areaNum||0)*100)/100,
         mg: mgNum, mg_valido: mgNum !== null,
@@ -6477,6 +6481,37 @@ function renderOxidoConsumo(){
   const CORES_ESTADO_OXC = ['#5c2410','#2c4a7a','#6b7a3f','#a68a2e','#7a5b8a','#3f8891','#8a3a3a','#9a6c3f','#5b7a99','#a4432a'];
   const coresPorEstado = {}; estadosPizza.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO_OXC[i%CORES_ESTADO_OXC.length]);
 
+  // Card de Acompanhamento — lista + progresso do Cronograma, reaproveitando os mesmos talhões (comDose)
+  function calcularDataColeta(dataPlantio){
+    if(!dataPlantio) return null;
+    const d = new Date(dataPlantio + 'T00:00:00');
+    if(isNaN(d.getTime())) return null;
+    d.setDate(d.getDate() + 45);
+    return d;
+  }
+  function fmtData(d){
+    if(!d) return '—';
+    return d.toLocaleDateString('pt-BR');
+  }
+  const consultoresDisponiveis = [...new Set(comDose.map(r=>r.consultor).filter(Boolean))].sort();
+  const clientesDisponiveis = [...new Set(comDose.map(r=>r.cliente).filter(Boolean))].sort();
+  if(!state.oxidoConsumoFiltroConsultor) state.oxidoConsumoFiltroConsultor = 'Todos';
+  if(!state.oxidoConsumoFiltroCliente) state.oxidoConsumoFiltroCliente = 'Todos';
+
+  const buscaTxt = (state.oxidoConsumoBusca||'').trim().toLowerCase();
+  const acompanhamentoLista = comDose.filter(r=>{
+    if(state.oxidoConsumoFiltroConsultor!=='Todos' && r.consultor!==state.oxidoConsumoFiltroConsultor) return false;
+    if(state.oxidoConsumoFiltroCliente!=='Todos' && r.cliente!==state.oxidoConsumoFiltroCliente) return false;
+    if(!buscaTxt) return true;
+    return `${r.cliente} ${r.fazenda} ${r.talhao}`.toLowerCase().includes(buscaTxt);
+  }).sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+  const PAGINA_TAM = 20;
+  const totalPaginas = Math.max(1, Math.ceil(acompanhamentoLista.length / PAGINA_TAM));
+  if(state.oxidoConsumoPagina > totalPaginas) state.oxidoConsumoPagina = totalPaginas;
+  if(state.oxidoConsumoPagina < 1) state.oxidoConsumoPagina = 1;
+  const inicioPagina = (state.oxidoConsumoPagina-1)*PAGINA_TAM;
+  const paginaAtual = acompanhamentoLista.slice(inicioPagina, inicioPagina+PAGINA_TAM);
+
   container.innerHTML = `
   <style>
     .oxc-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;height:560px;}
@@ -6508,6 +6543,16 @@ function renderOxidoConsumo(){
     .oxc-status-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;opacity:.5;}
     .oxc-status-pill.active{background:var(--amber-soft);color:#7a5b1c;border-color:var(--amber);opacity:1;}
     .oxc-status-action{border:none;background:none;font-size:10px;font-weight:600;color:var(--teal);cursor:pointer;font-family:inherit;padding:5px 6px;text-decoration:underline;}
+    .oxc-acomp-busca{width:100%;max-width:340px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:12.5px;margin-bottom:12px;}
+    .oxc-acomp-filtros{display:flex;gap:8px;margin:-4px 0 12px;flex-wrap:wrap;}
+    .oxc-acomp-select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:12px;background:#fff;color:var(--ink);}
+    .oxc-acomp-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:600;white-space:nowrap;}
+    .oxc-progress{display:flex;gap:3px;width:100%;min-width:120px;}
+    .oxc-progress-seg{flex:1;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.02em;}
+    .oxc-progress-legenda{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:9.5px;color:var(--ink-soft);}
+    .oxc-acomp-pag{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:12px;color:var(--ink-soft);}
+    .oxc-acomp-pag button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;font-family:inherit;font-size:12px;cursor:pointer;}
+    .oxc-acomp-pag button:disabled{opacity:.4;cursor:default;}
     @media (max-width:1100px){ .oxc-layout{grid-template-columns:1fr;} .oxc-map-card{grid-column:1;} .oxc-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .oxc-kpis{grid-template-columns:repeat(2,1fr);} }
   </style>
 
@@ -6571,6 +6616,63 @@ function renderOxidoConsumo(){
     <h3>📊 Tipo de Teste por Estado</h3>
     <p class="sub-sm">Aguardando cadastro da coluna "Tipo de teste" nesse projeto — assim que existir, esse card entra em funcionamento igual os outros dashboards (Faixa vs Lado a lado, empilhado por estado).</p>
   </div>
+
+  <div class="oxc-card full-card" style="margin-top:12px;animation-delay:.3s;">
+    <h3>🗓️ Acompanhamento (Cronograma)</h3>
+    <p class="sub-sm">Mesmos talhões dos cards acima (Dose Óxido &gt; 0, respeitando o filtro de Status) — participação, progresso das 4 etapas, e a data de coleta prevista (Data de plantio + 45 dias).</p>
+    <input type="text" class="oxc-acomp-busca" id="oxcAcompBusca" placeholder="Buscar por cliente, fazenda ou talhão…" value="${state.oxidoConsumoBusca}">
+    <div class="oxc-acomp-filtros">
+      <select class="oxc-acomp-select" id="oxcAcompConsultor">
+        <option value="Todos" ${state.oxidoConsumoFiltroConsultor==='Todos'?'selected':''}>Todos os consultores</option>
+        ${consultoresDisponiveis.map(c=>`<option value="${encodeURIComponent(c)}" ${state.oxidoConsumoFiltroConsultor===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      <select class="oxc-acomp-select" id="oxcAcompCliente">
+        <option value="Todos" ${state.oxidoConsumoFiltroCliente==='Todos'?'selected':''}>Todos os clientes</option>
+        ${clientesDisponiveis.map(c=>`<option value="${encodeURIComponent(c)}" ${state.oxidoConsumoFiltroCliente===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th><th>Progresso</th>
+        </tr></thead>
+        <tbody>
+          ${paginaAtual.map(r=>{
+            const key = cronogramaKey(r);
+            const entry = getCronogramaEntry(key);
+            const [pBg,,pText] = PARTICIPACAO_COLOR_MAP[entry.participacao] || PARTICIPACAO_COLOR_MAP['Pendente'];
+            const dataPlantio = r.data_plantio ? new Date(r.data_plantio+'T00:00:00') : null;
+            const dataColeta = calcularDataColeta(r.data_plantio);
+            return `<tr>
+              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="mono-td">${fmtNum(Number(r.dose_oxido),1)}</td>
+              <td>${r.status||'—'}</td>
+              <td><span class="oxc-acomp-badge" style="background:${pBg};color:${pText};">${entry.participacao}</span></td>
+              <td>${fmtData(dataPlantio)}</td>
+              <td>${fmtData(dataColeta)}</td>
+              <td>
+                <div class="oxc-progress" title="${ETAPA_LABELS.map((l,i)=>`${l}: ${entry[ETAPA_KEYS[i]]}`).join(' · ')}">
+                  ${ETAPA_KEYS.map((k,i)=>{
+                    const [,border,text] = ETAPA_COLOR_MAP[entry[k]] || ETAPA_COLOR_MAP['Pendente'];
+                    const corTexto = entry[k]==='Pendente' ? text : '#fff';
+                    return `<div class="oxc-progress-seg" style="background:${border};color:${corTexto};" title="${ETAPA_LABELS[i]}: ${entry[k]}">E${i+1}</div>`;
+                  }).join('')}
+                </div>
+              </td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="9">Nenhum talhão encontrado.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="oxc-progress-legenda">
+      ${ETAPA_LABELS.map((l,i)=>`<span><b>E${i+1}</b> = ${l}</span>`).join('')}
+    </div>
+    <div class="oxc-acomp-pag">
+      <button id="oxcAcompPrev" ${state.oxidoConsumoPagina<=1?'disabled':''}>◀ anterior</button>
+      <span>Página ${state.oxidoConsumoPagina} de ${totalPaginas} · ${acompanhamentoLista.length} talhão(ões)</span>
+      <button id="oxcAcompNext" ${state.oxidoConsumoPagina>=totalPaginas?'disabled':''}>próxima ▶</button>
+    </div>
+  </div>
   `;
 
   container.querySelectorAll('.oxc-mapa-pill').forEach(btn=>{
@@ -6593,6 +6695,34 @@ function renderOxidoConsumo(){
       renderOxidoConsumo();
     });
   });
+  const acompBuscaEl = container.querySelector('#oxcAcompBusca');
+  if(acompBuscaEl){
+    let debounceBusca;
+    acompBuscaEl.addEventListener('input', ()=>{
+      clearTimeout(debounceBusca);
+      debounceBusca = setTimeout(()=>{
+        state.oxidoConsumoBusca = acompBuscaEl.value;
+        state.oxidoConsumoPagina = 1;
+        renderOxidoConsumo();
+      }, 300);
+    });
+  }
+  const acompConsultorEl = container.querySelector('#oxcAcompConsultor');
+  if(acompConsultorEl) acompConsultorEl.addEventListener('change', ()=>{
+    state.oxidoConsumoFiltroConsultor = acompConsultorEl.value==='Todos' ? 'Todos' : decodeURIComponent(acompConsultorEl.value);
+    state.oxidoConsumoPagina = 1;
+    renderOxidoConsumo();
+  });
+  const acompClienteEl = container.querySelector('#oxcAcompCliente');
+  if(acompClienteEl) acompClienteEl.addEventListener('change', ()=>{
+    state.oxidoConsumoFiltroCliente = acompClienteEl.value==='Todos' ? 'Todos' : decodeURIComponent(acompClienteEl.value);
+    state.oxidoConsumoPagina = 1;
+    renderOxidoConsumo();
+  });
+  const acompPrevBtn = container.querySelector('#oxcAcompPrev');
+  if(acompPrevBtn) acompPrevBtn.addEventListener('click', ()=>{ state.oxidoConsumoPagina--; renderOxidoConsumo(); });
+  const acompNextBtn = container.querySelector('#oxcAcompNext');
+  if(acompNextBtn) acompNextBtn.addEventListener('click', ()=>{ state.oxidoConsumoPagina++; renderOxidoConsumo(); });
 
   Object.values(oxidoConsumoCharts).forEach(c=>{ if(c) c.destroy(); });
   oxidoConsumoCharts = {};
