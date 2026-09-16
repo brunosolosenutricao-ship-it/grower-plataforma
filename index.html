@@ -551,6 +551,7 @@
         <div class="nav-item" data-view="otimizacaop-dash">⚡ Otimização de P</div>
         <div class="nav-item" data-view="estruturacao-dash">🌾 Projeto Estruturação</div>
       <div class="nav-item" data-view="oxidoconsumo-dash">🧪 Óxido de Magnésio</div>
+      <div class="nav-item" data-view="microsolo-dash">🔬 Projeto Micro Solo</div>
       </div>
     </div>
     <div class="sidebar-user">
@@ -784,6 +785,26 @@
         <div id="tab-oxido-consumo"></div>
       </div>
     </div>
+
+    <div id="viewMicroSolo" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🔬 Projeto Micro Solo</h2>
+          <p class="sub">Médias de B, Mn, Zn e Cu (análise de solo 0-20cm) por estado (mapa modulável), área/volume por produto recomendado e natureza do produto.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="microSoloLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🔬</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="microSoloApp" style="display:none;">
+        <div id="tab-micro-solo"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -914,7 +935,7 @@ const PROJETOS_CONFIG = [
       { key:'mn_pct_micro', label:'Mn%', type:'number' },
       { key:'zn_pct_micro', label:'Zn%', type:'number' },
       { key:'cu_pct_micro', label:'Cu%', type:'number' },
-      { key:'natureza_produto_micro', label:'Natureza do Produto', type:'select', options:['Óxido','Sulfato','Oxi-sulfato'] },
+      { key:'natureza_produto_micro', label:'Natureza do Produto', type:'select', options:['Óxido','Sulfato','Oxi-sulfato','Ulexita'] },
       { key:'status_recomendacao_micro', label:'Status de Recomendação', type:'select', options:['Sem recomendação','Comprado','Aplicado','Pendente'] },
     ],
   },
@@ -2402,7 +2423,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewOtimizacaoP').style.display = view==='otimizacaop-dash' ? 'block' : 'none';
     document.getElementById('viewEstruturacao').style.display = view==='estruturacao-dash' ? 'block' : 'none';
     document.getElementById('viewOxidoConsumo').style.display = view==='oxidoconsumo-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash') && !dashMgJaCarregado){
+    document.getElementById('viewMicroSolo').style.display = view==='microsolo-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2512,6 +2534,7 @@ const state = {
   oxidoConsumoPagina: 1,   // página atual do card de Acompanhamento
   oxidoConsumoFiltroConsultor: 'Todos',
   oxidoConsumoFiltroCliente: 'Todos',
+  microSoloMapModo: 'b',
 };
 window.state = state; // a Alimentação (outro <script>) precisa enxergar esse objeto — let/const não cruza scripts sozinho
 
@@ -2671,6 +2694,8 @@ async function carregarDadosDoSupabase(){
   const estrAppEl = document.getElementById('estruturacaoApp');
   const oxcLoadingEl = document.getElementById('oxidoConsumoLoading');
   const oxcAppEl = document.getElementById('oxidoConsumoApp');
+  const microLoadingEl = document.getElementById('microSoloLoading');
+  const microAppEl = document.getElementById('microSoloApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
   if(ladLoadingEl) ladLoadingEl.style.display = 'flex';
@@ -2685,11 +2710,13 @@ async function carregarDadosDoSupabase(){
   if(estrAppEl) estrAppEl.style.display = 'none';
   if(oxcLoadingEl) oxcLoadingEl.style.display = 'flex';
   if(oxcAppEl) oxcAppEl.style.display = 'none';
+  if(microLoadingEl) microLoadingEl.style.display = 'flex';
+  if(microAppEl) microAppEl.style.display = 'none';
 
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
     const { data: talhoes, error: errT } = await fetchAllPaginated(
-      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, mg_0_20, p_resina_0_20, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
+      'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, mg_0_20, p_resina_0_20, b_0_20, mn_0_20, zn_0_20, cu_0_20, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual'
     );
     if(errT) throw errT;
 
@@ -2717,8 +2744,13 @@ async function carregarDadosDoSupabase(){
     const projResEstr = await sb.from('projetos').select('id').eq('slug', 'projeto-estruturacao').single();
     if(!projResEstr.error) projetoIdEstr = projResEstr.data.id;
 
+    // projeto Micro Solo — mesma lógica, opcional
+    let projetoIdMicro = null;
+    const projResMicro = await sb.from('projetos').select('id').eq('slug', 'projeto-micro-solo').single();
+    if(!projResMicro.error) projetoIdMicro = projResMicro.data.id;
+
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {};
+    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -2747,6 +2779,11 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdEstr).in('talhao_id', bloco);
         if(!errDEstr && dadosEstr) dadosEstr.forEach(d=>{ dadosMapEstr[d.talhao_id] = d.dados || {}; });
       }
+      if(projetoIdMicro){
+        const { data: dadosMicro, error: errDMicro } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdMicro).in('talhao_id', bloco);
+        if(!errDMicro && dadosMicro) dadosMicro.forEach(d=>{ dadosMapMicro[d.talhao_id] = d.dados || {}; });
+      }
     }
 
     const records = [], semArea = [];
@@ -2756,6 +2793,7 @@ async function carregarDadosDoSupabase(){
       const dc = dadosMapCond[t.id] || {};
       const dop = dadosMapOp[t.id] || {};
       const destr = dadosMapEstr[t.id] || {};
+      const dmicro = dadosMapMicro[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
@@ -2798,6 +2836,10 @@ async function carregarDadosDoSupabase(){
         cond_produto: dc.produto_utilizado_cond ?? null,
         // campos da Otimização de P (jsonb próprio, projeto separado) + P resina do Geral
         p_resina: t.p_resina_0_20 ?? null,
+        solo_b: t.b_0_20 ?? null,
+        solo_mn: t.mn_0_20 ?? null,
+        solo_zn: t.zn_0_20 ?? null,
+        solo_cu: t.cu_0_20 ?? null,
         op_dose_p2o5: dop.dose_p2o5 ?? null,
         op_fonte_p2o5: dop.fonte_p2o5 ?? null,
         op_solubilizador: dop.recomendacao_solubilizador_p ?? null,
@@ -2812,6 +2854,17 @@ async function carregarDadosDoSupabase(){
         estr_dose_padrao: destr.dose_padrao_fazenda_estr ?? null,
         estr_uso_tecnologia: destr.historico_uso_tecnologia_estr ?? null,
         estr_acamamento: destr.historico_acamamento_estr ?? null,
+        // campos do Projeto Micro Solo (jsonb próprio, projeto separado)
+        micro_area_projeto: dmicro.area_projeto_micro ?? null,
+        micro_tipo_teste: dmicro.tipo_teste_micro ?? null,
+        micro_produto: dmicro.produto_recomendado_2627_micro ?? null,
+        micro_dose: dmicro.dose_produto_2627_micro ?? null,
+        micro_b: dmicro.b_pct_micro ?? null,
+        micro_mn: dmicro.mn_pct_micro ?? null,
+        micro_zn: dmicro.zn_pct_micro ?? null,
+        micro_cu: dmicro.cu_pct_micro ?? null,
+        micro_natureza: dmicro.natureza_produto_micro ?? null,
+        micro_status: dmicro.status_recomendacao_micro ?? null,
       };
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
     });
@@ -2867,6 +2920,8 @@ async function carregarDadosDoSupabase(){
     if(estrAppEl) estrAppEl.style.display = 'block';
     if(oxcLoadingEl) oxcLoadingEl.style.display = 'none';
     if(oxcAppEl) oxcAppEl.style.display = 'block';
+    if(microLoadingEl) microLoadingEl.style.display = 'none';
+    if(microAppEl) microAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
@@ -2876,6 +2931,7 @@ async function carregarDadosDoSupabase(){
     if(opLoadingEl) opLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(estrLoadingEl) estrLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(oxcLoadingEl) oxcLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(microLoadingEl) microLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -3090,6 +3146,7 @@ function renderAll(){
   renderOtimizacaoP();
   renderEstruturacao();
   renderOxidoConsumo();
+  renderMicroSolo();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -5514,7 +5571,7 @@ function condicionadorMapaSvg(porEstado, unidade='ha', cores, corFn){
     const temDado = porEstado[uf]!=null;
     const valor = porEstado[uf] || 0;
     const cor = corFn ? corFn(temDado ? valor : null) : condicionadorCorIntensidade(valor, max, cores);
-    return `<path d="${d}" fill="${cor}" stroke="#1a2019" stroke-width="1.1">
+    return `<path d="${d}" data-uf="${uf}" fill="${cor}" stroke="#1a2019" stroke-width="1.1">
       <title>${uf}: ${valor.toLocaleString('pt-BR',{maximumFractionDigits:1})} ${unidade}</title>
     </path>`;
   }).join('');
@@ -6825,6 +6882,375 @@ function renderOxidoConsumo(){
       type:'bar',
       data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#6b7a3f', hoverBackgroundColor:'#85944f', borderRadius:4 }] },
       options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_OXC, plugins:{legend:{display:false}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...oxcDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
+    });
+  }
+}
+
+/* ---------------- TAB PROJETO MICRO SOLO ---------------- */
+let microSoloCharts = {};
+function criarFaixas(breakpoints){
+  const paleta = ['#c0392b','#e67e22','#f1c40f','#8bc34a','#4caf50','#1b5e20'];
+  const faixas = breakpoints.map((max,i)=> ({ max, cor: paleta[i] }));
+  faixas.push({ max: Infinity, cor: paleta[paleta.length-1] });
+  // rótulos
+  let anterior = null;
+  faixas.forEach(f=>{
+    f.label = anterior==null ? `(≤ ${f.max.toLocaleString('pt-BR')})` : (f.max===Infinity ? `(≥ ${anterior.toLocaleString('pt-BR')})` : `(${anterior.toLocaleString('pt-BR')} – ${f.max.toLocaleString('pt-BR')})`);
+    anterior = f.max;
+  });
+  return faixas;
+}
+const FAIXAS_B_MICRO = criarFaixas([0.3,0.5,0.8,1.0,1.3]);
+const FAIXAS_MN_MICRO = criarFaixas([2.0,3.5,5.0,10.0,50.0]);
+const FAIXAS_ZN_MICRO = criarFaixas([0.4,0.8,1.6,3.2,6.4]);
+const FAIXAS_CU_MICRO = criarFaixas([0.2,0.4,0.8,1.6,3.2]);
+function corPorFaixaGenerica(valor, faixas){
+  if(valor==null) return '#e3e3dc';
+  const v = Number(valor);
+  if(isNaN(v)) return '#e3e3dc';
+  const faixa = faixas.find(f=> v<=f.max);
+  return faixa ? faixa.cor : faixas[faixas.length-1].cor;
+}
+const MICRO_MAPA_MODOS = [
+  { key:'b', label:'B médio' },
+  { key:'mn', label:'Mn médio' },
+  { key:'zn', label:'Zn médio' },
+  { key:'cu', label:'Cu médio' },
+  { key:'area_recomendada', label:'Área com recomendação de Spheric (Sulfato)' },
+];
+function abrirModalMicroSoloEstado(uf, lista){
+  const linhas = lista.filter(r=> (r.estado||'').toUpperCase()===uf);
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="microEstModalOverlay">
+    <div class="modal-panel" style="max-width:1100px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Projeto Micro Solo</div>
+          <h2 style="margin:2px 0;">Talhões em ${uf}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões) com recomendação Spheric — Sulfato (Comprado ou Aplicado)</p>
+        </div>
+        <button class="backbtn" id="microEstModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Consultor</th><th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
+            <th>Cidade</th><th>Produto</th><th>Dose</th><th>B%</th><th>Mn%</th><th>Zn%</th><th>Cu%</th><th>Natureza</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.consultor||''}</td><td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td>${r.cidade||''}</td>
+              <td>${r.micro_produto||'—'}</td>
+              <td class="mono-td">${r.micro_dose!=null?fmtNum(Number(r.micro_dose),1):'—'}</td>
+              <td class="mono-td">${r.micro_b!=null?fmtNum(Number(r.micro_b),2):'—'}</td>
+              <td class="mono-td">${r.micro_mn!=null?fmtNum(Number(r.micro_mn),2):'—'}</td>
+              <td class="mono-td">${r.micro_zn!=null?fmtNum(Number(r.micro_zn),2):'—'}</td>
+              <td class="mono-td">${r.micro_cu!=null?fmtNum(Number(r.micro_cu),2):'—'}</td>
+              <td>${r.micro_natureza||'—'}</td>
+              <td>${r.micro_status||'—'}</td>
+            </tr>`).join('') || `<tr><td colspan="14">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('microEstModalFechar').addEventListener('click', fechar);
+  document.getElementById('microEstModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='microEstModalOverlay') fechar(); });
+}
+function abrirModalMicroSoloNatureza(natureza, lista){
+  const linhas = lista.filter(r=> r.micro_natureza===natureza);
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="microModalOverlay">
+    <div class="modal-panel" style="max-width:1100px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Projeto Micro Solo</div>
+          <h2 style="margin:2px 0;">Talhões — Natureza: ${natureza}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões)</p>
+        </div>
+        <button class="backbtn" id="microModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Consultor</th><th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
+            <th>Estado</th><th>Produto</th><th>Dose</th><th>B%</th><th>Mn%</th><th>Zn%</th><th>Cu%</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.consultor||''}</td><td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td>${r.estado||''}</td>
+              <td>${r.micro_produto||'—'}</td>
+              <td class="mono-td">${r.micro_dose!=null?fmtNum(Number(r.micro_dose),1):'—'}</td>
+              <td class="mono-td">${r.micro_b!=null?fmtNum(Number(r.micro_b),2):'—'}</td>
+              <td class="mono-td">${r.micro_mn!=null?fmtNum(Number(r.micro_mn),2):'—'}</td>
+              <td class="mono-td">${r.micro_zn!=null?fmtNum(Number(r.micro_zn),2):'—'}</td>
+              <td class="mono-td">${r.micro_cu!=null?fmtNum(Number(r.micro_cu),2):'—'}</td>
+              <td>${r.micro_status||'—'}</td>
+            </tr>`).join('') || `<tr><td colspan="13">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('microModalFechar').addEventListener('click', fechar);
+  document.getElementById('microModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='microModalOverlay') fechar(); });
+}
+function renderMicroSolo(){
+  const container = document.getElementById('tab-micro-solo');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const comQualquerDado = base.filter(r=> r.micro_area_projeto!=null || r.micro_produto!=null || r.micro_b!=null || r.micro_mn!=null || r.micro_zn!=null || r.micro_cu!=null || r.micro_natureza!=null || r.micro_status!=null);
+  const comRecomendacao = base.filter(r=> (r.micro_status==='Comprado' || r.micro_status==='Aplicado') && r.micro_natureza==='Sulfato');
+
+  if(!comQualquerDado.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Projeto Micro Solo</div>
+      <h2>Nenhum dado do Micro Solo ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer B%, Mn%, Zn%, Cu% ou Status de Recomendação preenchidos, os gráficos aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  function calcularMedia(lista, campo){
+    const somaN = {}, contN = {};
+    lista.forEach(r=>{
+      if(r[campo]==null || r[campo]==='' || isNaN(Number(r[campo]))) return;
+      const uf=(r.estado||'').toUpperCase(); if(!uf) return;
+      somaN[uf]=(somaN[uf]||0)+Number(r[campo]); contN[uf]=(contN[uf]||0)+1;
+    });
+    const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
+    return out;
+  }
+  function calcularMapaPorModo(modo){
+    if(modo==='area_recomendada'){
+      const out = {};
+      comRecomendacao.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; out[uf]=(out[uf]||0)+(r.area||0); });
+      return { valores: out, unidade: 'ha' };
+    }
+    // mapa mostra a ANÁLISE DE SOLO (mg/dm³) — mesma unidade das faixas de cor que já temos
+    const campoSoloMap = { b:'solo_b', mn:'solo_mn', zn:'solo_zn', cu:'solo_cu' };
+    const out = calcularMedia(comQualquerDado, campoSoloMap[modo]);
+    return { valores: out, unidade: 'mg/dm³' };
+  }
+  const modoAtivo = state.microSoloMapModo;
+  const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
+  const FAIXAS_ATIVA = { b:FAIXAS_B_MICRO, mn:FAIXAS_MN_MICRO, zn:FAIXAS_ZN_MICRO, cu:FAIXAS_CU_MICRO }[modoAtivo];
+
+  // gráfico de comparação: análise de solo (mg/dm³) x % recomendado, por estado, pro nutriente selecionado no mapa
+  const nutrienteComparacao = modoAtivo==='area_recomendada' ? 'b' : modoAtivo;
+  const campoSoloComp = { b:'solo_b', mn:'solo_mn', zn:'solo_zn', cu:'solo_cu' }[nutrienteComparacao];
+  const campoPctComp = { b:'micro_b', mn:'micro_mn', zn:'micro_zn', cu:'micro_cu' }[nutrienteComparacao];
+  const mediaSoloComp = calcularMedia(comQualquerDado, campoSoloComp);
+  const mediaPctComp = calcularMedia(comQualquerDado, campoPctComp);
+  const estadosComparacao = [...new Set([...Object.keys(mediaSoloComp), ...Object.keys(mediaPctComp)])].sort();
+  const NUTRIENTE_LABEL = { b:'B', mn:'Mn', zn:'Zn', cu:'Cu' };
+
+  const areaPorProduto = {};
+  comQualquerDado.forEach(r=>{ if(!r.micro_produto) return; areaPorProduto[r.micro_produto]=(areaPorProduto[r.micro_produto]||0)+(r.area||0); });
+
+  const volumePorProduto = {};
+  comQualquerDado.forEach(r=>{
+    if(!r.micro_produto || r.micro_dose==null) return;
+    volumePorProduto[r.micro_produto]=(volumePorProduto[r.micro_produto]||0)+(Number(r.micro_dose)*(r.area||0));
+  });
+
+  const areaPorNatureza = {};
+  comQualquerDado.forEach(r=>{ if(!r.micro_natureza) return; areaPorNatureza[r.micro_natureza]=(areaPorNatureza[r.micro_natureza]||0)+(r.area||0); });
+  const naturezas = Object.keys(areaPorNatureza).sort();
+
+  const tipos = ['Faixa','Lado a lado','Área total'];
+  const estadosComTeste = [...new Set(comQualquerDado.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
+  const tipoEstado = {};
+  tipos.forEach(tp=> tipoEstado[tp] = {});
+  comQualquerDado.forEach(r=>{
+    if(!r.micro_tipo_teste || r.micro_area_projeto==null) return;
+    const uf = (r.estado||'').toUpperCase();
+    tipoEstado[r.micro_tipo_teste][uf] = (tipoEstado[r.micro_tipo_teste][uf]||0) + Number(r.micro_area_projeto);
+  });
+
+  const areaTotalRecomendacao = comRecomendacao.reduce((a,r)=>a+(r.area||0),0);
+  const qtdEstados = new Set(comQualquerDado.map(r=>(r.estado||'').toUpperCase()).filter(Boolean)).size;
+  const qtdFazendas = new Set(comQualquerDado.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdProdutores = new Set(comQualquerDado.map(r=>r.cliente)).size;
+
+  const STATUS_MICRO_ORDEM = ['Sem recomendação','Comprado','Aplicado','Pendente'];
+  const funilStatus = {}; STATUS_MICRO_ORDEM.forEach(s=>funilStatus[s]=0);
+  comQualquerDado.forEach(r=>{ const s = r.micro_status || 'Sem recomendação'; if(funilStatus[s]!=null) funilStatus[s]++; else funilStatus[s]=1; });
+
+  const CORES_NATUREZA = { 'Óxido':'#5c2410', 'Sulfato':'#2c4a7a', 'Oxi-sulfato':'#6b7a3f', 'Ulexita':'#a68a2e' };
+  const CORES_ESTADO_MICRO = ['#5c2410','#2c4a7a','#6b7a3f','#a68a2e','#7a5b8a','#3f8891','#8a3a3a','#9a6c3f','#5b7a99','#a4432a'];
+  const coresPorEstado = {}; estadosComTeste.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO_MICRO[i%CORES_ESTADO_MICRO.length]);
+
+  container.innerHTML = `
+  <style>
+    .micro-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;height:560px;}
+    .micro-map-card{grid-column:span 2;display:flex;flex-direction:column;min-height:0;}
+    .micro-chart-grid{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(2,1fr);gap:12px;min-height:0;}
+    .micro-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;transition:box-shadow .2s, transform .2s;display:flex;flex-direction:column;min-height:0;}
+    .micro-card:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .micro-card h3{margin:0 0 2px;font-size:12.5px;}
+    .micro-card .sub-sm{font-size:10px;color:var(--ink-soft);margin:0 0 6px;line-height:1.3;}
+    .micro-card canvas{flex:1;min-height:0;width:100% !important;}
+    .micro-card-wrap{position:relative;flex:1;min-height:0;}
+    .micro-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+    .micro-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;transition:box-shadow .2s, transform .2s;}
+    .micro-kpi:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .micro-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#5c2410;line-height:1.15;}
+    .micro-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
+    .micro-faixas-legend{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;margin-top:8px;}
+    .micro-faixa-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--ink-soft);}
+    .micro-faixa-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+    .micro-map-legend{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
+    .micro-map-legend .bar{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#f0ddd3,#5c2410);}
+    .micro-map-card svg{flex:1;}
+    .micro-map-card path{transition:filter .15s, transform .15s, stroke-width .15s;transform-box:fill-box;transform-origin:center;cursor:pointer;}
+    .micro-map-card path:hover{filter:brightness(1.18) saturate(1.15);transform:scale(1.015);stroke:#5c2410;stroke-width:1.6;}
+    .micro-mapa-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+    .micro-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .micro-mapa-pill.active{background:#5c2410;color:#fff;border-color:#5c2410;}
+    .micro-funil{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+    .micro-funil-row{display:grid;grid-template-columns:110px 1fr 40px;align-items:center;gap:8px;font-size:10.5px;}
+    .micro-funil-bar{height:12px;border-radius:4px;background:#5c2410;}
+    @media (max-width:1100px){ .micro-layout{grid-template-columns:1fr;height:auto;} .micro-map-card{grid-column:1;} .micro-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .micro-kpis{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="micro-kpis">
+    <div class="micro-kpi" style="animation-delay:.02s"><div class="v">${areaTotalRecomendacao.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha com recomendação Spheric — Sulfato (Comprado + Aplicado)</div></div>
+    <div class="micro-kpi" style="animation-delay:.06s"><div class="v">${qtdEstados}</div><div class="l">Estados com dado do projeto</div></div>
+    <div class="micro-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendas}</div><div class="l">Fazendas com dado do projeto</div></div>
+    <div class="micro-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutores}</div><div class="l">Produtores com dado do projeto</div></div>
+  </div>
+
+  <div class="micro-layout">
+    <div class="micro-card micro-map-card" style="animation-delay:.05s;">
+      <h3>🗺️ Mapa modulável</h3>
+      <p class="sub-sm">Escolha o que o mapa mostra:</p>
+      <div class="micro-mapa-pills">
+        ${MICRO_MAPA_MODOS.map(m=>`<button class="micro-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
+      </div>
+      ${modoAtivo==='area_recomendada'
+        ? condicionadorMapaSvg(mapaValores, mapaUnidade, [[240,221,211],[92,36,16]])
+        : condicionadorMapaSvg(mapaValores, mapaUnidade, null, v=>corPorFaixaGenerica(v, FAIXAS_ATIVA))}
+      ${modoAtivo==='area_recomendada'
+        ? `<div class="micro-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`
+        : `<div class="micro-faixas-legend">${FAIXAS_ATIVA.map(f=>`<span class="micro-faixa-item"><span class="micro-faixa-dot" style="background:${f.cor}"></span>${f.label}</span>`).join('')}</div>`}
+      <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>
+    </div>
+    <div class="micro-chart-grid">
+      <div class="micro-card" style="animation-delay:.1s;">
+        <h3>🧪 Área por Produto Recomendado</h3>
+        <p class="sub-sm">Área do talhão, por produto (Safra 2026.27)</p>
+        <div class="micro-card-wrap"><canvas id="microAreaProduto"></canvas></div>
+      </div>
+      <div class="micro-card" style="animation-delay:.14s;">
+        <h3>💧 Volume por Produto Recomendado</h3>
+        <p class="sub-sm">Dose × Área do talhão</p>
+        <div class="micro-card-wrap"><canvas id="microVolumeProduto"></canvas></div>
+      </div>
+      <div class="micro-card" style="animation-delay:.18s;">
+        <h3>🥧 Área por Natureza do Produto</h3>
+        <p class="sub-sm">Óxido / Sulfato / Oxi-sulfato — clique numa fatia pra detalhar</p>
+        <div class="micro-card-wrap"><canvas id="microPieNatureza"></canvas></div>
+      </div>
+      <div class="micro-card" style="animation-delay:.22s;">
+        <h3>📊 Tipo de Teste por Estado</h3>
+        <p class="sub-sm">Faixa · Lado a lado · Área total (cor = estado)</p>
+        <div class="micro-card-wrap"><canvas id="microTipoEstado"></canvas></div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('.micro-mapa-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.microSoloMapModo = btn.dataset.mapaModo;
+      renderMicroSolo();
+    });
+  });
+  if(modoAtivo==='area_recomendada'){
+    container.querySelectorAll('.micro-map-card path[data-uf]').forEach(path=>{
+      path.addEventListener('click', ()=>{
+        const uf = path.dataset.uf;
+        if(mapaValores[uf]==null) return; // estado sem recomendação, nada pra mostrar
+        abrirModalMicroSoloEstado(uf, comRecomendacao);
+      });
+    });
+  }
+
+  Object.values(microSoloCharts).forEach(c=>{ if(c) c.destroy(); });
+  microSoloCharts = {};
+
+  const CHART_ANIMACAO_MICRO = { duration: 850, easing: 'easeOutQuart' };
+  const microTooltip = (extra={}) => ({
+    backgroundColor:'#1a2019', titleColor:'#fff', bodyColor:'#eef1e6',
+    padding:10, cornerRadius:8, displayColors:false, titleFont:{size:11.5,weight:'700'}, bodyFont:{size:11.5},
+    ...extra,
+  });
+  const microDataLabelBase = { color:'#1a2019', font:{size:9.5,weight:'700'}, anchor:'end', align:'end', offset:2 };
+
+  const canvasMicroAreaProduto = container.querySelector('#microAreaProduto');
+  if(canvasMicroAreaProduto){
+    const entradas = Object.entries(areaPorProduto).sort((a,b)=>b[1]-a[1]);
+    microSoloCharts.areaProduto = new Chart(canvasMicroAreaProduto.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#5c2410', hoverBackgroundColor:'#7a3a1e', borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:CHART_ANIMACAO_MICRO, plugins:{legend:{display:false}, tooltip:microTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...microDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasMicroVolProduto = container.querySelector('#microVolumeProduto');
+  if(canvasMicroVolProduto){
+    const entradas = Object.entries(volumePorProduto).sort((a,b)=>b[1]-a[1]);
+    microSoloCharts.volProduto = new Chart(canvasMicroVolProduto.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'volume', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#2c4a7a', hoverBackgroundColor:'#3f63a0', borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:CHART_ANIMACAO_MICRO, plugins:{legend:{display:false}, tooltip:microTooltip({callbacks:{label:c=>` ${c.formattedValue}`}}), datalabels:{...microDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+
+  const canvasMicroPie = container.querySelector('#microPieNatureza');
+  if(canvasMicroPie){
+    microSoloCharts.pie = new Chart(canvasMicroPie.getContext('2d'), {
+      type:'pie',
+      data:{ labels: naturezas, datasets:[{ data: naturezas.map(n=>Math.round((areaPorNatureza[n]||0)*10)/10), backgroundColor: naturezas.map(n=>CORES_NATUREZA[n]||'#7a5b8a'), hoverOffset:10, borderColor:'#fbfaf4', borderWidth:2 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{...CHART_ANIMACAO_MICRO, animateRotate:true, animateScale:true},
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const natureza = naturezas[elements[0].index];
+          abrirModalMicroSoloNatureza(natureza, comQualquerDado);
+        },
+        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:microTooltip({callbacks:{label:c=>` ${c.label}: ${c.formattedValue} ha`}})}
+      }
+    });
+  }
+
+  const canvasMicroTipo = container.querySelector('#microTipoEstado');
+  if(canvasMicroTipo){
+    microSoloCharts.tipoEstado = new Chart(canvasMicroTipo.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: tipos,
+        datasets: estadosComTeste.map(uf=>({
+          label: uf,
+          data: tipos.map(tp=> Math.round((tipoEstado[tp][uf]||0)*10)/10),
+          backgroundColor: coresPorEstado[uf],
+          hoverBackgroundColor: coresPorEstado[uf],
+          borderRadius:3,
+        })),
+      },
+      options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_MICRO, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:microTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
     });
   }
 }
