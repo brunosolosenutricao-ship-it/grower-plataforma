@@ -7961,14 +7961,18 @@ function renderLadroesMaximasMapa(){
       },
       options:{
         responsive:true, maintainAspectRatio:false,
-        onClick:(evt, elements)=>{
-          if(!elements.length) return;
-          const el = elements[0];
+        onClick:(evt, elements, chart)=>{
+          const pontos = chart.getElementsAtEventForMode(evt, 'nearest', {intersect:false, axis:'xy'}, true);
+          if(!pontos.length) return;
+          const el = pontos[0];
           const uf = estadosTodos[el.index];
           const projeto = el.datasetIndex===0 ? 'Ladrões' : 'Máximas';
           abrirModalLadroesMaximasLista(uf, projeto, selecionados);
         },
-        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onHover:(evt, elements, chart)=>{
+          const pontos = chart.getElementsAtEventForMode(evt, 'nearest', {intersect:false, axis:'xy'}, true);
+          evt.native.target.style.cursor = pontos.length ? 'pointer' : 'default';
+        },
         plugins:{legend:{position:'top', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}}, scales:{ y:{beginAtZero:true} } }
     });
   }
