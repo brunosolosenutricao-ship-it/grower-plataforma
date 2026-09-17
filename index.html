@@ -6976,10 +6976,10 @@ function renderOxidoConsumo(){
   const areaTotal = Object.values(areaPorEstado).reduce((a,b)=>a+b,0);
 
   const volumePorEstado = {};
-  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; volumePorEstado[uf]=(volumePorEstado[uf]||0)+(Number(r.dose_oxido)*(r.area||0)); });
+  comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; volumePorEstado[uf]=(volumePorEstado[uf]||0)+(Number(r.dose_oxido)*(r.area||0)/1000); });
 
   const volumePorCliente = {};
-  comDose.forEach(r=>{ volumePorCliente[r.cliente]=(volumePorCliente[r.cliente]||0)+(Number(r.dose_oxido)*(r.area||0)); });
+  comDose.forEach(r=>{ volumePorCliente[r.cliente]=(volumePorCliente[r.cliente]||0)+(Number(r.dose_oxido)*(r.area||0)/1000); });
   const top10Clientes = Object.entries(volumePorCliente).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
   const areaPorConsultor = {};
@@ -7110,7 +7110,7 @@ function renderOxidoConsumo(){
       </div>
       <div class="oxc-card" style="animation-delay:.14s;">
         <h3>💧 Volume por Estado (ton)</h3>
-        <p class="sub-sm">Dose (ton/ha) × Área do talhão</p>
+        <p class="sub-sm">Dose (kg/ha) × Área do talhão, convertido pra toneladas</p>
         <div class="oxc-card-wrap"><canvas id="oxcVolumeEstado"></canvas></div>
       </div>
       <div class="oxc-card" style="animation-delay:.18s;">
