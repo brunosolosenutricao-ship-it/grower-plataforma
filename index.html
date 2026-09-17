@@ -2600,6 +2600,20 @@ function getEstrAcompEntry(key){
   return found ? {...defaults, ...found} : defaults;
 }
 
+const MICRO_ETAPA1_OPTIONS = ['Aguardando','Análise 2026 já recebida','Análise de solo antiga recebida','Sem análise'];
+const MICRO_ETAPA23_OPTIONS = ['Feito','Laboratório','Recebido','Pendente'];
+const MICRO_ETAPAS = [
+  { key:'solo_pre', label:'Análise de solo pré aplicação', options: MICRO_ETAPA1_OPTIONS, default: 'Aguardando' },
+  { key:'foliar', label:'Análise foliar', options: MICRO_ETAPA23_OPTIONS, default: 'Pendente' },
+  { key:'solo_pos', label:'Análise de solo pós cultivo', options: MICRO_ETAPA23_OPTIONS, default: 'Pendente' },
+];
+function getMicroAcompEntry(key){
+  const defaults = {};
+  MICRO_ETAPAS.forEach(e=>{ defaults[e.key] = e.default; });
+  const found = state.microAcomp[key];
+  return found ? {...defaults, ...found} : defaults;
+}
+
 const state = {
   pais: 'Todos',
   tab: 'potencial',
@@ -3021,6 +3035,9 @@ async function carregarDadosDoSupabase(){
         micro_cu: dmicro.cu_pct_micro ?? null,
         micro_natureza: dmicro.natureza_produto_micro ?? null,
         micro_status: dmicro.status_recomendacao_micro ?? null,
+        micro_acomp_solo_pre: dmicro.acomp_solo_pre ?? null,
+        micro_acomp_foliar: dmicro.acomp_foliar ?? null,
+        micro_acomp_solo_pos: dmicro.acomp_solo_pos ?? null,
         // campos do Vida no Solo (jsonb próprio, projeto separado)
         vns_area_projeto: dvns.area_projeto_vns ?? null,
         vns_tipo_teste: dvns.tipo_teste_vns ?? null,
@@ -3102,6 +3119,17 @@ async function carregarDadosDoSupabase(){
         entry[e.key+'_exec'] = r['estr_acomp_'+e.key+'_exec'] || 'Pendente';
       });
       state.estrAcomp[key] = entry;
+    });
+    state.microAcomp = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = r.micro_acomp_solo_pre!=null || r.micro_acomp_foliar!=null || r.micro_acomp_solo_pos!=null;
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      state.microAcomp[key] = {
+        solo_pre: r.micro_acomp_solo_pre || 'Aguardando',
+        foliar: r.micro_acomp_foliar || 'Pendente',
+        solo_pos: r.micro_acomp_solo_pos || 'Pendente',
+      };
     });
 
     const baseInfoEl = document.getElementById('dashMgBaseInfo');
@@ -5191,13 +5219,17 @@ function renderLadroes(){
     return;
   }
 
-  // garante seleção válida de cliente/fazenda
-  if(!state.ladroesCliente || !clientes.includes(state.ladroesCliente)) state.ladroesCliente = clientes[0];
-  const fazendasDoCliente = Object.keys(porCliente[state.ladroesCliente]).sort();
-  if(!state.ladroesFazenda || !fazendasDoCliente.includes(state.ladroesFazenda)) state.ladroesFazenda = fazendasDoCliente[0];
-
-  const talhoes = porCliente[state.ladroesCliente][state.ladroesFazenda] || [];
-  const idxFazenda = fazendasDoCliente.indexOf(state.ladroesFazenda);
+  // multi-seleção de Clientes e Fazendas — combina os talhões de tudo que estiver marcado
+  if(!state.ladroesClientesSel || !state.ladroesClientesSel.size || ![...state.ladroesClientesSel].some(c=>clientes.includes(c))){
+    state.ladroesClientesSel = new Set([clientes[0]]);
+  }
+  const fazendasDisponiveis = [...new Set(clientes.filter(c=>state.ladroesClientesSel.has(c)).flatMap(c=>Object.keys(porCliente[c])))].sort();
+  if(!state.ladroesFazendasSel || !state.ladroesFazendasSel.size || ![...state.ladroesFazendasSel].some(f=>fazendasDisponiveis.includes(f))){
+    state.ladroesFazendasSel = new Set(fazendasDisponiveis.slice(0,1));
+  }
+  const talhoes = clientes.filter(c=>state.ladroesClientesSel.has(c)).flatMap(c=>
+    Object.keys(porCliente[c]).filter(f=>state.ladroesFazendasSel.has(f)).flatMap(f=>porCliente[c][f])
+  );
 
   // Card 2 — 25% piores, por critério selecionável (calculado por sistema, dentro de subCardPioresHtml)
   const crit = state.ladroesCriterio; // 'prod_25_26' | 'media_prod'
@@ -5332,6 +5364,11 @@ function renderLadroes(){
   <style>
     .ladroes-selectbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;background:var(--paper);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:18px;}
     .ladroes-selectbar .fitem{min-width:220px;}
+    .checklist{max-height:130px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;}
+    .checklist-item{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer;}
+    .checklist-item input{margin:0;cursor:pointer;}
+    .ms-actions{display:flex;gap:6px;margin-top:4px;}
+    .ms-actions button{border:none;background:none;font-size:10px;font-weight:600;color:var(--teal);cursor:pointer;font-family:inherit;padding:2px 4px;text-decoration:underline;}
     .ladroes-selectbar select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--ink);}
     .ladroes-nav{display:flex;align-items:center;gap:8px;}
     .ladroes-nav button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink-soft);}
@@ -5354,21 +5391,21 @@ function renderLadroes(){
 
   <div class="ladroes-selectbar">
     <div class="fitem">
-      <label>Cliente</label>
-      <select id="ladCliSelect">
-        ${clientes.map(c=>`<option value="${encodeURIComponent(c)}" ${c===state.ladroesCliente?'selected':''}>${c}</option>`).join('')}
-      </select>
+      <label>Clientes</label>
+      <div class="checklist" id="ladCliChecklist">
+        ${clientes.map(c=>`<label class="checklist-item"><input type="checkbox" value="${encodeURIComponent(c)}" ${state.ladroesClientesSel.has(c)?'checked':''}> ${c}</label>`).join('')}
+      </div>
+      <div class="ms-actions"><button id="ladCliTodos">Marcar todos</button><button id="ladCliLimpar">Limpar</button></div>
     </div>
     <div class="fitem">
-      <label>Fazenda</label>
-      <select id="ladFazSelect">
-        ${fazendasDoCliente.map(f=>`<option value="${encodeURIComponent(f)}" ${f===state.ladroesFazenda?'selected':''}>${f}</option>`).join('')}
-      </select>
+      <label>Fazendas</label>
+      <div class="checklist" id="ladFazChecklist">
+        ${fazendasDisponiveis.map(f=>`<label class="checklist-item"><input type="checkbox" value="${encodeURIComponent(f)}" ${state.ladroesFazendasSel.has(f)?'checked':''}> ${f}</label>`).join('')}
+      </div>
+      <div class="ms-actions"><button id="ladFazTodos">Marcar todas</button><button id="ladFazLimpar">Limpar</button></div>
     </div>
     <div class="ladroes-nav">
-      <button id="ladFazPrev" ${idxFazenda<=0?'disabled':''}>◀ fazenda anterior</button>
-      <span class="count">Fazenda ${idxFazenda+1} de ${fazendasDoCliente.length} · ${talhoes.length} talhões</span>
-      <button id="ladFazNext" ${idxFazenda>=fazendasDoCliente.length-1?'disabled':''}>próxima fazenda ▶</button>
+      <span class="count">${state.ladroesClientesSel.size} cliente(s) · ${state.ladroesFazendasSel.size} fazenda(s) · ${talhoes.length} talhões combinados</span>
     </div>
   </div>
 
@@ -5377,23 +5414,27 @@ function renderLadroes(){
   ${cardPioresHtml}
   `;
 
-  container.querySelector('#ladCliSelect').addEventListener('change', e=>{
-    state.ladroesCliente = decodeURIComponent(e.target.value);
-    state.ladroesFazenda = null; // reseta pra pegar a primeira fazenda do novo cliente
+  function atualizarSelecaoMultipla(listaEl, targetSet){
+    targetSet.clear();
+    listaEl.querySelectorAll('input[type=checkbox]:checked').forEach(cb=> targetSet.add(decodeURIComponent(cb.value)));
+    if(!targetSet.size){
+      const primeiro = listaEl.querySelector('input[type=checkbox]');
+      if(primeiro) targetSet.add(decodeURIComponent(primeiro.value));
+    }
+  }
+  container.querySelector('#ladCliChecklist').addEventListener('change', e=>{
+    atualizarSelecaoMultipla(e.currentTarget, state.ladroesClientesSel);
+    state.ladroesFazendasSel = new Set(); // reseta fazendas pro novo conjunto de clientes
     renderLadroes();
   });
-  container.querySelector('#ladFazSelect').addEventListener('change', e=>{
-    state.ladroesFazenda = decodeURIComponent(e.target.value);
+  container.querySelector('#ladFazChecklist').addEventListener('change', e=>{
+    atualizarSelecaoMultipla(e.currentTarget, state.ladroesFazendasSel);
     renderLadroes();
   });
-  const prevBtn = container.querySelector('#ladFazPrev');
-  if(prevBtn) prevBtn.addEventListener('click', ()=>{
-    if(idxFazenda>0){ state.ladroesFazenda = fazendasDoCliente[idxFazenda-1]; renderLadroes(); }
-  });
-  const nextBtn = container.querySelector('#ladFazNext');
-  if(nextBtn) nextBtn.addEventListener('click', ()=>{
-    if(idxFazenda<fazendasDoCliente.length-1){ state.ladroesFazenda = fazendasDoCliente[idxFazenda+1]; renderLadroes(); }
-  });
+  container.querySelector('#ladCliTodos').addEventListener('click', ()=>{ state.ladroesClientesSel = new Set(clientes); state.ladroesFazendasSel = new Set(); renderLadroes(); });
+  container.querySelector('#ladCliLimpar').addEventListener('click', ()=>{ state.ladroesClientesSel = new Set([clientes[0]]); state.ladroesFazendasSel = new Set(); renderLadroes(); });
+  container.querySelector('#ladFazTodos').addEventListener('click', ()=>{ state.ladroesFazendasSel = new Set(fazendasDisponiveis); renderLadroes(); });
+  container.querySelector('#ladFazLimpar').addEventListener('click', ()=>{ state.ladroesFazendasSel = new Set(fazendasDisponiveis.slice(0,1)); renderLadroes(); });
   container.querySelectorAll('.crit-btn-ld').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.ladroesCriterio = btn.dataset.crit; renderLadroes(); });
   });
@@ -5513,11 +5554,20 @@ function renderMaximas(){
     return;
   }
 
-  if(!state.maximasCliente || !clientes.includes(state.maximasCliente)) state.maximasCliente = clientes[0];
-  const fazendasDoCliente = Object.keys(porCliente[state.maximasCliente]).sort();
-  if(!state.maximasFazenda || !fazendasDoCliente.includes(state.maximasFazenda)) state.maximasFazenda = fazendasDoCliente[0];
-  const idxFazenda = fazendasDoCliente.indexOf(state.maximasFazenda);
-  const grupos = porCliente[state.maximasCliente][state.maximasFazenda];
+  if(!state.maximasClientesSel || !state.maximasClientesSel.size || ![...state.maximasClientesSel].some(c=>clientes.includes(c))){
+    state.maximasClientesSel = new Set([clientes[0]]);
+  }
+  const fazendasDisponiveis = [...new Set(clientes.filter(c=>state.maximasClientesSel.has(c)).flatMap(c=>Object.keys(porCliente[c])))].sort();
+  if(!state.maximasFazendasSel || !state.maximasFazendasSel.size || ![...state.maximasFazendasSel].some(f=>fazendasDisponiveis.includes(f))){
+    state.maximasFazendasSel = new Set(fazendasDisponiveis.slice(0,1));
+  }
+  const grupos = { Sequeiro: [], Irrigado: [] };
+  clientes.filter(c=>state.maximasClientesSel.has(c)).forEach(c=>{
+    Object.keys(porCliente[c]).filter(f=>state.maximasFazendasSel.has(f)).forEach(f=>{
+      grupos.Sequeiro.push(...porCliente[c][f].Sequeiro);
+      grupos.Irrigado.push(...porCliente[c][f].Irrigado);
+    });
+  });
 
   function calcularRanking(lista){
     // elegibilidade: precisa ter TODAS as safras da janela preenchidas e numéricas
@@ -5636,21 +5686,21 @@ function renderMaximas(){
 
   <div class="maximas-selectbar">
     <div class="fitem">
-      <label>Cliente</label>
-      <select id="maxCliSelect">
-        ${clientes.map(c=>`<option value="${encodeURIComponent(c)}" ${c===state.maximasCliente?'selected':''}>${c}</option>`).join('')}
-      </select>
+      <label>Clientes</label>
+      <div class="checklist" id="maxCliChecklist">
+        ${clientes.map(c=>`<label class="checklist-item"><input type="checkbox" value="${encodeURIComponent(c)}" ${state.maximasClientesSel.has(c)?'checked':''}> ${c}</label>`).join('')}
+      </div>
+      <div class="ms-actions"><button id="maxCliTodos">Marcar todos</button><button id="maxCliLimpar">Limpar</button></div>
     </div>
     <div class="fitem">
-      <label>Fazenda</label>
-      <select id="maxFazSelect">
-        ${fazendasDoCliente.map(f=>`<option value="${encodeURIComponent(f)}" ${f===state.maximasFazenda?'selected':''}>${f}</option>`).join('')}
-      </select>
+      <label>Fazendas</label>
+      <div class="checklist" id="maxFazChecklist">
+        ${fazendasDisponiveis.map(f=>`<label class="checklist-item"><input type="checkbox" value="${encodeURIComponent(f)}" ${state.maximasFazendasSel.has(f)?'checked':''}> ${f}</label>`).join('')}
+      </div>
+      <div class="ms-actions"><button id="maxFazTodos">Marcar todas</button><button id="maxFazLimpar">Limpar</button></div>
     </div>
     <div class="maximas-nav">
-      <button id="maxFazPrev" ${idxFazenda<=0?'disabled':''}>◀ fazenda anterior</button>
-      <span class="count">Fazenda ${idxFazenda+1} de ${fazendasDoCliente.length}</span>
-      <button id="maxFazNext" ${idxFazenda>=fazendasDoCliente.length-1?'disabled':''}>próxima fazenda ▶</button>
+      <span class="count">${state.maximasClientesSel.size} cliente(s) · ${state.maximasFazendasSel.size} fazenda(s) combinadas</span>
     </div>
     <div class="janela-ctrl">
       <span>Janela: <b>${janela} anos</b> (${SAFRA_LABELS[safraKeys[0]]} → ${SAFRA_LABELS[safraKeys[safraKeys.length-1]]})</span>
@@ -5663,26 +5713,30 @@ function renderMaximas(){
     ${cardSistemaHtml('Sequeiro', grupos.Sequeiro)}
     ${cardSistemaHtml('Irrigado', grupos.Irrigado)}
   </div>
-  ${(!temSequeiro && !temIrrigado) ? '<p class="sub">Nenhum talhão com Sistema reconhecido (Sequeiro/Irrigado) nessa fazenda.</p>' : ''}
+  ${(!temSequeiro && !temIrrigado) ? '<p class="sub">Nenhum talhão com Sistema reconhecido (Sequeiro/Irrigado) nessas fazendas.</p>' : ''}
   `;
 
-  container.querySelector('#maxCliSelect').addEventListener('change', e=>{
-    state.maximasCliente = decodeURIComponent(e.target.value);
-    state.maximasFazenda = null; // reseta pra pegar a primeira fazenda do novo cliente
+  function atualizarSelecaoMultiplaMax(listaEl, targetSet){
+    targetSet.clear();
+    listaEl.querySelectorAll('input[type=checkbox]:checked').forEach(cb=> targetSet.add(decodeURIComponent(cb.value)));
+    if(!targetSet.size){
+      const primeiro = listaEl.querySelector('input[type=checkbox]');
+      if(primeiro) targetSet.add(decodeURIComponent(primeiro.value));
+    }
+  }
+  container.querySelector('#maxCliChecklist').addEventListener('change', e=>{
+    atualizarSelecaoMultiplaMax(e.currentTarget, state.maximasClientesSel);
+    state.maximasFazendasSel = new Set();
     renderMaximas();
   });
-  container.querySelector('#maxFazSelect').addEventListener('change', e=>{
-    state.maximasFazenda = decodeURIComponent(e.target.value);
+  container.querySelector('#maxFazChecklist').addEventListener('change', e=>{
+    atualizarSelecaoMultiplaMax(e.currentTarget, state.maximasFazendasSel);
     renderMaximas();
   });
-  const prevBtn = container.querySelector('#maxFazPrev');
-  if(prevBtn) prevBtn.addEventListener('click', ()=>{
-    if(idxFazenda>0){ state.maximasFazenda = fazendasDoCliente[idxFazenda-1]; renderMaximas(); }
-  });
-  const nextBtn = container.querySelector('#maxFazNext');
-  if(nextBtn) nextBtn.addEventListener('click', ()=>{
-    if(idxFazenda<fazendasDoCliente.length-1){ state.maximasFazenda = fazendasDoCliente[idxFazenda+1]; renderMaximas(); }
-  });
+  container.querySelector('#maxCliTodos').addEventListener('click', ()=>{ state.maximasClientesSel = new Set(clientes); state.maximasFazendasSel = new Set(); renderMaximas(); });
+  container.querySelector('#maxCliLimpar').addEventListener('click', ()=>{ state.maximasClientesSel = new Set([clientes[0]]); state.maximasFazendasSel = new Set(); renderMaximas(); });
+  container.querySelector('#maxFazTodos').addEventListener('click', ()=>{ state.maximasFazendasSel = new Set(fazendasDisponiveis); renderMaximas(); });
+  container.querySelector('#maxFazLimpar').addEventListener('click', ()=>{ state.maximasFazendasSel = new Set(fazendasDisponiveis.slice(0,1)); renderMaximas(); });
   const menosBtn = container.querySelector('#maxJanelaMenos');
   if(menosBtn) menosBtn.addEventListener('click', ()=>{
     if(state.maximasJanela>3){ state.maximasJanela--; renderMaximas(); }
@@ -6606,7 +6660,7 @@ function renderEstruturacao(){
     <div class="estr-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
     <div class="estr-kpi" style="animation-delay:.06s"><div class="v">${qtdEstadosTeste}</div><div class="l">Estados com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
-    <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/26)*1000)/10}% da meta (26)</div></div>
+    <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/24)*1000)/10}% da meta (24)</div></div>
     <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia</div></div>
   </div>
 
@@ -7367,6 +7421,8 @@ function renderMicroSolo(){
   const base = byPais(RECORDS);
   const comQualquerDado = base.filter(r=> r.micro_area_projeto!=null || r.micro_produto!=null || r.micro_b!=null || r.micro_mn!=null || r.micro_zn!=null || r.micro_cu!=null || r.micro_natureza!=null || r.micro_status!=null);
   const comRecomendacao = base.filter(r=> (r.micro_status==='Comprado' || r.micro_status==='Aplicado') && r.micro_natureza==='Sulfato');
+  const acompRowsMicro = base.filter(r=> r.micro_status==='Aplicado')
+    .sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
 
   if(!comQualquerDado.length){
     container.innerHTML = `
@@ -7526,6 +7582,40 @@ function renderMicroSolo(){
       </div>
     </div>
   </div>
+
+  <div class="micro-card full-card" style="margin-top:12px;animation-delay:.34s;">
+    <h3>🗓️ Acompanhamento</h3>
+    <p class="sub-sm">Talhões com Status de Recomendação = <b>Aplicado</b> · ${acompRowsMicro.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Data de Plantio</th><th>Data coleta (prevista)</th><th>Produto recomendado</th>
+          ${MICRO_ETAPAS.map(e=>`<th>${e.label}</th>`).join('')}
+          <th>Salvar</th>
+        </tr></thead>
+        <tbody>
+          ${acompRowsMicro.map(r=>{
+            const key = cronogramaKey(r);
+            const entry = getMicroAcompEntry(key);
+            const dataPlantio = r.data_plantio ? new Date(r.data_plantio+'T00:00:00') : null;
+            let dataColeta = null;
+            if(dataPlantio){ dataColeta = new Date(dataPlantio); dataColeta.setDate(dataColeta.getDate()+45); }
+            return `<tr>
+              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="mono-td">${dataPlantio ? dataPlantio.toLocaleDateString('pt-BR') : '—'}</td>
+              <td class="mono-td">${dataColeta ? dataColeta.toLocaleDateString('pt-BR') : '—'}</td>
+              <td>${r.micro_produto||'—'}</td>
+              ${MICRO_ETAPAS.map(e=>`<td><select class="cell-input micro-acomp-input" data-micro-key="${encodeURIComponent(key)}" data-micro-campo="${e.key}">${e.options.map(o=>`<option value="${o}" ${entry[e.key]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
+              <td style="white-space:nowrap;">
+                <button class="row-save micro-acomp-save-btn" data-micro-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                <span class="micro-acomp-msg" data-micro-msg-key="${encodeURIComponent(key)}"></span>
+              </td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="${6+MICRO_ETAPAS.length+1}">Nenhum talhão com Status Aplicado.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>
   `;
 
   container.querySelectorAll('.micro-mapa-pill').forEach(btn=>{
@@ -7543,6 +7633,39 @@ function renderMicroSolo(){
       });
     });
   }
+
+  container.querySelectorAll('.micro-acomp-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const key = decodeURIComponent(el.dataset.microKey);
+      const campo = el.dataset.microCampo;
+      const valor = el.value || null;
+      if(!state.microAcomp[key]){
+        state.microAcomp[key] = {};
+        MICRO_ETAPAS.forEach(e=>{ state.microAcomp[key][e.key] = e.default; });
+      }
+      state.microAcomp[key][campo] = valor;
+      salvarMicroAcompCampo(key, campo, valor, el);
+    });
+  });
+  container.querySelectorAll('.micro-acomp-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = decodeURIComponent(btn.dataset.microKey);
+      const msgEl = container.querySelector(`.micro-acomp-msg[data-micro-msg-key="${btn.dataset.microKey}"]`);
+      const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const entry = getMicroAcompEntry(key);
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarMicroAcompEntradaCompleta(rec, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
+        else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
+    });
+  });
 
   Object.values(microSoloCharts).forEach(c=>{ if(c) c.destroy(); });
   microSoloCharts = {};
@@ -8564,6 +8687,55 @@ async function salvarEstrAcompEntradaCompleta(rec, entry, user){
       rec['estr_acomp_'+e.key+'_mes'] = entry[e.key+'_mes'] ?? null;
       rec['estr_acomp_'+e.key+'_exec'] = entry[e.key+'_exec'] ?? null;
     });
+  }
+  return { error };
+}
+
+function montarDadosMicroBase(rec){
+  return {
+    area_projeto_micro: rec.micro_area_projeto ?? null,
+    tipo_teste_micro: rec.micro_tipo_teste ?? null,
+    produto_recomendado_2627_micro: rec.micro_produto ?? null,
+    dose_produto_2627_micro: rec.micro_dose ?? null,
+    b_pct_micro: rec.micro_b ?? null,
+    mn_pct_micro: rec.micro_mn ?? null,
+    zn_pct_micro: rec.micro_zn ?? null,
+    cu_pct_micro: rec.micro_cu ?? null,
+    natureza_produto_micro: rec.micro_natureza ?? null,
+    status_recomendacao_micro: rec.micro_status ?? null,
+  };
+}
+async function salvarMicroAcompCampo(key, campoKey, valor, el){
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+  if(!rec || !projetosIds['projeto-micro-solo']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = montarDadosMicroBase(rec);
+  MICRO_ETAPAS.forEach(e=>{ dados['acomp_'+e.key] = campoKey===e.key ? valor : (rec['micro_acomp_'+e.key] ?? null); });
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['projeto-micro-solo'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec['micro_acomp_'+campoKey] = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+async function salvarMicroAcompEntradaCompleta(rec, entry, user){
+  if(!rec || !projetosIds['projeto-micro-solo']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = montarDadosMicroBase(rec);
+  MICRO_ETAPAS.forEach(e=>{ dados['acomp_'+e.key] = entry[e.key] ?? null; });
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['projeto-micro-solo'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    MICRO_ETAPAS.forEach(e=>{ rec['micro_acomp_'+e.key] = entry[e.key] ?? null; });
   }
   return { error };
 }
