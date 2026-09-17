@@ -7946,12 +7946,12 @@ function renderVidaNoSolo(){
 
 /* ---------------- TAB VISÃO GERAL DE PROJETOS ---------------- */
 const VG_PROJETOS = [
-  { key:'cond', label:'Condicionador', cor:'#5c2410', participa: r=> r.cond_dose!=null && Number(r.cond_dose)>0 },
-  { key:'op', label:'Otimização de P', cor:'#2c4a7a', participa: r=> r.op_dose_solub!=null && Number(r.op_dose_solub)>0 },
-  { key:'estr', label:'Estruturação', cor:'#6b7a3f', participa: r=> r.estr_tipo_teste!=null || r.estr_area_projeto!=null || r.estr_produto!=null || r.estr_uso_tecnologia!=null || r.estr_acamamento!=null },
+  { key:'cond', label:'Condicionador', cor:'#5c2410', participa: r=> r.cond_area_projeto!=null && Number(r.cond_area_projeto)>0 },
+  { key:'op', label:'Otimização de P', cor:'#2c4a7a', participa: r=> r.op_area_projeto!=null && Number(r.op_area_projeto)>0 },
+  { key:'estr', label:'Estruturação', cor:'#6b7a3f', participa: r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0 },
   { key:'oxc', label:'Óxido de Magnésio', cor:'#a68a2e', participa: r=> r.dose_oxido!=null && Number(r.dose_oxido)>0 },
-  { key:'micro', label:'Micro Solo', cor:'#7a5b8a', participa: r=> r.micro_area_projeto!=null || r.micro_produto!=null || r.micro_b!=null || r.micro_mn!=null || r.micro_zn!=null || r.micro_cu!=null || r.micro_natureza!=null || r.micro_status!=null },
-  { key:'vns', label:'Vida no Solo', cor:'#3f8891', participa: r=> r.vns_area_projeto!=null || ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado','vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia','vns_morte_plantas'].some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico },
+  { key:'micro', label:'Micro Solo', cor:'#7a5b8a', participa: r=> r.micro_status==='Aplicado' },
+  { key:'vns', label:'Vida no Solo', cor:'#3f8891', participa: r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 },
   { key:'maxlad', label:'Ladrões/Máximas', cor:'#a4432a', participa: r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas' },
 ];
 function renderVisaoGeral(){
