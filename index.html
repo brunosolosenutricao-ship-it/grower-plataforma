@@ -7715,7 +7715,7 @@ function renderVidaNoSolo(){
   const VNS_SIM_CAMPOS = ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado','vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia','vns_morte_plantas'];
   const comQualquerDado = base.filter(r=> r.vns_area_projeto!=null || VNS_SIM_CAMPOS.some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico);
   const comTeste = base.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
-  const comPonto = comQualquerDado.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
+  const comPonto = base.filter(r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 && r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
 
   if(!comQualquerDado.length){
     container.innerHTML = `
