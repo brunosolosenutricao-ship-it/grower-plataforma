@@ -553,6 +553,8 @@
       <div class="nav-item" data-view="oxidoconsumo-dash">🧪 Óxido de Magnésio</div>
       <div class="nav-item" data-view="microsolo-dash">🔬 Projeto Micro Solo</div>
       <div class="nav-item" data-view="ladroesmaximas-mapa-dash">📍 Ladrões/Máximas</div>
+      <div class="nav-item" data-view="vidanosolo-dash">🦠 Vida no Solo</div>
+      <div class="nav-item" data-view="visaogeral-dash">🌍 Visão Geral de Projetos</div>
       </div>
     </div>
     <div class="sidebar-user">
@@ -824,6 +826,46 @@
       </div>
       <div id="ladroesMaximasMapaApp" style="display:none;">
         <div id="tab-ladroesmaximas-mapa"></div>
+      </div>
+    </div>
+
+    <div id="viewVidaNoSolo" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🦠 Vida no Solo</h2>
+          <p class="sub">Mapa modulável (nematoides, doenças e talhões por ponto), área do projeto, área por produto e tipo de teste.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="vidaNoSoloLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🦠</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="vidaNoSoloApp" style="display:none;">
+        <div id="tab-vida-no-solo"></div>
+      </div>
+    </div>
+
+    <div id="viewVisaoGeral" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🌍 Visão Geral de Projetos</h2>
+          <p class="sub">Mapa de pontos (Latitude/Longitude) de todos os 7 projetos, cada um com sua cor, e tabela de participação por talhão.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="visaoGeralLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🌍</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+        </div>
+      </div>
+      <div id="visaoGeralApp" style="display:none;">
+        <div id="tab-visao-geral"></div>
       </div>
     </div>
   </div>
@@ -2463,7 +2505,9 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewOxidoConsumo').style.display = view==='oxidoconsumo-dash' ? 'block' : 'none';
     document.getElementById('viewMicroSolo').style.display = view==='microsolo-dash' ? 'block' : 'none';
     document.getElementById('viewLadroesMaximasMapa').style.display = view==='ladroesmaximas-mapa-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash') && !dashMgJaCarregado){
+    document.getElementById('viewVidaNoSolo').style.display = view==='vidanosolo-dash' ? 'block' : 'none';
+    document.getElementById('viewVisaoGeral').style.display = view==='visaogeral-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash' || view==='vidanosolo-dash' || view==='visaogeral-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2574,6 +2618,8 @@ const state = {
   oxidoConsumoFiltroConsultor: 'Todos',
   oxidoConsumoFiltroCliente: 'Todos',
   microSoloMapModo: 'b',
+  vidaNoSoloMapModo: 'nema_lesoes',
+  visaoGeralFiltro: 'Todos',
 };
 window.state = state; // a Alimentação (outro <script>) precisa enxergar esse objeto — let/const não cruza scripts sozinho
 
@@ -2737,6 +2783,10 @@ async function carregarDadosDoSupabase(){
   const microAppEl = document.getElementById('microSoloApp');
   const lmMapaLoadingEl = document.getElementById('ladroesMaximasMapaLoading');
   const lmMapaAppEl = document.getElementById('ladroesMaximasMapaApp');
+  const vnsLoadingEl = document.getElementById('vidaNoSoloLoading');
+  const vnsAppEl = document.getElementById('vidaNoSoloApp');
+  const vgLoadingEl = document.getElementById('visaoGeralLoading');
+  const vgAppEl = document.getElementById('visaoGeralApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
   if(ladLoadingEl) ladLoadingEl.style.display = 'flex';
@@ -2755,6 +2805,10 @@ async function carregarDadosDoSupabase(){
   if(microAppEl) microAppEl.style.display = 'none';
   if(lmMapaLoadingEl) lmMapaLoadingEl.style.display = 'flex';
   if(lmMapaAppEl) lmMapaAppEl.style.display = 'none';
+  if(vnsLoadingEl) vnsLoadingEl.style.display = 'flex';
+  if(vnsAppEl) vnsAppEl.style.display = 'none';
+  if(vgLoadingEl) vgLoadingEl.style.display = 'flex';
+  if(vgAppEl) vgAppEl.style.display = 'none';
 
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
@@ -2792,8 +2846,13 @@ async function carregarDadosDoSupabase(){
     const projResMicro = await sb.from('projetos').select('id').eq('slug', 'projeto-micro-solo').single();
     if(!projResMicro.error) projetoIdMicro = projResMicro.data.id;
 
+    // projeto Vida no Solo — mesma lógica, opcional
+    let projetoIdVns = null;
+    const projResVns = await sb.from('projetos').select('id').eq('slug', 'vida-no-solo').single();
+    if(!projResVns.error) projetoIdVns = projResVns.data.id;
+
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {};
+    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {}, dadosMapVns = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -2827,6 +2886,11 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdMicro).in('talhao_id', bloco);
         if(!errDMicro && dadosMicro) dadosMicro.forEach(d=>{ dadosMapMicro[d.talhao_id] = d.dados || {}; });
       }
+      if(projetoIdVns){
+        const { data: dadosVns, error: errDVns } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdVns).in('talhao_id', bloco);
+        if(!errDVns && dadosVns) dadosVns.forEach(d=>{ dadosMapVns[d.talhao_id] = d.dados || {}; });
+      }
     }
 
     const records = [], semArea = [];
@@ -2837,6 +2901,7 @@ async function carregarDadosDoSupabase(){
       const dop = dadosMapOp[t.id] || {};
       const destr = dadosMapEstr[t.id] || {};
       const dmicro = dadosMapMicro[t.id] || {};
+      const dvns = dadosMapVns[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
@@ -2911,6 +2976,23 @@ async function carregarDadosDoSupabase(){
         micro_cu: dmicro.cu_pct_micro ?? null,
         micro_natureza: dmicro.natureza_produto_micro ?? null,
         micro_status: dmicro.status_recomendacao_micro ?? null,
+        // campos do Vida no Solo (jsonb próprio, projeto separado)
+        vns_area_projeto: dvns.area_projeto_vns ?? null,
+        vns_tipo_teste: dvns.tipo_teste_vns ?? null,
+        vns_nema_lesoes: dvns.nematoide_lesoes_radiculares ?? null,
+        vns_nema_galhas: dvns.nematoide_galhas ?? null,
+        vns_nema_cisto: dvns.nematoide_cisto ?? null,
+        vns_nema_reniforme: dvns.nematoide_reniforme ?? null,
+        vns_nema_espiralado: dvns.nematoide_espiralado ?? null,
+        vns_doenca_fusarium: dvns.doenca_fusarium ?? null,
+        vns_doenca_macrophomina: dvns.doenca_macrophomina ?? null,
+        vns_doenca_mofo_branco: dvns.doenca_mofo_branco ?? null,
+        vns_doenca_rhizoctonia: dvns.doenca_rhizoctonia ?? null,
+        vns_morte_plantas: dvns.morte_plantas ?? null,
+        vns_nematicida_biologico: dvns.nematicida_biologico ?? null,
+        vns_fungicida_biologico: dvns.fungicida_biologico ?? null,
+        vns_fungicida_quimico: dvns.fungicida_quimico ?? null,
+        vns_nematicida_quimico: dvns.nematicida_quimico ?? null,
       };
       // copia todos os campos de análise de solo (0-20/20-40) com a MESMA chave do GERAL_CAMPOS —
       // usado pelo modal do Ladrões/Máximas, que lê genericamente por c.key
@@ -2973,6 +3055,10 @@ async function carregarDadosDoSupabase(){
     if(microAppEl) microAppEl.style.display = 'block';
     if(lmMapaLoadingEl) lmMapaLoadingEl.style.display = 'none';
     if(lmMapaAppEl) lmMapaAppEl.style.display = 'block';
+    if(vnsLoadingEl) vnsLoadingEl.style.display = 'none';
+    if(vnsAppEl) vnsAppEl.style.display = 'block';
+    if(vgLoadingEl) vgLoadingEl.style.display = 'none';
+    if(vgAppEl) vgAppEl.style.display = 'block';
     renderAll();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
@@ -2984,6 +3070,7 @@ async function carregarDadosDoSupabase(){
     if(oxcLoadingEl) oxcLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(microLoadingEl) microLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(lmMapaLoadingEl) lmMapaLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
+    if(vnsLoadingEl) vnsLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -3200,6 +3287,8 @@ function renderAll(){
   renderOxidoConsumo();
   renderMicroSolo();
   renderLadroesMaximasMapa();
+  renderVidaNoSolo();
+  renderVisaoGeral();
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -7485,6 +7574,485 @@ function renderLadroesMaximasMapa(){
   }
 }
 
+/* ---------------- TAB VIDA NO SOLO ---------------- */
+let vidaNoSoloCharts = {};
+const VNS_MAPA_MODOS = [
+  { key:'nema_lesoes', label:'Nematoide lesões' },
+  { key:'nema_galhas', label:'Nematoide galhas' },
+  { key:'nema_cisto', label:'Nematoide cisto' },
+  { key:'nema_reniforme', label:'Nematoide reniforme' },
+  { key:'nema_espiralado', label:'Nematoide espiralado' },
+  { key:'doenca_fusarium', label:'Fusarium' },
+  { key:'doenca_macrophomina', label:'Macrophomina' },
+  { key:'doenca_mofo_branco', label:'Mofo Branco' },
+  { key:'doenca_rhizoctonia', label:'Rhizoctonia' },
+  { key:'morte_plantas', label:'Morte de plantas' },
+  { key:'area_projeto', label:'Área do projeto' },
+  { key:'talhoes', label:'Talhões' },
+];
+function abrirModalVidaNoSoloEstado(uf, comTeste){
+  const linhas = comTeste.filter(r=> (r.estado||'').toUpperCase()===uf);
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="vnsModalOverlay">
+    <div class="modal-panel" style="max-width:1100px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Vida no Solo</div>
+          <h2 style="margin:2px 0;">Talhões em ${uf}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões) com teste (Faixa ou Lado a lado)</p>
+        </div>
+        <button class="backbtn" id="vnsModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Consultor</th><th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Área (ha)</th>
+            <th>Área do projeto</th><th>Tipo de teste</th>
+            <th>Nematicida biol.</th><th>Fungicida biol.</th><th>Fungicida quím.</th><th>Nematicida quím.</th>
+          </tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.consultor||''}</td><td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td class="mono-td">${r.vns_area_projeto!=null?fmtNum(Number(r.vns_area_projeto),1):'—'}</td>
+              <td>${r.vns_tipo_teste||'—'}</td>
+              <td>${r.vns_nematicida_biologico||'—'}</td>
+              <td>${r.vns_fungicida_biologico||'—'}</td>
+              <td>${r.vns_fungicida_quimico||'—'}</td>
+              <td>${r.vns_nematicida_quimico||'—'}</td>
+            </tr>`).join('') || `<tr><td colspan="11">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('vnsModalFechar').addEventListener('click', fechar);
+  document.getElementById('vnsModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='vnsModalOverlay') fechar(); });
+}
+function abrirModalVidaNoSoloTalhao(rec){
+  const modalRoot = document.getElementById('modalRoot');
+  const soloCampos = GERAL_CAMPOS.filter(c=> c.subgrupo==='solo1' || c.subgrupo==='solo2');
+  const NEMA_DOENCA_LABELS = {
+    vns_nema_lesoes:'Nematoide das lesões radiculares', vns_nema_galhas:'Nematoide de galhas', vns_nema_cisto:'Nematoides de cisto',
+    vns_nema_reniforme:'Nematoide reniforme', vns_nema_espiralado:'Nematoide espiralado',
+    vns_doenca_fusarium:'Doença Fusarium', vns_doenca_macrophomina:'Doença Macrophomina', vns_doenca_mofo_branco:'Doença Mofo Branco',
+    vns_doenca_rhizoctonia:'Doença Rhizoctonia', vns_morte_plantas:'Morte de plantas',
+  };
+  const presentesSim = Object.entries(NEMA_DOENCA_LABELS).filter(([k])=> rec[k]==='Sim').map(([,label])=>label);
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="vnsTalhaoModalOverlay">
+    <div class="modal-panel" style="max-width:1000px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · Vida no Solo</div>
+          <h2 style="margin:2px 0;">${rec.fazenda} — Talhão ${rec.talhao}</h2>
+          <p class="sub" style="margin:0;">${rec.cliente} · ${rec.consultor} · ${rec.cidade||''}/${rec.estado||''}</p>
+        </div>
+        <button class="backbtn" id="vnsTalhaoModalFechar">✕ Fechar</button>
+      </div>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Dados gerais</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;">
+        <tbody>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Consultor</td><td style="padding:4px 8px;">${rec.consultor||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cliente</td><td style="padding:4px 8px;">${rec.cliente||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Fazenda</td><td style="padding:4px 8px;">${rec.fazenda||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Talhão</td><td style="padding:4px 8px;">${rec.talhao||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Área (ha)</td><td style="padding:4px 8px;">${fmtNum(rec.area,1)}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cultura</td><td style="padding:4px 8px;">${rec.cultura||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Estado</td><td style="padding:4px 8px;">${rec.estado||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cidade</td><td style="padding:4px 8px;">${rec.cidade||'—'}</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Análise de solo (0-20cm e 20-40cm)</h3>
+      <div class="table-scroll" style="margin-bottom:16px;">
+        <table>
+          <thead><tr>${soloCampos.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
+          <tbody><tr>${soloCampos.map(c=>`<td class="mono-td">${rec[c.key]!=null?fmtNum(Number(rec[c.key]),2):'—'}</td>`).join('')}</tr></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Histórico produtivo</h3>
+      <div class="table-scroll" style="margin-bottom:16px;">
+        <table>
+          <thead><tr><th>20/21</th><th>21/22</th><th>22/23</th><th>23/24</th><th>24/25</th><th>25/26</th><th>Média</th><th>Sinaleiro</th><th>Avaliação</th></tr></thead>
+          <tbody><tr>
+            <td class="mono-td">${rec.max_prod_20_21!=null?fmtNum(Number(rec.max_prod_20_21),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_21_22!=null?fmtNum(Number(rec.max_prod_21_22),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_22_23!=null?fmtNum(Number(rec.max_prod_22_23),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_23_24!=null?fmtNum(Number(rec.max_prod_23_24),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_24_25!=null?fmtNum(Number(rec.max_prod_24_25),1):'—'}</td>
+            <td class="mono-td">${rec.max_prod_25_26!=null?fmtNum(Number(rec.max_prod_25_26),1):'—'}</td>
+            <td class="mono-td">${rec.max_media_prod!=null?fmtNum(Number(rec.max_media_prod),1):'—'}</td>
+            <td>${rec.max_sinaleiro ?? '—'}</td>
+            <td>${rec.max_avaliacao || '—'}</td>
+          </tr></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Produtos (Vida no Solo)</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;">
+        <tbody>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Nematicida biológico</td><td style="padding:4px 8px;">${rec.vns_nematicida_biologico||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Fungicida biológico</td><td style="padding:4px 8px;">${rec.vns_fungicida_biologico||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Fungicida químico</td><td style="padding:4px 8px;">${rec.vns_fungicida_quimico||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--ink-soft);">Nematicida químico</td><td style="padding:4px 8px;">${rec.vns_nematicida_quimico||'—'}</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:13px;margin:0 0 8px;">Nematoides / Doenças presentes (Sim)</h3>
+      <p class="sub">${presentesSim.length ? presentesSim.join(' · ') : 'Nenhum marcado como "Sim" neste talhão.'}</p>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('vnsTalhaoModalFechar').addEventListener('click', fechar);
+  document.getElementById('vnsTalhaoModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='vnsTalhaoModalOverlay') fechar(); });
+}
+function renderVidaNoSolo(){
+  const container = document.getElementById('tab-vida-no-solo');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const VNS_SIM_CAMPOS = ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado','vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia','vns_morte_plantas'];
+  const comQualquerDado = base.filter(r=> r.vns_area_projeto!=null || VNS_SIM_CAMPOS.some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico);
+  const comTeste = base.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
+  const comPonto = comQualquerDado.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
+
+  if(!comQualquerDado.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Vida no Solo</div>
+      <h2>Nenhum dado do Vida no Solo ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer Área do projeto, algum Nematoide/Doença ou os produtos preenchidos, os gráficos aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  const areaProjetoPorEstado = {};
+  comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaProjetoPorEstado[uf]=(areaProjetoPorEstado[uf]||0)+Number(r.vns_area_projeto); });
+  const areaProjetoTotal = Object.values(areaProjetoPorEstado).reduce((a,b)=>a+b,0);
+
+  function calcularMapaPorModo(modo){
+    if(modo==='area_projeto'){
+      return { valores: areaProjetoPorEstado, unidade: 'ha de projeto', tipo:'coropletico' };
+    }
+    if(modo==='talhoes'){
+      return { valores: {}, unidade: '', tipo:'pontos' };
+    }
+    const campo = 'vns_'+modo;
+    const out = {};
+    comQualquerDado.forEach(r=>{
+      if(r[campo]!=='Sim') return;
+      const uf=(r.estado||'').toUpperCase(); if(!uf) return;
+      out[uf]=(out[uf]||0)+(r.area||0);
+    });
+    return { valores: out, unidade: 'ha (Sim)', tipo:'coropletico' };
+  }
+  const modoAtivo = state.vidaNoSoloMapModo;
+  const { valores: mapaValores, unidade: mapaUnidade, tipo: mapaTipo } = calcularMapaPorModo(modoAtivo);
+
+  const areaPorNematBiol = {}, areaPorFungBiol = {}, areaPorFungQuim = {}, areaPorNematQuim = {};
+  comQualquerDado.forEach(r=>{
+    if(r.vns_nematicida_biologico) areaPorNematBiol[r.vns_nematicida_biologico] = (areaPorNematBiol[r.vns_nematicida_biologico]||0)+(r.area||0);
+    if(r.vns_fungicida_biologico) areaPorFungBiol[r.vns_fungicida_biologico] = (areaPorFungBiol[r.vns_fungicida_biologico]||0)+(r.area||0);
+    if(r.vns_fungicida_quimico) areaPorFungQuim[r.vns_fungicida_quimico] = (areaPorFungQuim[r.vns_fungicida_quimico]||0)+(r.area||0);
+    if(r.vns_nematicida_quimico) areaPorNematQuim[r.vns_nematicida_quimico] = (areaPorNematQuim[r.vns_nematicida_quimico]||0)+(r.area||0);
+  });
+
+  const tipos = ['Faixa','Lado a lado','Área total'];
+  const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
+  const tipoEstado = {};
+  tipos.forEach(tp=> tipoEstado[tp] = {});
+  comQualquerDado.forEach(r=>{
+    if(!r.vns_tipo_teste || r.vns_area_projeto==null) return;
+    const uf = (r.estado||'').toUpperCase();
+    tipoEstado[r.vns_tipo_teste][uf] = (tipoEstado[r.vns_tipo_teste][uf]||0) + Number(r.vns_area_projeto);
+  });
+
+  const qtdEstados = new Set(comQualquerDado.map(r=>(r.estado||'').toUpperCase()).filter(Boolean)).size;
+  const qtdFazendas = new Set(comQualquerDado.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdProdutores = new Set(comQualquerDado.map(r=>r.cliente)).size;
+
+  const CORES_ESTADO_VNS = ['#5c7a3f','#8a5a4a','#2c4a7a','#a68a2e','#6b3f7a','#3f8891','#8a3a3a','#5b7a99','#a4432a','#7a6b3f'];
+  const coresPorEstado = {}; estadosComTeste.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO_VNS[i%CORES_ESTADO_VNS.length]);
+
+  let mapaSvg;
+  if(mapaTipo==='pontos'){
+    const estadosSvg = Object.entries(ESTADOS_BR_PATHS).map(([uf,d])=>`<path d="${d}" fill="#e3e3dc" stroke="#c8ccb9" stroke-width="1"></path>`).join('');
+    const pontosSvg = comPonto.map(r=>{
+      const { x, y } = lmProjetarPonto(Number(r.max_latitude), Number(r.max_longitude));
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#d63384" stroke="#fff" stroke-width="1.2" data-talhao-id="${r.id}" style="cursor:pointer;">
+        <title>${r.fazenda} — Talhão ${r.talhao}</title>
+      </circle>`;
+    }).join('');
+    mapaSvg = `<svg viewBox="${ESTADOS_BR_VIEWBOX}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;margin:0 auto;">${estadosSvg}${pontosSvg}</svg>`;
+  } else {
+    mapaSvg = condicionadorMapaSvg(mapaValores, mapaUnidade, [[224,236,215],[45,74,31]]);
+  }
+
+  container.innerHTML = `
+  <style>
+    .vns-layout{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;align-items:stretch;height:560px;}
+    .vns-map-card{grid-column:span 2;display:flex;flex-direction:column;min-height:0;}
+    .vns-chart-grid{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:12px;min-height:0;}
+    .vns-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:11px 13px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;transition:box-shadow .2s, transform .2s;display:flex;flex-direction:column;min-height:0;}
+    .vns-card:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
+    .vns-card h3{margin:0 0 2px;font-size:11.5px;}
+    .vns-card .sub-sm{font-size:9.5px;color:var(--ink-soft);margin:0 0 5px;line-height:1.25;}
+    .vns-card canvas{flex:1;min-height:0;width:100% !important;}
+    .vns-card-wrap{position:relative;flex:1;min-height:0;}
+    .vns-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+    .vns-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;}
+    .vns-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#5c7a3f;line-height:1.15;}
+    .vns-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
+    .vns-map-legend{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
+    .vns-map-legend .bar{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#e0ecd7,#2d4a1f);}
+    .vns-map-card svg{flex:1;}
+    .vns-map-card path{transition:filter .15s, transform .15s, stroke-width .15s;transform-box:fill-box;transform-origin:center;cursor:pointer;}
+    .vns-map-card path:hover{filter:brightness(1.18) saturate(1.15);transform:scale(1.015);stroke:#2d4a1f;stroke-width:1.6;}
+    .vns-mapa-pills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+    .vns-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .vns-mapa-pill.active{background:#2d4a1f;color:#fff;border-color:#2d4a1f;}
+    @media (max-width:1100px){ .vns-layout{grid-template-columns:1fr;height:auto;} .vns-map-card{grid-column:1;height:440px;} .vns-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .vns-kpis{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="vns-kpis">
+    <div class="vns-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
+    <div class="vns-kpi" style="animation-delay:.06s"><div class="v">${qtdEstados}</div><div class="l">Estados com dado do projeto</div></div>
+    <div class="vns-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendas}</div><div class="l">Fazendas com dado do projeto</div></div>
+    <div class="vns-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutores}</div><div class="l">Produtores com dado do projeto</div></div>
+  </div>
+
+  <div class="vns-layout">
+    <div class="vns-card vns-map-card" style="animation-delay:.05s;">
+      <h3>🗺️ Mapa modulável</h3>
+      <p class="sub-sm">Escolha o que o mapa mostra:</p>
+      <div class="vns-mapa-pills">
+        ${VNS_MAPA_MODOS.map(m=>`<button class="vns-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
+      </div>
+      ${mapaSvg}
+      ${mapaTipo==='coropletico' ? `<div class="vns-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div><p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>` : `<p class="sub-sm" style="margin-top:4px;text-align:center;">${comPonto.length} talhão(ões) plotados · bolinha rosa</p>`}
+    </div>
+    <div class="vns-chart-grid">
+      <div class="vns-card" style="animation-delay:.1s;">
+        <h3>🥧 Área de projeto por Estado</h3>
+        <p class="sub-sm">Só Faixa / Lado a lado — clique numa fatia pra detalhar</p>
+        <div class="vns-card-wrap"><canvas id="vnsPieEstado"></canvas></div>
+      </div>
+      <div class="vns-card" style="animation-delay:.14s;">
+        <h3>📊 Tipo de Teste por Estado</h3>
+        <p class="sub-sm">Faixa · Lado a lado · Área total</p>
+        <div class="vns-card-wrap"><canvas id="vnsTipoEstado"></canvas></div>
+      </div>
+      <div class="vns-card" style="animation-delay:.18s;">
+        <h3>🧪 Nematicida biológico</h3>
+        <p class="sub-sm">Área tratada, por produto</p>
+        <div class="vns-card-wrap"><canvas id="vnsNematBiol"></canvas></div>
+      </div>
+      <div class="vns-card" style="animation-delay:.22s;">
+        <h3>🧪 Fungicida biológico</h3>
+        <p class="sub-sm">Área tratada, por produto</p>
+        <div class="vns-card-wrap"><canvas id="vnsFungBiol"></canvas></div>
+      </div>
+      <div class="vns-card" style="animation-delay:.26s;">
+        <h3>🧪 Fungicida químico</h3>
+        <p class="sub-sm">Área tratada, por produto</p>
+        <div class="vns-card-wrap"><canvas id="vnsFungQuim"></canvas></div>
+      </div>
+      <div class="vns-card" style="animation-delay:.3s;">
+        <h3>🧪 Nematicida químico</h3>
+        <p class="sub-sm">Área tratada, por produto</p>
+        <div class="vns-card-wrap"><canvas id="vnsNematQuim"></canvas></div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('.vns-mapa-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.vidaNoSoloMapModo = btn.dataset.mapaModo;
+      renderVidaNoSolo();
+    });
+  });
+  if(mapaTipo==='pontos'){
+    container.querySelectorAll('.vns-map-card circle[data-talhao-id]').forEach(circle=>{
+      circle.addEventListener('click', ()=>{
+        const rec = comPonto.find(r=>r.id===circle.dataset.talhaoId);
+        if(rec) abrirModalVidaNoSoloTalhao(rec);
+      });
+    });
+  }
+
+  Object.values(vidaNoSoloCharts).forEach(c=>{ if(c) c.destroy(); });
+  vidaNoSoloCharts = {};
+
+  const CHART_ANIMACAO_VNS = { duration: 850, easing: 'easeOutQuart' };
+  const vnsTooltip = (extra={}) => ({
+    backgroundColor:'#1a2019', titleColor:'#fff', bodyColor:'#eef1e6',
+    padding:10, cornerRadius:8, displayColors:false, titleFont:{size:11.5,weight:'700'}, bodyFont:{size:11.5},
+    ...extra,
+  });
+  const vnsDataLabelBase = { color:'#1a2019', font:{size:9,weight:'700'}, anchor:'end', align:'end', offset:2 };
+
+  const canvasVnsPie = container.querySelector('#vnsPieEstado');
+  if(canvasVnsPie){
+    vidaNoSoloCharts.pie = new Chart(canvasVnsPie.getContext('2d'), {
+      type:'pie',
+      data:{ labels: estadosComTeste, datasets:[{ data: estadosComTeste.map(uf=>Math.round((areaProjetoPorEstado[uf]||0)*10)/10), backgroundColor: estadosComTeste.map(uf=>coresPorEstado[uf]), hoverOffset:10, borderColor:'#fbfaf4', borderWidth:2 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{...CHART_ANIMACAO_VNS, animateRotate:true, animateScale:true},
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const uf = estadosComTeste[elements[0].index];
+          abrirModalVidaNoSoloEstado(uf, comTeste);
+        },
+        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins:{legend:{position:'right', labels:{boxWidth:10,font:{size:9.5}}}, tooltip:vnsTooltip({callbacks:{label:c=>` ${c.label}: ${c.formattedValue} ha`}})}
+      }
+    });
+  }
+
+  const canvasVnsTipo = container.querySelector('#vnsTipoEstado');
+  if(canvasVnsTipo){
+    vidaNoSoloCharts.tipoEstado = new Chart(canvasVnsTipo.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: tipos,
+        datasets: estadosComTeste.map(uf=>({
+          label: uf,
+          data: tipos.map(tp=> Math.round((tipoEstado[tp][uf]||0)*10)/10),
+          backgroundColor: coresPorEstado[uf],
+          borderRadius:3,
+        })),
+      },
+      options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_VNS, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:10,font:{size:9.5}}}, tooltip:vnsTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}})} }
+    });
+  }
+
+  function montarBarraProduto(id, mapaArea, cor){
+    const canvas = container.querySelector('#'+id);
+    if(!canvas) return;
+    const entradas = Object.entries(mapaArea).sort((a,b)=>b[1]-a[1]);
+    vidaNoSoloCharts[id] = new Chart(canvas.getContext('2d'), {
+      type:'bar',
+      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:cor, borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:CHART_ANIMACAO_VNS, plugins:{legend:{display:false}, tooltip:vnsTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...vnsDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+    });
+  }
+  montarBarraProduto('vnsNematBiol', areaPorNematBiol, '#5c7a3f');
+  montarBarraProduto('vnsFungBiol', areaPorFungBiol, '#2c4a7a');
+  montarBarraProduto('vnsFungQuim', areaPorFungQuim, '#8a5a4a');
+  montarBarraProduto('vnsNematQuim', areaPorNematQuim, '#6b3f7a');
+}
+
+/* ---------------- TAB VISÃO GERAL DE PROJETOS ---------------- */
+const VG_PROJETOS = [
+  { key:'cond', label:'Condicionador', cor:'#5c2410', participa: r=> r.cond_dose!=null && Number(r.cond_dose)>0 },
+  { key:'op', label:'Otimização de P', cor:'#2c4a7a', participa: r=> r.op_dose_solub!=null && Number(r.op_dose_solub)>0 },
+  { key:'estr', label:'Estruturação', cor:'#6b7a3f', participa: r=> r.estr_tipo_teste!=null || r.estr_area_projeto!=null || r.estr_produto!=null || r.estr_uso_tecnologia!=null || r.estr_acamamento!=null },
+  { key:'oxc', label:'Óxido de Magnésio', cor:'#a68a2e', participa: r=> r.dose_oxido!=null && Number(r.dose_oxido)>0 },
+  { key:'micro', label:'Micro Solo', cor:'#7a5b8a', participa: r=> r.micro_area_projeto!=null || r.micro_produto!=null || r.micro_b!=null || r.micro_mn!=null || r.micro_zn!=null || r.micro_cu!=null || r.micro_natureza!=null || r.micro_status!=null },
+  { key:'vns', label:'Vida no Solo', cor:'#3f8891', participa: r=> r.vns_area_projeto!=null || ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado','vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia','vns_morte_plantas'].some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico },
+  { key:'maxlad', label:'Ladrões/Máximas', cor:'#a4432a', participa: r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas' },
+];
+function renderVisaoGeral(){
+  const container = document.getElementById('tab-visao-geral');
+  if(!container) return;
+
+  const base = byPais(RECORDS);
+  const linhas = base.map(r=>{
+    const projetos = VG_PROJETOS.filter(p=>p.participa(r)).map(p=>p.key);
+    return { rec:r, projetos };
+  }).filter(l=> l.projetos.length>0);
+
+  if(!linhas.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Visão Geral de Projetos</div>
+      <h2>Nenhum talhão participando de projeto ainda</h2>
+      <p class="sub">Assim que algum talhão entrar em qualquer um dos 7 projetos, ele aparece aqui.</p>
+    </div>`;
+    return;
+  }
+
+  const filtroAtivo = state.visaoGeralFiltro || 'Todos';
+  const linhasFiltradas = filtroAtivo==='Todos' ? linhas : linhas.filter(l=> l.projetos.includes(filtroAtivo));
+  const comPonto = linhasFiltradas.filter(l=> l.rec.max_latitude!=null && l.rec.max_longitude!=null && !isNaN(Number(l.rec.max_latitude)) && !isNaN(Number(l.rec.max_longitude)));
+
+  const estadosSvg = Object.entries(ESTADOS_BR_PATHS).map(([uf,d])=>`<path d="${d}" fill="#e3e3dc" stroke="#c8ccb9" stroke-width="1"></path>`).join('');
+  const pontosSvg = comPonto.map(l=>{
+    const { x, y } = lmProjetarPonto(Number(l.rec.max_latitude), Number(l.rec.max_longitude));
+    const projetosPlotar = filtroAtivo==='Todos' ? l.projetos : [filtroAtivo];
+    return projetosPlotar.map((pk,i)=>{
+      const proj = VG_PROJETOS.find(p=>p.key===pk);
+      const offset = i * 3; // espalha levemente pontos sobrepostos do mesmo talhão
+      return `<circle cx="${(x+offset).toFixed(1)}" cy="${(y+offset).toFixed(1)}" r="4.5" fill="${proj.cor}" stroke="#fff" stroke-width="1" data-talhao-id="${l.rec.id}" style="cursor:pointer;">
+        <title>${l.rec.fazenda} — Talhão ${l.rec.talhao} (${proj.label})</title>
+      </circle>`;
+    }).join('');
+  }).join('');
+  const mapaSvg = `<svg viewBox="${ESTADOS_BR_VIEWBOX}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;margin:0 auto;">${estadosSvg}${pontosSvg}</svg>`;
+
+  container.innerHTML = `
+  <style>
+    .vg-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;height:600px;}
+    .vg-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
+    .vg-map-card svg{flex:1;min-height:0;}
+    .vg-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+    .vg-filtro-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .vg-filtro-pill.active{color:#fff;}
+    .vg-legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
+    .vg-legenda span{display:inline-flex;align-items:center;gap:4px;}
+    .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+    .vg-table-wrap{flex:1;min-height:0;overflow:auto;}
+    .vg-table{width:100%;border-collapse:collapse;font-size:11px;}
+    .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);z-index:1;}
+    .vg-table td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+    .vg-cell-on{background:var(--lime-soft);text-align:center;}
+    .vg-cell-off{text-align:center;color:var(--line);}
+    @media (max-width:1100px){ .vg-layout{grid-template-columns:1fr;height:auto;} .vg-map-card{height:440px;} .vg-table-wrap{max-height:440px;} }
+  </style>
+
+  <div class="vg-filtros">
+    <button class="vg-filtro-pill ${filtroAtivo==='Todos'?'active':''}" style="${filtroAtivo==='Todos'?'background:var(--green-deep);border-color:var(--green-deep);':''}" data-filtro="Todos">Todos</button>
+    ${VG_PROJETOS.map(p=>`<button class="vg-filtro-pill ${filtroAtivo===p.key?'active':''}" style="${filtroAtivo===p.key?`background:${p.cor};border-color:${p.cor};`:''}" data-filtro="${p.key}">${p.label}</button>`).join('')}
+  </div>
+
+  <div class="vg-layout">
+    <div class="vg-card vg-map-card">
+      <h3 style="margin:0 0 8px;font-size:13px;">🗺️ Mapa de pontos</h3>
+      ${mapaSvg}
+      <div class="vg-legenda">
+        ${VG_PROJETOS.map(p=>`<span><span class="vg-dot" style="background:${p.cor};"></span>${p.label}</span>`).join('')}
+      </div>
+    </div>
+    <div class="vg-card">
+      <h3 style="margin:0 0 8px;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
+      <div class="vg-table-wrap">
+        <table class="vg-table">
+          <thead><tr>
+            <th>Cliente</th><th>Fazenda</th><th>Talhão</th>
+            ${VG_PROJETOS.map(p=>`<th>${p.label}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${linhasFiltradas.map(l=>`<tr>
+              <td>${l.rec.cliente||''}</td><td>${l.rec.fazenda||''}</td><td>${l.rec.talhao||''}</td>
+              ${VG_PROJETOS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on">✓</td>` : `<td class="vg-cell-off">—</td>`).join('')}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('.vg-filtro-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.visaoGeralFiltro = btn.dataset.filtro;
+      renderVisaoGeral();
+    });
+  });
+}
+
 /* ---------------- TAB CRONOGRAMA ---------------- */
 async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
@@ -7587,9 +8155,9 @@ function renderCronograma(){
     <h2>Acompanhamento das etapas por talhão</h2>
     <p class="sub">
       Talhões com dose de óxido recomendada (${state.pais}) · ${allRows.length.toLocaleString('pt-BR')} no total.
-      Como o dashboard não tem banco de dados, as marcações ficam só nesta sessão do navegador —
-      use os botões abaixo para <b>exportar</b> um Excel com o progresso atual, e <b>importar</b> esse mesmo arquivo depois
-      para continuar de onde parou (o casamento das linhas é feito por Consultor + Cliente + Fazenda + Talhão).
+      Cada mudança de dropdown já salva sozinha no banco — o botão "💾 Salvar" em cada linha só reforça
+      o salvamento dos 5 campos daquele talhão de uma vez, com uma mensagem clara confirmando.
+      Os botões abaixo continuam disponíveis pra <b>exportar</b>/<b>importar</b> em massa via Excel.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 4px;align-items:center;">
       <button class="btn solid" id="exportCronogramaBtn">📤 Exportar Cronograma (Excel)</button>
@@ -7612,6 +8180,7 @@ function renderCronograma(){
         <thead><tr>
           <th>Talhão</th><th>Fazenda</th><th>Cliente</th><th>Status</th><th>ANO</th><th>Participação</th>
           ${ETAPA_LABELS.map(l=>`<th>${l}</th>`).join('')}
+          <th>Salvar</th>
         </tr></thead>
         <tbody>
           ${pageRows.map(r=>{
@@ -7621,8 +8190,12 @@ function renderCronograma(){
               <td class="mono-td">${r.ano==null || r.ano==='' ? '—' : r.ano}</td>
               <td>${participacaoSelectHtml(key)}</td>
               ${ETAPA_KEYS.map((_,i)=>`<td>${etapaSelectHtml(key,i)}</td>`).join('')}
+              <td style="white-space:nowrap;">
+                <button class="row-save crono-save-btn" data-crono-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                <span class="crono-save-msg" data-crono-msg-key="${encodeURIComponent(key)}"></span>
+              </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="10">Nenhum talhão para esse recorte.</td></tr>`}
+          }).join('') || `<tr><td colspan="11">Nenhum talhão para esse recorte.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -7649,6 +8222,31 @@ function renderCronograma(){
       sel.style.cssText += cronoSelectStyle(map, sel.value);
       // não precisa re-renderizar tudo — só recolore o próprio select, mantém posição de scroll
       salvarCronogramaCampo(key, etapaKey, sel.value, sel);
+    });
+  });
+
+  container.querySelectorAll('.crono-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = decodeURIComponent(btn.dataset.cronoKey);
+      const msgEl = container.querySelector(`.crono-save-msg[data-crono-msg-key="${btn.dataset.cronoKey}"]`);
+      const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const entry = getCronogramaEntry(key);
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarCronogramaEntradaCompleta(rec, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){
+          msgEl.textContent = '✕ Erro ao salvar — tente de novo';
+          msgEl.style.color = 'var(--red)';
+        } else {
+          msgEl.textContent = '✓ Salvo com sucesso';
+          msgEl.style.color = 'var(--lime)';
+        }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
     });
   });
 
