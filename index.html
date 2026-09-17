@@ -2574,6 +2574,32 @@ function getCronogramaEntry(key){
   return found ? {...defaults, ...found} : defaults;
 }
 
+const NDVI_OPTIONS = ['Pendente','Em construção','Pronto'];
+const RAIZ_ENZIMA_OPTIONS = ['Pendente','Coletado','Laboratório','Pronto'];
+function getCondAcompEntry(key){
+  const defaults = { data_plantio:null, ndvi:'Pendente', raiz_v4:'Pendente', enzima:'Pendente', produtividade:null };
+  const found = state.condAcomp[key];
+  return found ? {...defaults, ...found} : defaults;
+}
+
+const MESES_OPTIONS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const EXECUCAO_OPTIONS = ['Pendente','Feito'];
+const ESTR_ETAPAS = [
+  { key:'altura_v4', label:'Altura V4' },
+  { key:'foto_v4', label:'Foto V4' },
+  { key:'vagens_planta', label:'Número de vagens p/ planta' },
+  { key:'hastes_planta', label:'N de hastes p/ planta' },
+  { key:'nos_hastes', label:'N de nós (haste prin. e lateral)' },
+  { key:'distrib_vagens', label:'Distribuição de vagens por terço' },
+  { key:'fotos', label:'Fotos' },
+];
+function getEstrAcompEntry(key){
+  const defaults = {};
+  ESTR_ETAPAS.forEach(e=>{ defaults[e.key+'_mes'] = null; defaults[e.key+'_exec'] = 'Pendente'; });
+  const found = state.estrAcomp[key];
+  return found ? {...defaults, ...found} : defaults;
+}
+
 const state = {
   pais: 'Todos',
   tab: 'potencial',
@@ -2945,6 +2971,11 @@ async function carregarDadosDoSupabase(){
         cond_tipo_teste: dc.tipo_teste_cond ?? null,
         cond_dose: dc.dose_condicionador ?? null,
         cond_produto: dc.produto_utilizado_cond ?? null,
+        cond_acomp_data_plantio: dc.data_plantio_cond ?? null,
+        cond_acomp_ndvi: dc.ndvi_area_cond ?? null,
+        cond_acomp_raiz_v4: dc.avaliacao_raiz_v4_cond ?? null,
+        cond_acomp_enzima: dc.enzima_rizosfera_cond ?? null,
+        cond_acomp_produtividade: dc.produtividade_cond ?? null,
         // campos da Otimização de P (jsonb próprio, projeto separado) + P resina do Geral
         p_resina: t.p_resina_0_20 ?? null,
         solo_b: t.b_0_20 ?? null,
@@ -2965,6 +2996,20 @@ async function carregarDadosDoSupabase(){
         estr_dose_padrao: destr.dose_padrao_fazenda_estr ?? null,
         estr_uso_tecnologia: destr.historico_uso_tecnologia_estr ?? null,
         estr_acamamento: destr.historico_acamamento_estr ?? null,
+        estr_acomp_altura_v4_mes: destr.acomp_altura_v4_mes ?? null,
+        estr_acomp_altura_v4_exec: destr.acomp_altura_v4_exec ?? null,
+        estr_acomp_foto_v4_mes: destr.acomp_foto_v4_mes ?? null,
+        estr_acomp_foto_v4_exec: destr.acomp_foto_v4_exec ?? null,
+        estr_acomp_vagens_planta_mes: destr.acomp_vagens_planta_mes ?? null,
+        estr_acomp_vagens_planta_exec: destr.acomp_vagens_planta_exec ?? null,
+        estr_acomp_hastes_planta_mes: destr.acomp_hastes_planta_mes ?? null,
+        estr_acomp_hastes_planta_exec: destr.acomp_hastes_planta_exec ?? null,
+        estr_acomp_nos_hastes_mes: destr.acomp_nos_hastes_mes ?? null,
+        estr_acomp_nos_hastes_exec: destr.acomp_nos_hastes_exec ?? null,
+        estr_acomp_distrib_vagens_mes: destr.acomp_distrib_vagens_mes ?? null,
+        estr_acomp_distrib_vagens_exec: destr.acomp_distrib_vagens_exec ?? null,
+        estr_acomp_fotos_mes: destr.acomp_fotos_mes ?? null,
+        estr_acomp_fotos_exec: destr.acomp_fotos_exec ?? null,
         // campos do Projeto Micro Solo (jsonb próprio, projeto separado)
         micro_area_projeto: dmicro.area_projeto_micro ?? null,
         micro_tipo_teste: dmicro.tipo_teste_micro ?? null,
@@ -3032,7 +3077,32 @@ async function carregarDadosDoSupabase(){
       };
     });
     state.cronogramaPage = 1; state.cronogramaMsg = '';
+    state.condAcomp = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = r.cond_acomp_data_plantio!=null || r.cond_acomp_ndvi!=null || r.cond_acomp_raiz_v4!=null || r.cond_acomp_enzima!=null || r.cond_acomp_produtividade!=null;
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      state.condAcomp[key] = {
+        data_plantio: r.cond_acomp_data_plantio || null,
+        ndvi: r.cond_acomp_ndvi || 'Pendente',
+        raiz_v4: r.cond_acomp_raiz_v4 || 'Pendente',
+        enzima: r.cond_acomp_enzima || 'Pendente',
+        produtividade: r.cond_acomp_produtividade ?? null,
+      };
+    });
     state.talhoesSelecionados = new Set(); state.talhoesResumoOpen = false;
+    state.estrAcomp = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = ESTR_ETAPAS.some(e=> r['estr_acomp_'+e.key+'_mes']!=null || r['estr_acomp_'+e.key+'_exec']!=null);
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      const entry = {};
+      ESTR_ETAPAS.forEach(e=>{
+        entry[e.key+'_mes'] = r['estr_acomp_'+e.key+'_mes'] || null;
+        entry[e.key+'_exec'] = r['estr_acomp_'+e.key+'_exec'] || 'Pendente';
+      });
+      state.estrAcomp[key] = entry;
+    });
 
     const baseInfoEl = document.getElementById('dashMgBaseInfo');
     if(baseInfoEl) baseInfoEl.innerHTML = `${RECORDS.length.toLocaleString('pt-BR')} talhões válidos · atualizado agora`;
@@ -5767,6 +5837,8 @@ function renderCondicionador(){
   const base = byPais(RECORDS);
   const comDose = base.filter(r=> r.cond_dose!=null && Number(r.cond_dose)>0);
   const comTeste = base.filter(r=> (r.cond_tipo_teste==='Faixa' || r.cond_tipo_teste==='Lado a lado') && r.cond_area_projeto!=null && Number(r.cond_area_projeto)>0);
+  const acompRows = base.filter(r=> r.cond_area_projeto!=null && Number(r.cond_area_projeto)>0)
+    .sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
 
   if(!comDose.length && !comTeste.length){
     container.innerHTML = `
@@ -5819,6 +5891,9 @@ function renderCondicionador(){
   const qtdFazendasDose = new Set(comDose.map(r=>`${r.cliente}||${r.fazenda}`)).size;
   const qtdProdutoresDose = new Set(comDose.map(r=>r.cliente)).size;
   const qtdTalhoesTeste = comTeste.length;
+  const areaTotalComDose = comDose.reduce((a,r)=>a+(r.area||0),0);
+  const areaReabilit = comDose.filter(r=>r.cond_produto==='Reabilit BioSolo').reduce((a,r)=>a+(r.area||0),0);
+  const areaCrescimentoPotencial = areaTotalComDose - areaReabilit;
 
   const CORES_ESTADO = ['#35533f','#2e6e76','#c99a3d','#7a5b8a','#b8352a','#4d7ea8','#8a9b4f','#a4432a','#5b7a99','#9a6c3f'];
   const coresPorEstado = {}; estadosComTeste.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO[i%CORES_ESTADO.length]);
@@ -5834,6 +5909,7 @@ function renderCondicionador(){
     .cond-card h3{margin:0 0 2px;font-size:12.5px;}
     .cond-card .sub-sm{font-size:10px;color:var(--ink-soft);margin:0 0 6px;line-height:1.3;}
     .cond-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+    .cond-kpis.cond-kpis-2{grid-template-columns:repeat(2,1fr);}
     .cond-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;transition:box-shadow .2s, transform .2s;}
     .cond-kpi:hover{box-shadow:0 2px 6px rgba(26,32,25,.10), 0 10px 26px rgba(26,32,25,.12);transform:translateY(-2px);}
     .cond-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--green-deep);line-height:1.15;}
@@ -5855,6 +5931,10 @@ function renderCondicionador(){
     <div class="cond-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasDose}</div><div class="l">Fazendas (dose &gt; 0)</div></div>
     <div class="cond-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresDose}</div><div class="l">Produtores (dose &gt; 0)</div></div>
     <div class="cond-kpi" style="animation-delay:.18s"><div class="v">${qtdTalhoesTeste}</div><div class="l">Talhões com teste (área proj. &gt; 0)</div></div>
+  </div>
+  <div class="cond-kpis cond-kpis-2">
+    <div class="cond-kpi" style="animation-delay:.22s"><div class="v">${areaTotalComDose.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha com uso de condicionador (dose &gt; 0)</div></div>
+    <div class="cond-kpi" style="animation-delay:.26s"><div class="v">${areaCrescimentoPotencial.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de crescimento potencial (total − Reabilit BioSolo)</div></div>
   </div>
 
   <div class="cond-layout">
@@ -5897,11 +5977,74 @@ function renderCondicionador(){
       </div>
     </div>
   </div>
+
+  <div class="cond-card full-card" style="margin-top:12px;animation-delay:.34s;">
+    <h3>🗓️ Acompanhamento</h3>
+    <p class="sub-sm">Talhões com Área do projeto (Condicionador) &gt; 0 · ${acompRows.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Condicionador</th>
+          <th>Data de Plantio</th><th>NDVI da Área</th><th>Avaliação Raiz V4</th><th>Enzima de Rizosfera</th><th>Produtividade</th><th>Salvar</th>
+        </tr></thead>
+        <tbody>
+          ${acompRows.map(r=>{
+            const key = cronogramaKey(r);
+            const entry = getCondAcompEntry(key);
+            return `<tr>
+              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="mono-td">${r.cond_dose!=null?fmtNum(Number(r.cond_dose),1):'—'}</td>
+              <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+              <td><select class="cell-input cond-acomp-input" data-cond-key="${encodeURIComponent(key)}" data-cond-campo="ndvi">${NDVI_OPTIONS.map(o=>`<option value="${o}" ${entry.ndvi===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><select class="cell-input cond-acomp-input" data-cond-key="${encodeURIComponent(key)}" data-cond-campo="raiz_v4">${RAIZ_ENZIMA_OPTIONS.map(o=>`<option value="${o}" ${entry.raiz_v4===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><select class="cell-input cond-acomp-input" data-cond-key="${encodeURIComponent(key)}" data-cond-campo="enzima">${RAIZ_ENZIMA_OPTIONS.map(o=>`<option value="${o}" ${entry.enzima===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><input type="text" inputmode="decimal" class="cell-input cond-acomp-input" data-cond-key="${encodeURIComponent(key)}" data-cond-campo="produtividade" value="${entry.produtividade!=null?String(entry.produtividade).replace('.',','):''}" placeholder="—"></td>
+              <td style="white-space:nowrap;">
+                <button class="row-save cond-acomp-save-btn" data-cond-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                <span class="cond-acomp-msg" data-cond-msg-key="${encodeURIComponent(key)}"></span>
+              </td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="10">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>
   `;
 
   // destrói instâncias anteriores antes de recriar (evita vazamento/duplicação em re-render)
   Object.values(condicionadorCharts).forEach(c=>{ if(c) c.destroy(); });
   condicionadorCharts = {};
+
+  container.querySelectorAll('.cond-acomp-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const key = decodeURIComponent(el.dataset.condKey);
+      const campo = el.dataset.condCampo;
+      let valor = el.value || null;
+      if(campo==='produtividade') valor = valor ? parseFloat(String(valor).replace(',','.')) : null;
+      if(!state.condAcomp[key]) state.condAcomp[key] = { data_plantio:null, ndvi:'Pendente', raiz_v4:'Pendente', enzima:'Pendente', produtividade:null };
+      state.condAcomp[key][campo] = valor;
+      salvarCondAcompCampo(key, campo, valor, el);
+    });
+  });
+  container.querySelectorAll('.cond-acomp-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = decodeURIComponent(btn.dataset.condKey);
+      const msgEl = container.querySelector(`.cond-acomp-msg[data-cond-msg-key="${btn.dataset.condKey}"]`);
+      const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const entry = getCondAcompEntry(key);
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarCondAcompEntradaCompleta(rec, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
+        else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
+    });
+  });
 
   const CHART_ANIMACAO = { duration: 850, easing: 'easeOutQuart' };
   const chartTooltip = (extra={}) => ({
@@ -6360,6 +6503,8 @@ function renderEstruturacao(){
   const comUsoInfo = base.filter(r=> r.estr_uso_tecnologia==='Sim' || r.estr_uso_tecnologia==='Não');
   const comProduto = base.filter(r=> r.estr_produto!=null && r.estr_produto!=='');
   const oportunidade = base.filter(r=> r.estr_uso_tecnologia==='Não' && r.estr_acamamento!=null && Number(r.estr_acamamento)>0);
+  const acompRowsEstr = base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0)
+    .sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
 
   if(!comTeste.length && !comUsoInfo.length && !comProduto.length && !oportunidade.length){
     container.innerHTML = `
@@ -6461,7 +6606,7 @@ function renderEstruturacao(){
     <div class="estr-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
     <div class="estr-kpi" style="animation-delay:.06s"><div class="v">${qtdEstadosTeste}</div><div class="l">Estados com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
-    <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div></div>
+    <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/26)*1000)/10}% da meta (26)</div></div>
     <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia</div></div>
   </div>
 
@@ -6509,12 +6654,82 @@ function renderEstruturacao(){
       </div>
     </div>
   </div>
+
+  <div class="estr-card full-card" style="margin-top:12px;animation-delay:.34s;">
+    <h3>🗓️ Acompanhamento</h3>
+    <p class="sub-sm">Talhões com Área do projeto (Estruturação) &gt; 0 · ${acompRowsEstr.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Data de Plantio</th>
+          ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
+          <th>Salvar</th>
+        </tr></thead>
+        <thead><tr>
+          <th></th><th></th><th></th><th></th>
+          ${ESTR_ETAPAS.map(()=>`<th>Mês</th><th>Execução</th>`).join('')}
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${acompRowsEstr.map(r=>{
+            const key = cronogramaKey(r);
+            const entry = getEstrAcompEntry(key);
+            return `<tr>
+              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+              ${ESTR_ETAPAS.map(e=>`
+                <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes"><option value="">—</option>${MESES_OPTIONS.map(m=>`<option value="${m}" ${entry[e.key+'_mes']===m?'selected':''}>${m}</option>`).join('')}</select></td>
+                <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec">${EXECUCAO_OPTIONS.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              `).join('')}
+              <td style="white-space:nowrap;">
+                <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
+              </td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="${4+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>
   `;
 
   container.querySelectorAll('.estr-mapa-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.estruturacaoMapModo = btn.dataset.mapaModo;
       renderEstruturacao();
+    });
+  });
+
+  container.querySelectorAll('.estr-acomp-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const key = decodeURIComponent(el.dataset.estrKey);
+      const campo = el.dataset.estrCampo;
+      const valor = el.value || null;
+      if(!state.estrAcomp[key]){
+        state.estrAcomp[key] = {};
+        ESTR_ETAPAS.forEach(e=>{ state.estrAcomp[key][e.key+'_mes'] = null; state.estrAcomp[key][e.key+'_exec'] = 'Pendente'; });
+      }
+      state.estrAcomp[key][campo] = valor;
+      salvarEstrAcompCampo(key, campo, valor, el);
+    });
+  });
+  container.querySelectorAll('.estr-acomp-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = decodeURIComponent(btn.dataset.estrKey);
+      const msgEl = container.querySelector(`.estr-acomp-msg[data-estr-msg-key="${btn.dataset.estrKey}"]`);
+      const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const entry = getEstrAcompEntry(key);
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarEstrAcompEntradaCompleta(rec, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
+        else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
     });
   });
 
@@ -7408,6 +7623,41 @@ function lmProjetarPonto(lat, lon){
   return { x, y };
 }
 let ladroesMaximasMapaCharts = {};
+function abrirModalLadroesMaximasLista(uf, projeto, lista){
+  const linhas = lista.filter(r=> (r.estado||'').toUpperCase()===uf && r.max_selecao===projeto);
+  const modalRoot = document.getElementById('modalRoot');
+  const cor = projeto==='Ladrões' ? 'var(--red)' : 'var(--teal)';
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="lmListaModalOverlay">
+    <div class="modal-panel" style="max-width:900px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <div class="eyebrow">Detalhamento · <span style="color:${cor};font-weight:700;">${projeto}</span></div>
+          <h2 style="margin:2px 0;">Talhões em ${uf}</h2>
+          <p class="sub" style="margin:0;">${linhas.length} talhão(ões)</p>
+        </div>
+        <button class="backbtn" id="lmListaModalFechar">✕ Fechar</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Cliente</th><th>Estado</th><th>Talhão</th><th>Área (ha)</th><th>Data de plantio</th></tr></thead>
+          <tbody>
+            ${linhas.map(r=>`<tr>
+              <td>${r.cliente||''}</td>
+              <td>${r.estado||''}</td>
+              <td>${r.talhao||''}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td>${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+            </tr>`).join('') || `<tr><td colspan="5">Nenhum talhão encontrado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('lmListaModalFechar').addEventListener('click', fechar);
+  document.getElementById('lmListaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmListaModalOverlay') fechar(); });
+}
 function abrirModalLadroesMaximasTalhao(rec){
   const modalRoot = document.getElementById('modalRoot');
   const soloCampos = GERAL_CAMPOS.filter(c=> c.subgrupo==='solo1' || c.subgrupo==='solo2');
@@ -7487,6 +7737,14 @@ function renderLadroesMaximasMapa(){
 
   const areaLadroes = selecionados.filter(r=>r.max_selecao==='Ladrões').reduce((a,r)=>a+(r.area||0),0);
   const areaMaximas = selecionados.filter(r=>r.max_selecao==='Máximas').reduce((a,r)=>a+(r.area||0),0);
+  const talhoesLadroes = selecionados.filter(r=>r.max_selecao==='Ladrões');
+  const talhoesMaximas = selecionados.filter(r=>r.max_selecao==='Máximas');
+  const qtdTalhoesLadroes = talhoesLadroes.length;
+  const qtdTalhoesMaximas = talhoesMaximas.length;
+  const qtdFazendasLadroes = new Set(talhoesLadroes.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdFazendasMaximas = new Set(talhoesMaximas.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdClientesLadroes = new Set(talhoesLadroes.map(r=>r.cliente)).size;
+  const qtdClientesMaximas = new Set(talhoesMaximas.map(r=>r.cliente)).size;
   const areaPorEstadoLadroes = {}, areaPorEstadoMaximas = {};
   selecionados.forEach(r=>{
     const uf = (r.estado||'').toUpperCase(); if(!uf) return;
@@ -7514,6 +7772,7 @@ function renderLadroesMaximasMapa(){
     .lm-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;opacity:0;transform:translateY(10px);animation:condFadeIn .45s ease forwards;display:flex;flex-direction:column;min-height:0;}
     .lm-card canvas{flex:1;min-height:0;width:100% !important;}
     .lm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+    .lm-kpis.lm-kpis-6{grid-template-columns:repeat(6,1fr);}
     .lm-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 14px;opacity:0;transform:translateY(10px);animation:condFadeIn .4s ease forwards;}
     .lm-kpi .v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1.15;}
     .lm-kpi .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;line-height:1.3;margin-top:2px;}
@@ -7528,6 +7787,14 @@ function renderLadroesMaximasMapa(){
     <div class="lm-kpi" style="animation-delay:.06s"><div class="v" style="color:#2e6e76;">${areaMaximas.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha em Máximas</div></div>
     <div class="lm-kpi" style="animation-delay:.1s"><div class="v" style="color:var(--ink);">${comCoordenada.length}</div><div class="l">Talhões plotados no mapa</div></div>
     <div class="lm-kpi" style="animation-delay:.14s"><div class="v" style="color:var(--ink-soft);">${semCoordenada}</div><div class="l">Selecionados sem coordenada (fora do mapa)</div></div>
+  </div>
+  <div class="lm-kpis lm-kpis-6">
+    <div class="lm-kpi" style="animation-delay:.16s"><div class="v" style="color:#b8352a;">${qtdTalhoesLadroes}</div><div class="l">Talhões — Ladrões</div></div>
+    <div class="lm-kpi" style="animation-delay:.18s"><div class="v" style="color:#b8352a;">${qtdFazendasLadroes}</div><div class="l">Fazendas — Ladrões</div></div>
+    <div class="lm-kpi" style="animation-delay:.2s"><div class="v" style="color:#b8352a;">${qtdClientesLadroes}</div><div class="l">Clientes — Ladrões</div></div>
+    <div class="lm-kpi" style="animation-delay:.22s"><div class="v" style="color:#2e6e76;">${qtdTalhoesMaximas}</div><div class="l">Talhões — Máximas</div></div>
+    <div class="lm-kpi" style="animation-delay:.24s"><div class="v" style="color:#2e6e76;">${qtdFazendasMaximas}</div><div class="l">Fazendas — Máximas</div></div>
+    <div class="lm-kpi" style="animation-delay:.26s"><div class="v" style="color:#2e6e76;">${qtdClientesMaximas}</div><div class="l">Clientes — Máximas</div></div>
   </div>
 
   <div class="lm-layout">
@@ -7569,7 +7836,17 @@ function renderLadroesMaximasMapa(){
           { label:'Máximas', data: estadosTodos.map(uf=>Math.round((areaPorEstadoMaximas[uf]||0)*10)/10), backgroundColor:'#2e6e76', borderRadius:4 },
         ],
       },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}}, scales:{ y:{beginAtZero:true} } }
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const el = elements[0];
+          const uf = estadosTodos[el.index];
+          const projeto = el.datasetIndex===0 ? 'Ladrões' : 'Máximas';
+          abrirModalLadroesMaximasLista(uf, projeto, selecionados);
+        },
+        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins:{legend:{position:'top', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}}, scales:{ y:{beginAtZero:true} } }
     });
   }
 }
@@ -7996,7 +8273,14 @@ function renderVisaoGeral(){
   <style>
     .vg-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;height:600px;}
     .vg-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
-    .vg-map-card svg{flex:1;min-height:0;}
+    .vg-map-zoom-wrap{position:relative;flex:1;min-height:0;overflow:hidden;border-radius:8px;cursor:grab;background:var(--bg);}
+    .vg-map-zoom-wrap.dragging{cursor:grabbing;}
+    .vg-map-zoom-inner{width:100%;height:100%;transform-origin:center center;}
+    .vg-map-zoom-inner svg{width:100%;height:100%;display:block;}
+    .vg-zoom-controls{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;z-index:2;}
+    .vg-zoom-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.12);font-family:inherit;line-height:1;}
+    .vg-zoom-btn:hover{background:var(--bg);}
+    .vg-zoom-btn.reset{font-size:12px;}
     .vg-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
     .vg-filtro-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
     .vg-filtro-pill.active{color:#fff;}
@@ -8019,8 +8303,15 @@ function renderVisaoGeral(){
 
   <div class="vg-layout">
     <div class="vg-card vg-map-card">
-      <h3 style="margin:0 0 8px;font-size:13px;">🗺️ Mapa de pontos</h3>
-      ${mapaSvg}
+      <h3 style="margin:0 0 8px;font-size:13px;">🗺️ Mapa de pontos <span style="font-weight:400;font-size:10px;color:var(--ink-soft);">(arraste pra navegar, com zoom)</span></h3>
+      <div class="vg-map-zoom-wrap" id="vgMapZoomWrap">
+        <div class="vg-zoom-controls">
+          <button class="vg-zoom-btn" id="vgZoomIn" title="Mais zoom">+</button>
+          <button class="vg-zoom-btn" id="vgZoomOut" title="Menos zoom">−</button>
+          <button class="vg-zoom-btn reset" id="vgZoomReset" title="Resetar">⟲</button>
+        </div>
+        <div class="vg-map-zoom-inner" id="vgMapZoomInner">${mapaSvg}</div>
+      </div>
       <div class="vg-legenda">
         ${VG_PROJETOS.map(p=>`<span><span class="vg-dot" style="background:${p.cor};"></span>${p.label}</span>`).join('')}
       </div>
@@ -8051,6 +8342,50 @@ function renderVisaoGeral(){
       renderVisaoGeral();
     });
   });
+
+  // Zoom/Pan do mapa — só manipula transform via CSS, não re-renderiza (mantém a posição enquanto navega)
+  (function(){
+    const wrap = container.querySelector('#vgMapZoomWrap');
+    const inner = container.querySelector('#vgMapZoomInner');
+    if(!wrap || !inner) return;
+    let zoom = 1, panX = 0, panY = 0;
+    const ZOOM_MIN = 1, ZOOM_MAX = 8;
+    function aplicar(comTransicao){
+      inner.style.transition = comTransicao ? 'transform .15s' : 'none';
+      inner.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    }
+    function zoomPara(novoZoom){
+      novoZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, novoZoom));
+      if(novoZoom===ZOOM_MIN){ panX = 0; panY = 0; }
+      zoom = novoZoom;
+      aplicar(true);
+    }
+    container.querySelector('#vgZoomIn').addEventListener('click', ()=> zoomPara(zoom * 1.6));
+    container.querySelector('#vgZoomOut').addEventListener('click', ()=> zoomPara(zoom / 1.6));
+    container.querySelector('#vgZoomReset').addEventListener('click', ()=>{ zoom=1; panX=0; panY=0; aplicar(true); });
+
+    wrap.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1.15 : 1/1.15;
+      zoomPara(zoom * delta);
+    }, { passive:false });
+
+    let arrastando = false, inicioX=0, inicioY=0, panXInicio=0, panYInicio=0;
+    wrap.addEventListener('mousedown', (e)=>{
+      if(zoom<=1) return;
+      arrastando = true; wrap.classList.add('dragging');
+      inicioX = e.clientX; inicioY = e.clientY; panXInicio = panX; panYInicio = panY;
+    });
+    window.addEventListener('mousemove', (e)=>{
+      if(!arrastando) return;
+      panX = panXInicio + (e.clientX - inicioX);
+      panY = panYInicio + (e.clientY - inicioY);
+      aplicar(false);
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(arrastando){ arrastando = false; wrap.classList.remove('dragging'); }
+    });
+  })();
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
@@ -8113,6 +8448,122 @@ async function salvarCronogramaEntradaCompleta(rec, entry, user){
     rec.crono_etapa2 = entry.etapa2 ?? null;
     rec.crono_etapa3 = entry.etapa3 ?? null;
     rec.crono_etapa4 = entry.etapa4 ?? null;
+  }
+  return { error };
+}
+
+// Acompanhamento do Condicionador — mesmo padrão do Cronograma do Óxido, mas dentro do próprio projeto Condicionador.
+// Importante: reconstrói TODOS os campos já existentes do Condicionador (área/tipo teste/dose/produto),
+// senão o upsert sobrescreveria o jsonb inteiro e apagaria o que já estava salvo.
+async function salvarCondAcompCampo(key, campoKey, valor, el){
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+  if(!rec || !projetosIds['condicionador-de-solo']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = {
+    area_projeto_cond: rec.cond_area_projeto ?? null,
+    tipo_teste_cond: rec.cond_tipo_teste ?? null,
+    dose_condicionador: rec.cond_dose ?? null,
+    produto_utilizado_cond: rec.cond_produto ?? null,
+    data_plantio_cond: campoKey==='data_plantio' ? valor : (rec.cond_acomp_data_plantio ?? null),
+    ndvi_area_cond: campoKey==='ndvi' ? valor : (rec.cond_acomp_ndvi ?? null),
+    avaliacao_raiz_v4_cond: campoKey==='raiz_v4' ? valor : (rec.cond_acomp_raiz_v4 ?? null),
+    enzima_rizosfera_cond: campoKey==='enzima' ? valor : (rec.cond_acomp_enzima ?? null),
+    produtividade_cond: campoKey==='produtividade' ? valor : (rec.cond_acomp_produtividade ?? null),
+  };
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['condicionador-de-solo'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec['cond_acomp_'+campoKey] = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+async function salvarCondAcompEntradaCompleta(rec, entry, user){
+  if(!rec || !projetosIds['condicionador-de-solo']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = {
+    area_projeto_cond: rec.cond_area_projeto ?? null,
+    tipo_teste_cond: rec.cond_tipo_teste ?? null,
+    dose_condicionador: rec.cond_dose ?? null,
+    produto_utilizado_cond: rec.cond_produto ?? null,
+    data_plantio_cond: entry.data_plantio ?? null,
+    ndvi_area_cond: entry.ndvi ?? null,
+    avaliacao_raiz_v4_cond: entry.raiz_v4 ?? null,
+    enzima_rizosfera_cond: entry.enzima ?? null,
+    produtividade_cond: entry.produtividade ?? null,
+  };
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['condicionador-de-solo'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    rec.cond_acomp_data_plantio = entry.data_plantio ?? null;
+    rec.cond_acomp_ndvi = entry.ndvi ?? null;
+    rec.cond_acomp_raiz_v4 = entry.raiz_v4 ?? null;
+    rec.cond_acomp_enzima = entry.enzima ?? null;
+    rec.cond_acomp_produtividade = entry.produtividade ?? null;
+  }
+  return { error };
+}
+
+// Acompanhamento da Estruturação — mesmo padrão do Condicionador: reconstrói TODOS os campos já
+// existentes do projeto, senão o upsert sobrescreveria o jsonb inteiro e apagaria o que já estava salvo.
+function montarDadosEstrBase(rec){
+  return {
+    area_projeto_estr: rec.estr_area_projeto ?? null,
+    tipo_teste_estr: rec.estr_tipo_teste ?? null,
+    nome_produto_estr: rec.estr_produto ?? null,
+    dose_padrao_fazenda_estr: rec.estr_dose_padrao ?? null,
+    historico_uso_tecnologia_estr: rec.estr_uso_tecnologia ?? null,
+    historico_acamamento_estr: rec.estr_acamamento ?? null,
+  };
+}
+async function salvarEstrAcompCampo(key, campoKey, valor, el){
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+  if(!rec || !projetosIds['projeto-estruturacao']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = montarDadosEstrBase(rec);
+  ESTR_ETAPAS.forEach(e=>{
+    dados['acomp_'+e.key+'_mes'] = campoKey===(e.key+'_mes') ? valor : (rec['estr_acomp_'+e.key+'_mes'] ?? null);
+    dados['acomp_'+e.key+'_exec'] = campoKey===(e.key+'_exec') ? valor : (rec['estr_acomp_'+e.key+'_exec'] ?? null);
+  });
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['projeto-estruturacao'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec['estr_acomp_'+campoKey] = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+async function salvarEstrAcompEntradaCompleta(rec, entry, user){
+  if(!rec || !projetosIds['projeto-estruturacao']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = montarDadosEstrBase(rec);
+  ESTR_ETAPAS.forEach(e=>{
+    dados['acomp_'+e.key+'_mes'] = entry[e.key+'_mes'] ?? null;
+    dados['acomp_'+e.key+'_exec'] = entry[e.key+'_exec'] ?? null;
+  });
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['projeto-estruturacao'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    ESTR_ETAPAS.forEach(e=>{
+      rec['estr_acomp_'+e.key+'_mes'] = entry[e.key+'_mes'] ?? null;
+      rec['estr_acomp_'+e.key+'_exec'] = entry[e.key+'_exec'] ?? null;
+    });
   }
   return { error };
 }
