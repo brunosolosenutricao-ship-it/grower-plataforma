@@ -6261,16 +6261,16 @@ function renderOtimizacaoP(){
   // mapa modulável — cada modo soma/agrupa diferente
   function calcularMapaPorModo(modo){
     if(modo==='p_resina'){
-      const somaN = {}, contN = {};
-      comPResina.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.p_resina); contN[uf]=(contN[uf]||0)+1; });
-      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
-      return { valores: out, sufixo: 'mg/dm³ (média)', unidade: 'mg/dm³' };
+      const somaN = {}, somaArea = {};
+      comPResina.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; const a=r.area||0; somaN[uf]=(somaN[uf]||0)+Number(r.p_resina)*a; somaArea[uf]=(somaArea[uf]||0)+a; });
+      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]= somaArea[uf]>0 ? somaN[uf]/somaArea[uf] : null);
+      return { valores: out, sufixo: 'mg/dm³ (média ponderada por área)', unidade: 'mg/dm³' };
     }
     if(modo==='dose_p2o5'){
-      const somaN = {}, contN = {};
-      comDoseP2O5.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.op_dose_p2o5); contN[uf]=(contN[uf]||0)+1; });
-      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
-      return { valores: out, sufixo: 'kg/ha (média)', unidade: 'kg/ha' };
+      const somaN = {}, somaArea = {};
+      comDoseP2O5.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; const a=r.area||0; somaN[uf]=(somaN[uf]||0)+Number(r.op_dose_p2o5)*a; somaArea[uf]=(somaArea[uf]||0)+a; });
+      const out = {}; Object.keys(somaN).forEach(uf=> out[uf]= somaArea[uf]>0 ? somaN[uf]/somaArea[uf] : null);
+      return { valores: out, sufixo: 'kg/ha (média ponderada por área)', unidade: 'kg/ha' };
     }
     if(modo==='solubilizador'){
       const out = {};
@@ -6596,13 +6596,11 @@ function renderEstruturacao(){
   const areaPorProduto = {};
   comProduto.forEach(r=>{ areaPorProduto[r.estr_produto]=(areaPorProduto[r.estr_produto]||0)+(r.area||0); });
 
-  const adocaoPorConsultor = {}; // consultor -> {sim, total}
-  comUsoInfo.forEach(r=>{
-    if(!adocaoPorConsultor[r.consultor]) adocaoPorConsultor[r.consultor] = {sim:0, total:0};
-    adocaoPorConsultor[r.consultor].total++;
-    if(r.estr_uso_tecnologia==='Sim') adocaoPorConsultor[r.consultor].sim++;
+  const areaPorConsultorEstr = {};
+  base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0).forEach(r=>{
+    areaPorConsultorEstr[r.consultor] = (areaPorConsultorEstr[r.consultor]||0) + (r.area||0);
   });
-  const adocaoConsultorPct = Object.entries(adocaoPorConsultor).map(([c,v])=>[c, Math.round((v.sim/v.total)*1000)/10]).sort((a,b)=>b[1]-a[1]);
+  const adocaoConsultorPct = Object.entries(areaPorConsultorEstr).map(([c,v])=>[c, Math.round(v*10)/10]).sort((a,b)=>b[1]-a[1]);
 
   const tipos = ['Faixa','Lado a lado'];
   const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
@@ -6688,7 +6686,7 @@ function renderEstruturacao(){
       </div>
       <div class="estr-card" style="animation-delay:.18s;">
         <h3>👤 Adoção por Consultor</h3>
-        <p class="sub-sm">% de talhões com tecnologia adotada</p>
+        <p class="sub-sm">Soma da área do talhão, onde Área do projeto (ha) &gt; 0</p>
         <canvas id="estrAdocaoConsultor"></canvas>
       </div>
       <div class="estr-card" style="animation-delay:.22s;">
@@ -6830,8 +6828,8 @@ function renderEstruturacao(){
   if(canvasEstrAdocao){
     estruturacaoCharts.adocaoConsultor = new Chart(canvasEstrAdocao.getContext('2d'), {
       type:'bar',
-      data:{ labels: adocaoConsultorPct.map(e=>e[0]), datasets:[{ label:'% adoção', data: adocaoConsultorPct.map(e=>e[1]), backgroundColor:'#6b7a3f', hoverBackgroundColor:'#85944f', borderRadius:4 }] },
-      options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue}%`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v+'%'}}, scales:{ y:{beginAtZero:true, max:100} } }
+      data:{ labels: adocaoConsultorPct.map(e=>e[0]), datasets:[{ label:'ha', data: adocaoConsultorPct.map(e=>e[1]), backgroundColor:'#6b7a3f', hoverBackgroundColor:'#85944f', borderRadius:4 }] },
+      options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
     });
   }
 
