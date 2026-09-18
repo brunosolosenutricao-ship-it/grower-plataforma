@@ -8074,15 +8074,18 @@ function abrirModalLadroesMaximasTalhao(rec){
     .lm-badge-sinaleiro{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;margin-bottom:8px;width:100%;box-sizing:border-box;}
     .lm-badge-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
     .lm-badge-aval{background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;width:100%;box-sizing:border-box;}
-    .lm-timeline{position:relative;height:70px;margin-top:6px;}
-    .lm-timeline-track{position:absolute;left:6px;right:6px;top:28px;height:3px;background:var(--line);border-radius:2px;}
-    .lm-timeline-pt{position:absolute;top:20px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:90px;}
-    .lm-timeline-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);margin-bottom:4px;}
+    .lm-timeline{position:relative;height:130px;margin-top:10px;}
+    .lm-timeline-track{position:absolute;left:6px;right:6px;top:65px;height:3px;background:var(--line);border-radius:2px;}
+    .lm-timeline-pt{position:absolute;top:65px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:100px;}
+    .lm-timeline-pt.cima{flex-direction:column-reverse;top:auto;bottom:65px;}
+    .lm-timeline-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);flex-shrink:0;}
+    .lm-timeline-pt:not(.cima) .lm-timeline-dot{margin-bottom:4px;}
+    .lm-timeline-pt.cima .lm-timeline-dot{margin-top:4px;}
     .lm-timeline-label{font-size:9px;text-align:center;color:var(--ink);font-weight:600;line-height:1.2;white-space:nowrap;}
     .lm-timeline-date{font-size:8px;color:var(--ink-soft);margin-top:1px;}
   </style>
   <div class="modal-overlay" id="lmModalOverlay">
-    <div class="modal-panel" style="max-width:1020px;">
+    <div class="modal-panel" style="max-width:1275px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="eyebrow">Detalhamento · <span style="color:${corBadge};font-weight:700;">${rec.max_selecao}</span></div>
@@ -8136,9 +8139,10 @@ function abrirModalLadroesMaximasTalhao(rec){
         ${pontosLinha.length ? `
         <div class="lm-timeline">
           <div class="lm-timeline-track"></div>
-          ${pontosLinha.map(p=>{
+          ${pontosLinha.map((p,i)=>{
             const pct = spanMs>0 ? ((p.data.getTime()-dataMin)/spanMs)*100 : 0;
-            return `<div class="lm-timeline-pt" style="left:${pct}%;">
+            const cima = i%2===1;
+            return `<div class="lm-timeline-pt ${cima?'cima':''}" style="left:${pct}%;">
               <div class="lm-timeline-dot" style="background:${p.cor};"></div>
               <div class="lm-timeline-label">${p.label}</div>
               <div class="lm-timeline-date">${p.data.toLocaleDateString('pt-BR')}</div>
@@ -8178,12 +8182,6 @@ function renderLadroesMaximasMapa(){
 
   const base = byPais(RECORDS);
   const selecionados = base.filter(r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas');
-  const comCoordenada = selecionados.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
-  const semCoordenada = selecionados.length - comCoordenada.length;
-
-  const acompFiltro = state.lmAcompFiltro || 'Todos';
-  const acompRowsLm = selecionados.filter(r=> acompFiltro==='Todos' || r.max_selecao===acompFiltro)
-    .sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
 
   if(!selecionados.length){
     container.innerHTML = `
@@ -8195,10 +8193,24 @@ function renderLadroesMaximasMapa(){
     return;
   }
 
-  const areaLadroes = selecionados.filter(r=>r.max_selecao==='Ladrões').reduce((a,r)=>a+(r.area||0),0);
-  const areaMaximas = selecionados.filter(r=>r.max_selecao==='Máximas').reduce((a,r)=>a+(r.area||0),0);
-  const talhoesLadroes = selecionados.filter(r=>r.max_selecao==='Ladrões');
-  const talhoesMaximas = selecionados.filter(r=>r.max_selecao==='Máximas');
+  // filtro único no topo (Projeto + Cliente) — controla mapa, KPIs, gráfico e a tabela de Acompanhamento juntos
+  const clientesDisponiveisLm = [...new Set(selecionados.map(r=>r.cliente).filter(Boolean))].sort();
+  const filtroProjetoLm = state.lmFiltroProjeto || 'Todos';
+  const filtroClienteLm = state.lmFiltroCliente || 'Todos';
+  const selFiltrados = selecionados.filter(r=>
+    (filtroProjetoLm==='Todos' || r.max_selecao===filtroProjetoLm) &&
+    (filtroClienteLm==='Todos' || r.cliente===filtroClienteLm)
+  );
+
+  const comCoordenada = selFiltrados.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
+  const semCoordenada = selFiltrados.length - comCoordenada.length;
+
+  const acompRowsLm = [...selFiltrados].sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+
+  const areaLadroes = selFiltrados.filter(r=>r.max_selecao==='Ladrões').reduce((a,r)=>a+(r.area||0),0);
+  const areaMaximas = selFiltrados.filter(r=>r.max_selecao==='Máximas').reduce((a,r)=>a+(r.area||0),0);
+  const talhoesLadroes = selFiltrados.filter(r=>r.max_selecao==='Ladrões');
+  const talhoesMaximas = selFiltrados.filter(r=>r.max_selecao==='Máximas');
   const qtdTalhoesLadroes = talhoesLadroes.length;
   const qtdTalhoesMaximas = talhoesMaximas.length;
   const qtdFazendasLadroes = new Set(talhoesLadroes.map(r=>`${r.cliente}||${r.fazenda}`)).size;
@@ -8206,7 +8218,7 @@ function renderLadroesMaximasMapa(){
   const qtdClientesLadroes = new Set(talhoesLadroes.map(r=>r.cliente)).size;
   const qtdClientesMaximas = new Set(talhoesMaximas.map(r=>r.cliente)).size;
   const areaPorEstadoLadroes = {}, areaPorEstadoMaximas = {};
-  selecionados.forEach(r=>{
+  selFiltrados.forEach(r=>{
     const uf = (r.estado||'').toUpperCase(); if(!uf) return;
     if(r.max_selecao==='Ladrões') areaPorEstadoLadroes[uf] = (areaPorEstadoLadroes[uf]||0)+(r.area||0);
     else areaPorEstadoMaximas[uf] = (areaPorEstadoMaximas[uf]||0)+(r.area||0);
@@ -8232,8 +8244,30 @@ function renderLadroesMaximasMapa(){
     .lm-acomp-pill.active{color:#fff;}
     .lm-acomp-pill.active[data-acomp-filtro="Todos"]{background:var(--green-deep);border-color:var(--green-deep);}
     .lm-dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+    .lm-top-filtros{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:12px 16px;margin-bottom:14px;}
+    .lm-top-filtros .fitem label{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);display:block;margin-bottom:4px;}
+    .lm-top-filtros select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:12px;background:#fff;min-width:160px;}
     @media (max-width:1100px){ .lm-layout{grid-template-columns:1fr;height:auto;} .lm-map-card{grid-column:1;height:440px;} .lm-side-card{grid-column:1;} .lm-kpis{grid-template-columns:repeat(2,1fr);} }
   </style>
+
+  <div class="lm-top-filtros">
+    <div class="fitem">
+      <label>Projeto</label>
+      <select id="lmFiltroProjetoSel">
+        <option value="Todos" ${filtroProjetoLm==='Todos'?'selected':''}>Todos</option>
+        <option value="Ladrões" ${filtroProjetoLm==='Ladrões'?'selected':''}>Ladrões</option>
+        <option value="Máximas" ${filtroProjetoLm==='Máximas'?'selected':''}>Máximas</option>
+      </select>
+    </div>
+    <div class="fitem">
+      <label>Cliente</label>
+      <select id="lmFiltroClienteSel">
+        <option value="Todos" ${filtroClienteLm==='Todos'?'selected':''}>Todos</option>
+        ${clientesDisponiveisLm.map(c=>`<option value="${encodeURIComponent(c)}" ${filtroClienteLm===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <span style="font-size:10.5px;color:var(--ink-soft);">${selFiltrados.length} de ${selecionados.length} talhão(ões) — controla o mapa, os KPIs, o gráfico e a tabela abaixo</span>
+  </div>
 
   <div class="lm-kpis">
     <div class="lm-kpi" style="animation-delay:.02s"><div class="v" style="color:#b8352a;">${areaLadroes.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha em Ladrões</div></div>
@@ -8270,12 +8304,7 @@ function renderLadroesMaximasMapa(){
 
   <div class="lm-card full-card" style="margin-top:12px;">
     <h3 style="margin:0 0 4px;font-size:13px;">🗓️ Acompanhamento</h3>
-    <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Talhões com Seleção = Ladrões ou Máximas · ${acompRowsLm.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
-    <div class="lm-acomp-filtros" style="display:flex;gap:6px;margin-bottom:10px;">
-      <button class="lm-acomp-pill ${acompFiltro==='Todos'?'active':''}" data-acomp-filtro="Todos">Todos</button>
-      <button class="lm-acomp-pill ${acompFiltro==='Ladrões'?'active':''}" style="${acompFiltro==='Ladrões'?'background:#b8352a;border-color:#b8352a;':''}" data-acomp-filtro="Ladrões">Ladrões</button>
-      <button class="lm-acomp-pill ${acompFiltro==='Máximas'?'active':''}" style="${acompFiltro==='Máximas'?'background:#2e6e76;border-color:#2e6e76;':''}" data-acomp-filtro="Máximas">Máximas</button>
-    </div>
+    <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Projeto/Cliente lá em cima · ${acompRowsLm.length} talhão(ões). Esses campos moram só aqui, não aparecem na Alimentação.</p>
     <div class="table-scroll">
       <table>
         <thead><tr>
@@ -8322,11 +8351,13 @@ function renderLadroesMaximasMapa(){
     onClickPonto: (rec)=> abrirModalLadroesMaximasTalhao(rec),
   });
 
-  container.querySelectorAll('.lm-acomp-pill').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.lmAcompFiltro = btn.dataset.acompFiltro;
-      renderLadroesMaximasMapa();
-    });
+  container.querySelector('#lmFiltroProjetoSel').addEventListener('change', (e)=>{
+    state.lmFiltroProjeto = e.target.value;
+    renderLadroesMaximasMapa();
+  });
+  container.querySelector('#lmFiltroClienteSel').addEventListener('change', (e)=>{
+    state.lmFiltroCliente = e.target.value==='Todos' ? 'Todos' : decodeURIComponent(e.target.value);
+    renderLadroesMaximasMapa();
   });
   container.querySelectorAll('.lm-acomp-input').forEach(el=>{
     el.addEventListener('change', ()=>{
