@@ -2517,6 +2517,7 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
     }
+    if(window.verificarRendersPendentes) window.verificarRendersPendentes();
     if(window.verificarMapasPendentes) window.verificarMapasPendentes();
   });
 });
@@ -3425,6 +3426,27 @@ document.addEventListener('click', (e)=>{
 });
 
 /* ============================= RENDER GERAL ============================= */
+const rendersPendentes = {}; // viewId -> função de render, chamada quando a aba fica visível
+function renderPreguicoso(viewId, renderFn){
+  const viewEl = document.getElementById(viewId);
+  if(viewEl && viewEl.style.display !== 'none'){
+    renderFn();
+  } else {
+    rendersPendentes[viewId] = renderFn;
+  }
+}
+function verificarRendersPendentes(){
+  Object.keys(rendersPendentes).forEach(viewId=>{
+    const viewEl = document.getElementById(viewId);
+    if(viewEl && viewEl.style.display !== 'none'){
+      const fn = rendersPendentes[viewId];
+      delete rendersPendentes[viewId];
+      fn();
+    }
+  });
+}
+window.verificarRendersPendentes = verificarRendersPendentes;
+
 function renderAll(){
   document.getElementById('semAreaCount').textContent = '('+SEM_AREA.length+')';
   renderPotencial();
@@ -3438,14 +3460,15 @@ function renderAll(){
   renderCronograma();
   renderLadroes();
   renderMaximas();
-  renderCondicionador();
-  renderOtimizacaoP();
-  renderEstruturacao();
-  renderOxidoConsumo();
-  renderMicroSolo();
-  renderLadroesMaximasMapa();
-  renderVidaNoSolo();
-  renderVisaoGeral();
+
+  renderPreguicoso('viewCondicionador', renderCondicionador);
+  renderPreguicoso('viewOtimizacaoP', renderOtimizacaoP);
+  renderPreguicoso('viewEstruturacao', renderEstruturacao);
+  renderPreguicoso('viewOxidoConsumo', renderOxidoConsumo);
+  renderPreguicoso('viewMicroSolo', renderMicroSolo);
+  renderPreguicoso('viewLadroesMaximasMapa', renderLadroesMaximasMapa);
+  renderPreguicoso('viewVidaNoSolo', renderVidaNoSolo);
+  renderPreguicoso('viewVisaoGeral', renderVisaoGeral);
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
