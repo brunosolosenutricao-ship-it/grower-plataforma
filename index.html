@@ -224,6 +224,9 @@
 <style>
 /* ===== Estilos do Dashboard Óxido de Magnésio (isolados, ids/classes já conferidos sem colisão real) ===== */
 
+.chart-zoom-btn{position:absolute;top:2px;right:2px;z-index:6;width:22px;height:22px;border-radius:6px;border:1px solid var(--line,#d8dccb);background:rgba(255,255,255,.9);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.chart-zoom-btn:hover{background:#fff;transform:scale(1.08);}
+
   :root{
     --bg: #eef1e6;
     --paper: #fbfaf4;
@@ -5788,6 +5791,51 @@ const ESTADOS_BR_PATHS = {
 };
 const ESTADOS_BR_VIEWBOX = "0 0 500 520";
 let condicionadorCharts = {};
+// Botão de zoom genérico — funciona em QUALQUER gráfico Chart.js já criado, sem precisar
+// tocar em cada gráfico individualmente. Chama adicionarBotoesZoomGraficos(container) no fim de cada render.
+function adicionarBotoesZoomGraficos(container){
+  container.querySelectorAll('canvas').forEach(canvas=>{
+    if(canvas.dataset.zoomAdicionado) return; // evita duplicar em re-render
+    canvas.dataset.zoomAdicionado = '1';
+    const wrapper = canvas.parentElement;
+    if(wrapper && getComputedStyle(wrapper).position === 'static') wrapper.style.position = 'relative';
+    const btn = document.createElement('button');
+    btn.className = 'chart-zoom-btn';
+    btn.title = 'Ampliar gráfico';
+    btn.innerHTML = '🔍';
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const chart = Chart.getChart(canvas);
+      if(chart) abrirModalZoomChart(chart);
+    });
+    if(wrapper) wrapper.appendChild(btn);
+  });
+}
+function abrirModalZoomChart(chart){
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="zoomChartOverlay">
+    <div class="modal-panel" style="max-width:1000px;width:90vw;height:78vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:15px;">🔍 Gráfico ampliado</h2>
+        <button class="backbtn" id="zoomChartFechar">✕ Fechar</button>
+      </div>
+      <div style="flex:1;position:relative;min-height:0;">
+        <canvas id="zoomChartCanvas"></canvas>
+      </div>
+    </div>
+  </div>`;
+  const bigCanvas = document.getElementById('zoomChartCanvas');
+  const cfg = chart.config;
+  new Chart(bigCanvas.getContext('2d'), {
+    type: cfg.type,
+    data: cfg.data,
+    options: {...cfg.options, responsive:true, maintainAspectRatio:false},
+  });
+  const fechar = ()=>{ modalRoot.innerHTML = ''; };
+  document.getElementById('zoomChartFechar').addEventListener('click', fechar);
+  document.getElementById('zoomChartOverlay').addEventListener('click', (e)=>{ if(e.target.id==='zoomChartOverlay') fechar(); });
+}
 function condicionadorCorIntensidade(valor, max, cores){
   if(!valor || valor<=0 || !max) return '#e3e3dc';
   const t = Math.min(1, valor/max);
@@ -6183,6 +6231,7 @@ function renderCondicionador(){
       options:{ responsive:true, animation:CHART_ANIMACAO, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:chartTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB OTIMIZAÇÃO DE P ---------------- */
@@ -6496,6 +6545,7 @@ function renderOtimizacaoP(){
       options:{ responsive:true, animation:CHART_ANIMACAO_OP, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:opTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB PROJETO ESTRUTURAÇÃO ---------------- */
@@ -6876,6 +6926,7 @@ function renderEstruturacao(){
       options:{ responsive:true, animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB ÓXIDO DE MAGNÉSIO — CONSUMO ---------------- */
@@ -7293,6 +7344,7 @@ function renderOxidoConsumo(){
       options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_OXC, plugins:{legend:{display:false}, tooltip:oxcTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...oxcDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ y:{beginAtZero:true} } }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB PROJETO MICRO SOLO ---------------- */
@@ -7731,6 +7783,7 @@ function renderMicroSolo(){
       options:{ responsive:true, maintainAspectRatio:false, animation:CHART_ANIMACAO_MICRO, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} }, plugins:{legend:{position:'right', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:microTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{display:v=>v.dataset.data[v.dataIndex]>0, color:'#fff', font:{size:9,weight:'700'}, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}} }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB LADRÕES/MÁXIMAS — MAPA DE PONTOS ---------------- */
@@ -7974,6 +8027,7 @@ function renderLadroesMaximasMapa(){
         plugins:{legend:{position:'top', labels:{boxWidth:11,font:{size:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}}, scales:{ y:{beginAtZero:true} } }
     });
   }
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB VIDA NO SOLO ---------------- */
@@ -8344,6 +8398,7 @@ function renderVidaNoSolo(){
   montarBarraProduto('vnsFungBiol', areaPorFungBiol, '#2c4a7a');
   montarBarraProduto('vnsFungQuim', areaPorFungQuim, '#8a5a4a');
   montarBarraProduto('vnsNematQuim', areaPorNematQuim, '#6b3f7a');
+  adicionarBotoesZoomGraficos(container);
 }
 
 /* ---------------- TAB VISÃO GERAL DE PROJETOS ---------------- */
