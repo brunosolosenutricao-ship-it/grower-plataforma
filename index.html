@@ -12,8 +12,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg: #eef1e6;
@@ -5854,6 +5854,10 @@ function criarMapaCoropleticoLeaflet(containerId, porEstado, opts){
   opts = opts || {};
   const el = document.getElementById(containerId);
   if(!el) return null;
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;padding:20px;color:var(--ink-soft);font-size:12px;">⚠️ Não foi possível carregar o mapa (falha de conexão). Recarregue a página pra tentar de novo.</div>';
+    return null;
+  }
   // preguiçoso: se a aba estiver escondida agora, não gasta tempo montando o mapa —
   // ele é montado de verdade quando essa view fica visível (ver marcarMapaPendente/verificarMapasPendentes)
   if(el.offsetParent === null){
@@ -5907,6 +5911,10 @@ function criarMapaPontosLeaflet(containerId, pontos, opts){
   opts = opts || {};
   const el = document.getElementById(containerId);
   if(!el) return null;
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;padding:20px;color:var(--ink-soft);font-size:12px;">⚠️ Não foi possível carregar o mapa (falha de conexão). Recarregue a página pra tentar de novo.</div>';
+    return null;
+  }
   if(el.offsetParent === null){
     marcarMapaPendente(containerId, ()=> criarMapaPontosLeaflet(containerId, pontos, opts));
     return null;
