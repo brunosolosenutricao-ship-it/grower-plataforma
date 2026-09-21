@@ -92,6 +92,9 @@
   .nav-group{background:rgba(255,255,255,.05);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:3px;}
   .nav-group-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#9fb08f;padding:4px 8px 6px;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#c9d6c0;font-size:13.5px;font-weight:500;cursor:pointer;transition:.15s;}
+  .nav-item.nav-locked{opacity:.55;cursor:not-allowed;}
+  .nav-item.nav-locked .lock-icon{margin-left:auto;font-size:11px;}
+  .nav-item.nav-locked:hover{background:none;}
   .nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
   .nav-item.active{background:var(--lime);color:var(--green-deep);font-weight:700;}
   .sidebar-user{border-top:1px solid rgba(255,255,255,.12);padding-top:14px;margin-top:10px;}
@@ -552,11 +555,11 @@
       </div>
       <div class="nav-group">
         <div class="nav-group-label">Dash de Acompanhamento</div>
-        <div class="nav-item" data-view="condicionador-dash">🧪 Projeto Condicionador</div>
-        <div class="nav-item" data-view="otimizacaop-dash">⚡ Otimização de P</div>
+        <div class="nav-item nav-locked" data-view="condicionador-dash" data-locked="true">🧪 Projeto Condicionador <span class="lock-icon">🔒</span></div>
+        <div class="nav-item nav-locked" data-view="otimizacaop-dash" data-locked="true">⚡ Otimização de P <span class="lock-icon">🔒</span></div>
         <div class="nav-item" data-view="estruturacao-dash">🌾 Projeto Estruturação</div>
       <div class="nav-item" data-view="oxidoconsumo-dash">🧪 Óxido de Magnésio</div>
-      <div class="nav-item" data-view="microsolo-dash">🔬 Projeto Micro Solo</div>
+      <div class="nav-item nav-locked" data-view="microsolo-dash" data-locked="true">🔬 Projeto Micro Solo <span class="lock-icon">🔒</span></div>
       <div class="nav-item" data-view="ladroesmaximas-mapa-dash">📍 Ladrões/Máximas</div>
       <div class="nav-item" data-view="vidanosolo-dash">🦠 Vida no Solo</div>
       <div class="nav-item" data-view="visaogeral-dash">🌍 Visão Geral de Projetos</div>
@@ -2499,6 +2502,7 @@ async function confirmarImportacaoMassa(plan){
 let dashMgJaCarregado = false;
 document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
   item.addEventListener('click', ()=>{
+    if(item.dataset.locked==='true') return; // item bloqueado (cadeado) — não abre o dashboard
     document.querySelectorAll('.nav-item[data-view]').forEach(i=>i.classList.toggle('active', i===item));
     const view = item.dataset.view;
     document.getElementById('viewAlimentacao').style.display = view==='alimentacao' ? 'block' : 'none';
@@ -3220,6 +3224,8 @@ async function carregarDadosDoSupabase(){
     if(vgLoadingEl) vgLoadingEl.style.display = 'none';
     if(vgAppEl) vgAppEl.style.display = 'block';
     renderAll();
+    if(window.verificarRendersPendentes) window.verificarRendersPendentes();
+    if(window.verificarMapasPendentes) window.verificarMapasPendentes();
   }catch(err){
     if(loadingEl) loadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
     if(ladLoadingEl) ladLoadingEl.innerHTML = `<div class="loading-msg" style="color:var(--red);">Erro ao carregar dados do Supabase: ${err.message}</div>`;
@@ -5954,7 +5960,7 @@ function criarMapaPontosLeaflet(containerId, pontos, opts){
   pontos.forEach(p=>{
     const cor = opts.corPonto ? opts.corPonto(p) : '#2c4a7a';
     const marker = L.circleMarker([p.lat, p.lon], {
-      radius: 7, fillColor: cor, color: '#fff', weight: 1.5, fillOpacity: 0.9,
+      radius: 3.5, fillColor: cor, color: '#fff', weight: 1, fillOpacity: 0.9,
     }).addTo(map);
     if(p.titulo) marker.bindTooltip(p.titulo);
     if(opts.onClickPonto) marker.on('click', ()=> opts.onClickPonto(p.item));
@@ -8333,45 +8339,55 @@ function renderLadroesMaximasMapa(){
     </div>
   </div>
 
-  <div class="lm-card full-card" style="margin-top:12px;">
-    <h3 style="margin:0 0 4px;font-size:13px;">🗓️ Acompanhamento</h3>
-    <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Projeto/Cliente lá em cima · ${acompRowsLm.length} talhão(ões). Esses campos moram só aqui, não aparecem na Alimentação.</p>
-    <div class="table-scroll">
-      <table>
-        <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Ciclo</th><th>Seleção</th><th>Área (ha)</th><th>Consultor</th><th>Data de Plantio</th>
-          ${LM_AVALIACOES.map(a=>`<th colspan="2">${a.label}</th>`).join('')}
-          <th></th>
-        </tr>
-        <tr>
-          <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
-          ${LM_AVALIACOES.map(()=>`<th>Status</th><th>Data</th>`).join('')}
-          <th>Salvar</th>
-        </tr></thead>
-        <tbody>
-          ${acompRowsLm.map(r=>{
-            const key = cronogramaKey(r);
-            const entry = getLmAcompEntry(key);
-            const corSel = r.max_selecao==='Ladrões' ? '#b8352a' : '#2e6e76';
-            return `<tr>
-              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
-              <td>${r.cultivar||'—'}</td>
-              <td><input type="text" inputmode="numeric" class="cell-input lm-ciclo-input" data-lm-talhao-id="${r.id}" value="${r.max_ciclo!=null?r.max_ciclo:''}" placeholder="—" style="width:50px;"></td>
-              <td><span style="color:${corSel};font-weight:700;">${r.max_selecao}</span></td>
-              <td class="mono-td">${fmtNum(r.area,1)}</td>
-              <td>${r.consultor||''}</td>
-              <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-              ${LM_AVALIACOES.map(a=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[a.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}_data" value="${entry[a.key+'_data']||''}"></td>`).join('')}
-              <td style="white-space:nowrap;">
-                <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
-                <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
-              </td>
-            </tr>`;
-          }).join('') || `<tr><td colspan="${10+LM_AVALIACOES.length*2}">Nenhum talhão encontrado.</td></tr>`}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  ${(()=>{
+    // desmembra em duas tabelas — cada uma só do seu projeto, respeitando só o filtro de Cliente
+    // (o pill de Projeto lá em cima continua controlando mapa/KPIs/gráfico, não essas duas tabelas)
+    const porClienteLm = selecionados.filter(r=> filtroClienteLm==='Todos' || r.cliente===filtroClienteLm);
+    const linhasMaximas = porClienteLm.filter(r=>r.max_selecao==='Máximas').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+    const linhasLadroes = porClienteLm.filter(r=>r.max_selecao==='Ladrões').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+
+    function montarTabelaAcompLm(titulo, cor, linhas){
+      return `
+      <div class="lm-card full-card" style="margin-top:12px;">
+        <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
+        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Esses campos moram só aqui, não aparecem na Alimentação.</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Ciclo</th><th>Área (ha)</th><th>Consultor</th><th>Data de Plantio</th>
+              ${LM_AVALIACOES.map(a=>`<th colspan="2">${a.label}</th>`).join('')}
+              <th></th>
+            </tr>
+            <tr>
+              <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+              ${LM_AVALIACOES.map(()=>`<th>Status</th><th>Data</th>`).join('')}
+              <th>Salvar</th>
+            </tr></thead>
+            <tbody>
+              ${linhas.map(r=>{
+                const key = cronogramaKey(r);
+                const entry = getLmAcompEntry(key);
+                return `<tr>
+                  <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+                  <td>${r.cultivar||'—'}</td>
+                  <td><input type="text" inputmode="numeric" class="cell-input lm-ciclo-input" data-lm-talhao-id="${r.id}" value="${r.max_ciclo!=null?r.max_ciclo:''}" placeholder="—" style="width:50px;"></td>
+                  <td class="mono-td">${fmtNum(r.area,1)}</td>
+                  <td>${r.consultor||''}</td>
+                  <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                  ${LM_AVALIACOES.map(a=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[a.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}_data" value="${entry[a.key+'_data']||''}"></td>`).join('')}
+                  <td style="white-space:nowrap;">
+                    <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                    <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
+                  </td>
+                </tr>`;
+              }).join('') || `<tr><td colspan="${9+LM_AVALIACOES.length*2}">Nenhum talhão encontrado.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+    return montarTabelaAcompLm('Máximas', '#2e6e76', linhasMaximas) + montarTabelaAcompLm('Ladrões', '#b8352a', linhasLadroes);
+  })()}
   `;
 
   criarMapaPontosLeaflet('lmLeafletMap', comCoordenada.map(r=>({
@@ -8832,7 +8848,8 @@ const VG_PROJETOS = [
   { key:'oxc', label:'Óxido de Magnésio', cor:'#a68a2e', participa: r=> r.dose_oxido!=null && Number(r.dose_oxido)>0 },
   { key:'micro', label:'Micro Solo', cor:'#7a5b8a', participa: r=> r.micro_status==='Aplicado' },
   { key:'vns', label:'Vida no Solo', cor:'#3f8891', participa: r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 },
-  { key:'maxlad', label:'Ladrões/Máximas', cor:'#a4432a', participa: r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas' },
+  { key:'ladroes', label:'Ladrões', cor:'#b8352a', participa: r=> r.max_selecao==='Ladrões' },
+  { key:'maximas', label:'Máximas', cor:'#2e6e76', participa: r=> r.max_selecao==='Máximas' },
 ];
 function renderVisaoGeral(){
   const container = document.getElementById('tab-visao-geral');
