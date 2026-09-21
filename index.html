@@ -959,6 +959,7 @@ const PROJETOS_CONFIG = [
       { key:'selecao', label:'Seleção', type:'select', options:['Nenhum','Ladrões','Máximas'] },
       { key:'latitude', label:'Latitude', type:'number' },
       { key:'longitude', label:'Longitude', type:'number' },
+      { key:'ciclo', label:'Ciclo', type:'number' },
       { key:'prod_20_21', label:'20/21', type:'mirror', mirrorFrom:'geral_prod_20_21' },
       { key:'prod_21_22', label:'21/22', type:'mirror', mirrorFrom:'geral_prod_21_22' },
       { key:'prod_22_23', label:'22/23', type:'mirror', mirrorFrom:'geral_prod_22_23' },
@@ -3012,6 +3013,7 @@ async function carregarDadosDoSupabase(){
         max_selecao: dm.selecao ?? null,
         max_latitude: dm.latitude ?? null,
         max_longitude: dm.longitude ?? null,
+        max_ciclo: dm.ciclo ?? null,
         max_aval_marcha_absorcao: dm.aval_marcha_absorcao ?? null,
         max_aval_massa_fresca: dm.aval_massa_fresca ?? null,
         max_aval_analise_foliar: dm.aval_analise_foliar ?? null,
@@ -5536,11 +5538,9 @@ async function salvarIpiLadroes(inp){
     return;
   }
 
-  // reconstrói o jsonb do projeto — só Sistema e IPI moram aqui, o resto migrou pro Geral
-  const dados = {
-    sistema: rec.max_sistema ?? null,
-    ipi: valorNum,
-  };
+  // reconstrói o jsonb do projeto inteiro (Sistema, Seleção, Lat/Long, Ciclo) — só troca o IPI
+  const dados = montarDadosMaxBase(rec);
+  dados.ipi = valorNum;
 
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -8339,12 +8339,12 @@ function renderLadroesMaximasMapa(){
     <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Seleção</th><th>Área (ha)</th><th>Consultor</th><th>Data de Plantio</th>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Ciclo</th><th>Seleção</th><th>Área (ha)</th><th>Consultor</th><th>Data de Plantio</th>
           ${LM_AVALIACOES.map(a=>`<th colspan="2">${a.label}</th>`).join('')}
           <th></th>
         </tr>
         <tr>
-          <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+          <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
           ${LM_AVALIACOES.map(()=>`<th>Status</th><th>Data</th>`).join('')}
           <th>Salvar</th>
         </tr></thead>
@@ -8356,6 +8356,7 @@ function renderLadroesMaximasMapa(){
             return `<tr>
               <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
               <td>${r.cultivar||'—'}</td>
+              <td><input type="text" inputmode="numeric" class="cell-input lm-ciclo-input" data-lm-talhao-id="${r.id}" value="${r.max_ciclo!=null?r.max_ciclo:''}" placeholder="—" style="width:50px;"></td>
               <td><span style="color:${corSel};font-weight:700;">${r.max_selecao}</span></td>
               <td class="mono-td">${fmtNum(r.area,1)}</td>
               <td>${r.consultor||''}</td>
@@ -8366,7 +8367,7 @@ function renderLadroesMaximasMapa(){
                 <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${9+LM_AVALIACOES.length*2}">Nenhum talhão encontrado.</td></tr>`}
+          }).join('') || `<tr><td colspan="${10+LM_AVALIACOES.length*2}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -8401,6 +8402,12 @@ function renderLadroesMaximasMapa(){
       }
       state.lmAcomp[key][campo] = valor;
       salvarLmAcompCampo(key, campo, valor, el);
+    });
+  });
+  container.querySelectorAll('.lm-ciclo-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const valor = el.value ? parseNum(el.value) : null;
+      salvarCicloLadroesMaximas(el.dataset.lmTalhaoId, valor, el);
     });
   });
   container.querySelectorAll('.lm-acomp-save-btn').forEach(btn=>{
@@ -9165,7 +9172,29 @@ function montarDadosMaxBase(rec){
     latitude: rec.max_latitude ?? null,
     longitude: rec.max_longitude ?? null,
     ipi: rec.max_ipi ?? null,
+    ciclo: rec.max_ciclo ?? null,
   };
+}
+async function salvarCicloLadroesMaximas(talhaoId, valor, el){
+  const rec = RECORDS.find(r=>r.id===talhaoId) || SEM_AREA.find(r=>r.id===talhaoId);
+  if(!rec || !projetosIds['maximas-produtividades']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = montarDadosMaxBase(rec);
+  dados.ciclo = valor;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: talhaoId, projeto_id: projetosIds['maximas-produtividades'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec.max_ciclo = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
 async function salvarLmAcompCampo(key, campoKey, valor, el){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
