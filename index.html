@@ -231,6 +231,10 @@
 
 .chart-zoom-btn{position:absolute;top:2px;right:2px;z-index:6;width:22px;height:22px;border-radius:6px;border:1px solid var(--line,#d8dccb);background:rgba(255,255,255,.9);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .chart-zoom-btn:hover{background:#fff;transform:scale(1.08);}
+.load-progress-track{width:220px;max-width:80%;height:8px;border-radius:5px;background:rgba(0,0,0,.08);margin:14px auto 6px;overflow:hidden;}
+.load-progress-fill{height:100%;background:var(--lime,#7fa653);border-radius:5px;transition:width .25s ease;}
+.load-progress-text{font-size:11px;color:var(--ink-soft,#666);font-family:'IBM Plex Mono',monospace;margin:0;}
+@keyframes condFadeIn{ from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
 
   :root{
     --bg: #eef1e6;
@@ -635,8 +639,10 @@
 <div class="empty-wrap" id="dashMgLoading" style="display:flex;">
   <div class="dropzone" style="text-align:center;">
     <div class="drop-icon">Mg</div>
-    <h2>Carregando dados do projeto…</h2>
-    <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
   </div>
 </div>
 
@@ -690,6 +696,8 @@
           <div class="drop-icon">🚩</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="ladroesApp" style="display:none;">
@@ -710,6 +718,8 @@
           <div class="drop-icon">🌱</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="maximasApp" style="display:none;">
@@ -730,6 +740,8 @@
           <div class="drop-icon">🧪</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="condicionadorApp" style="display:none;">
@@ -750,6 +762,8 @@
           <div class="drop-icon">⚡</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="otimizacaoPApp" style="display:none;">
@@ -770,6 +784,8 @@
           <div class="drop-icon">🌾</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="estruturacaoApp" style="display:none;">
@@ -790,6 +806,8 @@
           <div class="drop-icon">🧪</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="oxidoConsumoApp" style="display:none;">
@@ -810,6 +828,8 @@
           <div class="drop-icon">🔬</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="microSoloApp" style="display:none;">
@@ -830,6 +850,8 @@
           <div class="drop-icon">📍</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="ladroesMaximasMapaApp" style="display:none;">
@@ -850,6 +872,8 @@
           <div class="drop-icon">🦠</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="vidaNoSoloApp" style="display:none;">
@@ -870,6 +894,8 @@
           <div class="drop-icon">🌍</div>
           <h2>Carregando dados do projeto…</h2>
           <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
         </div>
       </div>
       <div id="visaoGeralApp" style="display:none;">
@@ -2626,27 +2652,67 @@ function getMicroAcompEntry(key){
   return found ? {...defaults, ...found} : defaults;
 }
 
-const LM_AVALIACOES = [
-  { key:'marcha_absorcao', label:'Marcha de absorção' },
-  { key:'massa_fresca', label:'Análise de massa fresca' },
-  { key:'analise_foliar', label:'Análise foliar' },
-  { key:'modulacao', label:'Avaliações de modulação' },
-  { key:'estande', label:'Estande' },
-  { key:'fotos_aereas', label:'Fotos aéreas do talhão' },
-  { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)' },
-  { key:'ground_cover', label:'Ground cover' },
-  { key:'altura_final', label:'Altura final das plantas' },
-  { key:'nos_haste_principal', label:'Nº de nós na haste principal' },
-  { key:'ramos_laterais', label:'Nº de ramos laterais' },
-  { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos' },
-  { key:'graos_falhados', label:'Grãos falhados por nós' },
-  { key:'produtividade', label:'Produtividade' },
-  { key:'pmg', label:'PMG' },
+// Estádios fenológicos da soja (ciclo ~125 dias) — DAP (dias após plantio) + janela de tolerância
+const LM_ESTAGIO_DAP = {
+  'V4': { dap:25, faixa:3 },
+  'R1': { dap:42, faixa:4 },
+  'R4': { dap:70, faixa:5 },
+  'R5.4': { dap:93, faixa:4 },
+  'R7/R8': { dap:120, faixa:5 },
+  'Colheita': { dap:130, faixa:5 },
+};
+function lmEstagioKey(estagio){ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R7/R8'->'r7r8', 'R5.4'->'r54'
+
+// 4 blocos — cada avaliação lista em quais estádios ela ocorre (algumas ocorrem em vários)
+const LM_BLOCOS = [
+  { num:1, label:'Nutrição e amostragem', itens:[
+    { key:'marcha_absorcao', label:'Marcha de absorção', estagios:['V4','R1','R4','R5.4','R7/R8'] },
+    { key:'massa_fresca', label:'Análise de massa fresca', estagios:['V4'] },
+    { key:'analise_foliar', label:'Análise foliar', estagios:['R1'] },
+  ]},
+  { num:2, label:'Nodulação', itens:[
+    { key:'nodulacao', label:'Avaliações de nodulação', estagios:['V4','R4'] },
+  ]},
+  { num:3, label:'Estande e monitoramento visual', itens:[
+    { key:'estande', label:'Estande', estagios:['V4','R7/R8'] },
+    { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1','R7/R8'] },
+    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1','R4','R5.4','R7/R8'] },
+    { key:'ground_cover', label:'Ground cover', estagios:['V4','R1','R4'] },
+  ]},
+  { num:4, label:'Componentes produtivos', itens:[
+    { key:'altura_final', label:'Altura final das plantas', estagios:['R7/R8'] },
+    { key:'nos_haste_principal', label:'Nº de nós na haste principal', estagios:['R7/R8'] },
+    { key:'ramos_laterais', label:'Nº de ramos laterais', estagios:['R7/R8'] },
+    { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos', estagios:['R7/R8'] },
+    { key:'graos_falhados', label:'Grãos falhados por nós', estagios:['R7/R8'] },
+    { key:'produtividade', label:'Produtividade', estagios:['Colheita'] },
+    { key:'pmg', label:'PMG', estagios:['Colheita'] },
+  ]},
 ];
+// achata blocos em ocorrências (avaliação × estádio) — cada ocorrência tem seu próprio Status + Data
+function lmOcorrencias(blocos){
+  const out = [];
+  blocos.forEach(b=>{
+    b.itens.forEach(it=>{
+      it.estagios.forEach(estagio=>{
+        out.push({
+          blocoNum:b.num, blocoLabel:b.label,
+          avaliacaoKey:it.key, avaliacaoLabel:it.label,
+          estagio, campoKey: it.key+'_'+lmEstagioKey(estagio),
+          dap: LM_ESTAGIO_DAP[estagio].dap, faixa: LM_ESTAGIO_DAP[estagio].faixa,
+        });
+      });
+    });
+  });
+  return out;
+}
+const LM_OCORRENCIAS_MAXIMAS = lmOcorrencias(LM_BLOCOS); // 30 ocorrências (todos os 4 blocos)
+const LM_OCORRENCIAS_LADROES = lmOcorrencias(LM_BLOCOS.filter(b=>b.num===4)); // 7 ocorrências (só Componentes produtivos)
+const LM_OCORRENCIAS_TODAS = LM_OCORRENCIAS_MAXIMAS; // usada pra popular o rec/state (superconjunto — cobre os dois)
 const LM_AVAL_OPTIONS = ['Pendente','Executado'];
 function getLmAcompEntry(key){
   const defaults = {};
-  LM_AVALIACOES.forEach(e=>{ defaults[e.key] = 'Pendente'; defaults[e.key+'_data'] = null; });
+  LM_OCORRENCIAS_TODAS.forEach(oc=>{ defaults[oc.campoKey] = 'Pendente'; defaults[oc.campoKey+'_data'] = null; });
   const found = state.lmAcomp[key];
   return found ? {...defaults, ...found} : defaults;
 }
@@ -2842,6 +2908,12 @@ function processWorkbook(wb){
 
 /* ============================= CARREGAMENTO VIA SUPABASE ============================= */
 async function carregarDadosDoSupabase(){
+  function atualizarProgresso(pct){
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    document.querySelectorAll('.load-progress-fill').forEach(el=> el.style.width = pct+'%');
+    document.querySelectorAll('.load-progress-text').forEach(el=> el.textContent = pct+'%');
+  }
+  atualizarProgresso(0);
   const loadingEl = document.getElementById('dashMgLoading');
   const appEl = document.getElementById('dashMgApp');
   const ladLoadingEl = document.getElementById('ladroesLoading');
@@ -2893,6 +2965,7 @@ async function carregarDadosDoSupabase(){
       'talhoes', 'id, consultor, cliente, estado, cidade, fazenda, talhao, area_ha, cultura, cultivar, ano_analise_solo, data_plantio, geral_prod_20_21, geral_prod_21_22, geral_prod_22_23, geral_prod_23_24, geral_prod_24_25, geral_prod_25_26, geral_media_prod, geral_sinaleiro, geral_avaliacao_individual, ' + GERAL_CAMPOS.filter(c=>c.subgrupo==='solo1'||c.subgrupo==='solo2').map(c=>c.key).join(', ')
     );
     if(errT) throw errT;
+    atualizarProgresso(8);
 
     const projRes = await sb.from('projetos').select('id').eq('slug', 'oxido-magnesio').single();
     if(projRes.error) throw projRes.error;
@@ -2927,6 +3000,7 @@ async function carregarDadosDoSupabase(){
     let projetoIdVns = null;
     const projResVns = await sb.from('projetos').select('id').eq('slug', 'vida-no-solo').single();
     if(!projResVns.error) projetoIdVns = projResVns.data.id;
+    atualizarProgresso(15);
 
     const ids = talhoes.map(t=>t.id);
     let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {}, dadosMapVns = {};
@@ -2968,7 +3042,9 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdVns).in('talhao_id', bloco);
         if(!errDVns && dadosVns) dadosVns.forEach(d=>{ dadosMapVns[d.talhao_id] = d.dados || {}; });
       }
+      atualizarProgresso(15 + ((i+CHUNK_IDS) / Math.max(ids.length,1)) * 75);
     }
+    atualizarProgresso(90);
 
     const records = [], semArea = [];
     talhoes.forEach(t=>{
@@ -3018,21 +3094,6 @@ async function carregarDadosDoSupabase(){
         max_latitude: dm.latitude ?? null,
         max_longitude: dm.longitude ?? null,
         max_ciclo: dm.ciclo ?? null,
-        max_aval_marcha_absorcao: dm.aval_marcha_absorcao ?? null,
-        max_aval_massa_fresca: dm.aval_massa_fresca ?? null,
-        max_aval_analise_foliar: dm.aval_analise_foliar ?? null,
-        max_aval_modulacao: dm.aval_modulacao ?? null,
-        max_aval_estande: dm.aval_estande ?? null,
-        max_aval_fotos_aereas: dm.aval_fotos_aereas ?? null,
-        max_aval_foto_planta_inteira: dm.aval_foto_planta_inteira ?? null,
-        max_aval_ground_cover: dm.aval_ground_cover ?? null,
-        max_aval_altura_final: dm.aval_altura_final ?? null,
-        max_aval_nos_haste_principal: dm.aval_nos_haste_principal ?? null,
-        max_aval_ramos_laterais: dm.aval_ramos_laterais ?? null,
-        max_aval_vagens_graos: dm.aval_vagens_graos ?? null,
-        max_aval_graos_falhados: dm.aval_graos_falhados ?? null,
-        max_aval_produtividade: dm.aval_produtividade ?? null,
-        max_aval_pmg: dm.aval_pmg ?? null,
         // campos do Condicionador de Solo (jsonb próprio, projeto separado)
         cond_area_projeto: dc.area_projeto_cond ?? null,
         cond_tipo_teste: dc.tipo_teste_cond ?? null,
@@ -3112,7 +3173,10 @@ async function carregarDadosDoSupabase(){
       // copia todos os campos de análise de solo (0-20/20-40) com a MESMA chave do GERAL_CAMPOS —
       // usado pelo modal do Ladrões/Máximas, que lê genericamente por c.key
       GERAL_CAMPOS.forEach(c=>{ if(c.subgrupo==='solo1' || c.subgrupo==='solo2') rec[c.key] = t[c.key] ?? null; });
-      LM_AVALIACOES.forEach(a=>{ rec['max_aval_'+a.key+'_data'] = dm['aval_'+a.key+'_data'] ?? null; });
+      LM_OCORRENCIAS_TODAS.forEach(oc=>{
+        rec['max_aval_'+oc.campoKey] = dm['aval_'+oc.campoKey] ?? null;
+        rec['max_aval_'+oc.campoKey+'_data'] = dm['aval_'+oc.campoKey+'_data'] ?? null;
+      });
       if(areaNum <= 0) semArea.push(rec); else records.push(rec);
     });
 
@@ -3187,13 +3251,13 @@ async function carregarDadosDoSupabase(){
     });
     state.lmAcomp = {};
     RECORDS.forEach(r=>{
-      const temAlgo = LM_AVALIACOES.some(a=> r['max_aval_'+a.key]!=null || r['max_aval_'+a.key+'_data']!=null);
+      const temAlgo = LM_OCORRENCIAS_TODAS.some(oc=> r['max_aval_'+oc.campoKey]!=null || r['max_aval_'+oc.campoKey+'_data']!=null);
       if(!temAlgo) return;
       const key = cronogramaKey(r);
       const entry = {};
-      LM_AVALIACOES.forEach(a=>{
-        entry[a.key] = r['max_aval_'+a.key] || 'Pendente';
-        entry[a.key+'_data'] = r['max_aval_'+a.key+'_data'] || null;
+      LM_OCORRENCIAS_TODAS.forEach(oc=>{
+        entry[oc.campoKey] = r['max_aval_'+oc.campoKey] || 'Pendente';
+        entry[oc.campoKey+'_data'] = r['max_aval_'+oc.campoKey+'_data'] || null;
       });
       state.lmAcomp[key] = entry;
     });
@@ -3223,6 +3287,7 @@ async function carregarDadosDoSupabase(){
     if(vnsAppEl) vnsAppEl.style.display = 'block';
     if(vgLoadingEl) vgLoadingEl.style.display = 'none';
     if(vgAppEl) vgAppEl.style.display = 'block';
+    atualizarProgresso(100);
     renderAll();
     if(window.verificarRendersPendentes) window.verificarRendersPendentes();
     if(window.verificarMapasPendentes) window.verificarMapasPendentes();
@@ -5873,7 +5938,8 @@ window.verificarMapasPendentes = verificarMapasPendentes;
 
 function destruirLeafletMapa(containerId){
   if(leafletMapasAtivos[containerId]){
-    leafletMapasAtivos[containerId].remove();
+    try{ leafletMapasAtivos[containerId].remove(); }
+    catch(e){ /* o container antigo já foi substituído pelo re-render — ignora com segurança */ }
     delete leafletMapasAtivos[containerId];
   }
 }
@@ -5894,6 +5960,7 @@ function criarMapaCoropleticoLeaflet(containerId, porEstado, opts){
     return null;
   }
   destruirLeafletMapa(containerId);
+  if(el._leaflet_id) delete el._leaflet_id; // limpa marca antiga do Leaflet, evita "container já inicializado"
   const map = L.map(containerId, { scrollWheelZoom: true, zoomControl: true }).setView([-14.2, -51.9], 4);
   leafletMapasAtivos[containerId] = map;
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -5929,9 +5996,10 @@ function criarMapaCoropleticoLeaflet(containerId, porEstado, opts){
     },
   }).addTo(map);
   try{ map.fitBounds(layer.getBounds(), { padding:[8,8] }); }catch(e){}
-  setTimeout(()=> map.invalidateSize(), 60);
-  setTimeout(()=> map.invalidateSize(), 300);
-  new ResizeObserver(()=> map.invalidateSize()).observe(el);
+  const invalidateSeguro = ()=>{ try{ map.invalidateSize(); }catch(e){ /* mapa já foi substituído — ignora */ } };
+  setTimeout(invalidateSeguro, 60);
+  setTimeout(invalidateSeguro, 300);
+  new ResizeObserver(invalidateSeguro).observe(el);
   return map;
 }
 
@@ -5949,6 +6017,7 @@ function criarMapaPontosLeaflet(containerId, pontos, opts){
     return null;
   }
   destruirLeafletMapa(containerId);
+  if(el._leaflet_id) delete el._leaflet_id; // limpa marca antiga do Leaflet, evita "container já inicializado"
   const map = L.map(containerId, { scrollWheelZoom: true, zoomControl: true }).setView([-14.2, -51.9], 4);
   leafletMapasAtivos[containerId] = map;
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -5970,9 +6039,10 @@ function criarMapaPontosLeaflet(containerId, pontos, opts){
     const grupo = L.featureGroup(marcadores);
     try{ map.fitBounds(grupo.getBounds(), { padding:[24,24], maxZoom:7 }); }catch(e){}
   }
-  setTimeout(()=> map.invalidateSize(), 60);
-  setTimeout(()=> map.invalidateSize(), 300);
-  new ResizeObserver(()=> map.invalidateSize()).observe(el);
+  const invalidateSeguro = ()=>{ try{ map.invalidateSize(); }catch(e){ /* mapa já foi substituído — ignora */ } };
+  setTimeout(invalidateSeguro, 60);
+  setTimeout(invalidateSeguro, 300);
+  new ResizeObserver(invalidateSeguro).observe(el);
   return map;
 }
 
@@ -8080,12 +8150,21 @@ function abrirModalLadroesMaximasTalhao(rec){
   ];
   const corSinaleiro = (()=>{ const n = Number(rec.max_sinaleiro); if(isNaN(n)) return '#d9d9d4'; if(n<=1) return '#2ecc71'; if(n===2) return '#f1c40f'; return '#e74c3c'; })();
 
-  // linha do tempo: Data de Plantio (início) + cada avaliação que já tem data preenchida, em ordem cronológica
+  // linha do tempo: Data de Plantio (início) + cada ocorrência que já tem data preenchida, comparando com o esperado (Plantio + DAP)
   const pontosLinha = [];
-  if(rec.data_plantio) pontosLinha.push({ label:'Plantio', data: new Date(rec.data_plantio+'T00:00:00'), cor:'#5c7a3f' });
-  LM_AVALIACOES.forEach(a=>{
-    const d = rec['max_aval_'+a.key+'_data'];
-    if(d) pontosLinha.push({ label:a.label, data: new Date(d+'T00:00:00'), cor:'#2e6e76' });
+  const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
+  if(dataPlantioObj) pontosLinha.push({ label:'Plantio', data: dataPlantioObj, cor:'#5c7a3f', sub:'' });
+  LM_OCORRENCIAS_MAXIMAS.forEach(oc=>{
+    const d = rec['max_aval_'+oc.campoKey+'_data'];
+    if(!d) return;
+    const dataReal = new Date(d+'T00:00:00');
+    let sub = '';
+    if(dataPlantioObj){
+      const esperada = new Date(dataPlantioObj); esperada.setDate(esperada.getDate()+oc.dap);
+      const diffDias = Math.round((dataReal-esperada)/86400000);
+      sub = Math.abs(diffDias)<=oc.faixa ? 'no prazo' : (diffDias>0 ? `${diffDias}d atrasado` : `${Math.abs(diffDias)}d adiantado`);
+    }
+    pontosLinha.push({ label:`${oc.avaliacaoLabel} (${oc.estagio})`, data: dataReal, cor:'#2e6e76', sub });
   });
   pontosLinha.sort((a,b)=> a.data - b.data);
   const dataMin = pontosLinha.length ? pontosLinha[0].data.getTime() : 0;
@@ -8179,10 +8258,12 @@ function abrirModalLadroesMaximasTalhao(rec){
           ${pontosLinha.map((p,i)=>{
             const pct = spanMs>0 ? ((p.data.getTime()-dataMin)/spanMs)*100 : 0;
             const cima = i%2===1;
+            const corSub = p.sub==='no prazo' ? '#2ecc71' : (p.sub ? '#e67e22' : 'transparent');
             return `<div class="lm-timeline-pt ${cima?'cima':''}" style="left:${pct}%;">
               <div class="lm-timeline-dot" style="background:${p.cor};"></div>
               <div class="lm-timeline-label">${p.label}</div>
               <div class="lm-timeline-date">${p.data.toLocaleDateString('pt-BR')}</div>
+              ${p.sub?`<div class="lm-timeline-date" style="color:${corSub};font-weight:700;">${p.sub}</div>`:''}
             </div>`;
           }).join('')}
         </div>` : `<p class="sub" style="margin:0;">Nenhuma data preenchida ainda (nem Data de Plantio, nem avaliações).</p>`}
@@ -8346,23 +8427,31 @@ function renderLadroesMaximasMapa(){
     const linhasMaximas = porClienteLm.filter(r=>r.max_selecao==='Máximas').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
     const linhasLadroes = porClienteLm.filter(r=>r.max_selecao==='Ladrões').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
 
-    function montarTabelaAcompLm(titulo, cor, linhas){
+    function montarTabelaAcompLm(titulo, cor, linhas, blocos){
+      const ocorrencias = lmOcorrencias(blocos);
+      const totalCols = ocorrencias.length*2;
       return `
       <div class="lm-card full-card" style="margin-top:12px;">
         <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
-        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Esses campos moram só aqui, não aparecem na Alimentação.</p>
+        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
         <div class="table-scroll">
           <table>
-            <thead><tr>
-              <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Ciclo</th><th>Área (ha)</th><th>Consultor</th><th>Data de Plantio</th>
-              ${LM_AVALIACOES.map(a=>`<th colspan="2">${a.label}</th>`).join('')}
-              <th></th>
+            <thead>
+            <tr>
+              <th rowspan="4">Cliente</th><th rowspan="4">Fazenda</th><th rowspan="4">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th>
+              ${blocos.map(b=>`<th colspan="${b.itens.reduce((s,it)=>s+it.estagios.length,0)*2}">Bloco ${b.num} — ${b.label}</th>`).join('')}
+              <th rowspan="4">Salvar</th>
             </tr>
             <tr>
-              <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
-              ${LM_AVALIACOES.map(()=>`<th>Status</th><th>Data</th>`).join('')}
-              <th>Salvar</th>
-            </tr></thead>
+              ${blocos.flatMap(b=>b.itens.map(it=>`<th colspan="${it.estagios.length*2}">${it.label}</th>`)).join('')}
+            </tr>
+            <tr>
+              ${ocorrencias.map(oc=>`<th colspan="2">${oc.estagio}<br><span style="font-weight:400;font-size:8.5px;opacity:.8;">${oc.dap} DAP ±${oc.faixa}</span></th>`).join('')}
+            </tr>
+            <tr>
+              ${ocorrencias.map(()=>`<th>Status</th><th>Data</th>`).join('')}
+            </tr>
+            </thead>
             <tbody>
               ${linhas.map(r=>{
                 const key = cronogramaKey(r);
@@ -8374,19 +8463,19 @@ function renderLadroesMaximasMapa(){
                   <td class="mono-td">${fmtNum(r.area,1)}</td>
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                  ${LM_AVALIACOES.map(a=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[a.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${a.key}_data" value="${entry[a.key+'_data']||''}"></td>`).join('')}
+                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" value="${entry[oc.campoKey+'_data']||''}"></td>`).join('')}
                   <td style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
                   </td>
                 </tr>`;
-              }).join('') || `<tr><td colspan="${9+LM_AVALIACOES.length*2}">Nenhum talhão encontrado.</td></tr>`}
+              }).join('') || `<tr><td colspan="${9+totalCols}">Nenhum talhão encontrado.</td></tr>`}
             </tbody>
           </table>
         </div>
       </div>`;
     }
-    return montarTabelaAcompLm('Máximas', '#2e6e76', linhasMaximas) + montarTabelaAcompLm('Ladrões', '#b8352a', linhasLadroes);
+    return montarTabelaAcompLm('Máximas', '#2e6e76', linhasMaximas, LM_BLOCOS) + montarTabelaAcompLm('Ladrões', '#b8352a', linhasLadroes, LM_BLOCOS.filter(b=>b.num===4));
   })()}
   `;
 
@@ -8414,7 +8503,7 @@ function renderLadroesMaximasMapa(){
       const valor = el.value;
       if(!state.lmAcomp[key]){
         state.lmAcomp[key] = {};
-        LM_AVALIACOES.forEach(a=>{ state.lmAcomp[key][a.key] = 'Pendente'; state.lmAcomp[key][a.key+'_data'] = null; });
+        LM_OCORRENCIAS_TODAS.forEach(oc=>{ state.lmAcomp[key][oc.campoKey] = 'Pendente'; state.lmAcomp[key][oc.campoKey+'_data'] = null; });
       }
       state.lmAcomp[key][campo] = valor;
       salvarLmAcompCampo(key, campo, valor, el);
@@ -9220,9 +9309,9 @@ async function salvarLmAcompCampo(key, campoKey, valor, el){
     return;
   }
   const dados = montarDadosMaxBase(rec);
-  LM_AVALIACOES.forEach(a=>{
-    dados['aval_'+a.key] = campoKey===a.key ? valor : (rec['max_aval_'+a.key] ?? null);
-    dados['aval_'+a.key+'_data'] = campoKey===(a.key+'_data') ? valor : (rec['max_aval_'+a.key+'_data'] ?? null);
+  LM_OCORRENCIAS_TODAS.forEach(oc=>{
+    dados['aval_'+oc.campoKey] = campoKey===oc.campoKey ? valor : (rec['max_aval_'+oc.campoKey] ?? null);
+    dados['aval_'+oc.campoKey+'_data'] = campoKey===(oc.campoKey+'_data') ? valor : (rec['max_aval_'+oc.campoKey+'_data'] ?? null);
   });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -9240,18 +9329,18 @@ async function salvarLmAcompCampo(key, campoKey, valor, el){
 async function salvarLmAcompEntradaCompleta(rec, entry, user){
   if(!rec || !projetosIds['maximas-produtividades']) return { error: 'talhão ou projeto não encontrado' };
   const dados = montarDadosMaxBase(rec);
-  LM_AVALIACOES.forEach(a=>{
-    dados['aval_'+a.key] = entry[a.key] ?? null;
-    dados['aval_'+a.key+'_data'] = entry[a.key+'_data'] ?? null;
+  LM_OCORRENCIAS_TODAS.forEach(oc=>{
+    dados['aval_'+oc.campoKey] = entry[oc.campoKey] ?? null;
+    dados['aval_'+oc.campoKey+'_data'] = entry[oc.campoKey+'_data'] ?? null;
   });
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: rec.id, projeto_id: projetosIds['maximas-produtividades'], dados,
     updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
   }, { onConflict: 'talhao_id,projeto_id' });
   if(!error){
-    LM_AVALIACOES.forEach(a=>{
-      rec['max_aval_'+a.key] = entry[a.key] ?? null;
-      rec['max_aval_'+a.key+'_data'] = entry[a.key+'_data'] ?? null;
+    LM_OCORRENCIAS_TODAS.forEach(oc=>{
+      rec['max_aval_'+oc.campoKey] = entry[oc.campoKey] ?? null;
+      rec['max_aval_'+oc.campoKey+'_data'] = entry[oc.campoKey+'_data'] ?? null;
     });
   }
   return { error };
