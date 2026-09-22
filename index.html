@@ -6950,7 +6950,7 @@ function renderEstruturacao(){
 
   const areaPorConsultorEstr = {};
   base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0).forEach(r=>{
-    areaPorConsultorEstr[r.consultor] = (areaPorConsultorEstr[r.consultor]||0) + (r.area||0);
+    areaPorConsultorEstr[r.consultor] = (areaPorConsultorEstr[r.consultor]||0) + (Number(r.estr_area_projeto)||0);
   });
   const adocaoConsultorPct = Object.entries(areaPorConsultorEstr).map(([c,v])=>[c, Math.round(v*10)/10]).sort((a,b)=>b[1]-a[1]);
 
@@ -7037,8 +7037,8 @@ function renderEstruturacao(){
         <canvas id="estrAreaProduto"></canvas>
       </div>
       <div class="estr-card" style="animation-delay:.18s;">
-        <h3>👤 Adoção por Consultor</h3>
-        <p class="sub-sm">Soma da área do talhão, onde Área do projeto (ha) &gt; 0</p>
+        <h3>👤 Área do projeto por Consultor</h3>
+        <p class="sub-sm">Soma da Área do projeto (Estruturação) preenchida em cada talhão</p>
         <canvas id="estrAdocaoConsultor"></canvas>
       </div>
       <div class="estr-card" style="animation-delay:.22s;">
@@ -8150,26 +8150,35 @@ function abrirModalLadroesMaximasTalhao(rec){
   ];
   const corSinaleiro = (()=>{ const n = Number(rec.max_sinaleiro); if(isNaN(n)) return '#d9d9d4'; if(n<=1) return '#2ecc71'; if(n===2) return '#f1c40f'; return '#e74c3c'; })();
 
-  // linha do tempo: Data de Plantio (início) + cada ocorrência que já tem data preenchida, comparando com o esperado (Plantio + DAP)
-  const pontosLinha = [];
+  // agrupa as 30 ocorrências por estádio — cada estádio vira 1 "bolinha" (Plantio + V4 + R1 + R4 + R5.4 + R7/R8 + Colheita)
+  // a bolinha fica vermelha se tiver algo atrasado ali dentro, verde se tudo realizado no prazo, cinza se só previsão ainda
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
-  if(dataPlantioObj) pontosLinha.push({ label:'Plantio', data: dataPlantioObj, cor:'#5c7a3f', sub:'' });
-  LM_OCORRENCIAS_MAXIMAS.forEach(oc=>{
-    const d = rec['max_aval_'+oc.campoKey+'_data'];
-    if(!d) return;
-    const dataReal = new Date(d+'T00:00:00');
-    let sub = '';
-    if(dataPlantioObj){
-      const esperada = new Date(dataPlantioObj); esperada.setDate(esperada.getDate()+oc.dap);
-      const diffDias = Math.round((dataReal-esperada)/86400000);
-      sub = Math.abs(diffDias)<=oc.faixa ? 'no prazo' : (diffDias>0 ? `${diffDias}d atrasado` : `${Math.abs(diffDias)}d adiantado`);
-    }
-    pontosLinha.push({ label:`${oc.avaliacaoLabel} (${oc.estagio})`, data: dataReal, cor:'#2e6e76', sub });
+  const ESTAGIOS_ORDEM = ['V4','R1','R4','R5.4','R7/R8','Colheita'];
+  const gruposEstagio = ESTAGIOS_ORDEM.map(estagio=>{
+    const ocorrenciasDoEstagio = LM_OCORRENCIAS_MAXIMAS.filter(oc=>oc.estagio===estagio);
+    const detalhes = ocorrenciasDoEstagio.map(oc=>{
+      const d = rec['max_aval_'+oc.campoKey+'_data'];
+      let status = 'previsto', sub = 'previsto', dataMostrar = null;
+      if(dataPlantioObj){
+        const esperada = new Date(dataPlantioObj); esperada.setDate(esperada.getDate()+oc.dap);
+        if(d){
+          dataMostrar = new Date(d+'T00:00:00');
+          const diffDias = Math.round((dataMostrar-esperada)/86400000);
+          if(Math.abs(diffDias)<=oc.faixa){ status='no_prazo'; sub='no prazo'; }
+          else { status = diffDias>0 ? 'atrasado' : 'adiantado'; sub = diffDias>0 ? `${diffDias}d atrasado` : `${Math.abs(diffDias)}d adiantado`; }
+        } else {
+          dataMostrar = esperada;
+        }
+      }
+      return { label: oc.avaliacaoLabel, status, sub, data: dataMostrar };
+    });
+    const temAtrasado = detalhes.some(x=>x.status==='atrasado');
+    const todasOk = detalhes.length>0 && detalhes.every(x=>x.status==='no_prazo'||x.status==='adiantado');
+    const cor = temAtrasado ? '#e74c3c' : (todasOk ? '#2ecc71' : '#c7cdbd');
+    const dapInfo = LM_ESTAGIO_DAP[estagio];
+    const dataEstagio = dataPlantioObj ? (()=>{ const d=new Date(dataPlantioObj); d.setDate(d.getDate()+dapInfo.dap); return d; })() : null;
+    return { estagio, cor, data: dataEstagio, dap: dapInfo.dap, faixa: dapInfo.faixa, detalhes };
   });
-  pontosLinha.sort((a,b)=> a.data - b.data);
-  const dataMin = pontosLinha.length ? pontosLinha[0].data.getTime() : 0;
-  const dataMax = pontosLinha.length ? pontosLinha[pontosLinha.length-1].data.getTime() : 1;
-  const spanMs = Math.max(1, dataMax - dataMin);
 
   modalRoot.innerHTML = `
   <style>
@@ -8190,15 +8199,17 @@ function abrirModalLadroesMaximasTalhao(rec){
     .lm-badge-sinaleiro{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;margin-bottom:8px;width:100%;box-sizing:border-box;}
     .lm-badge-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
     .lm-badge-aval{background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;width:100%;box-sizing:border-box;}
-    .lm-timeline{position:relative;height:130px;margin-top:10px;}
-    .lm-timeline-track{position:absolute;left:6px;right:6px;top:65px;height:3px;background:var(--line);border-radius:2px;}
-    .lm-timeline-pt{position:absolute;top:65px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:100px;}
-    .lm-timeline-pt.cima{flex-direction:column-reverse;top:auto;bottom:65px;}
-    .lm-timeline-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);flex-shrink:0;}
-    .lm-timeline-pt:not(.cima) .lm-timeline-dot{margin-bottom:4px;}
-    .lm-timeline-pt.cima .lm-timeline-dot{margin-top:4px;}
-    .lm-timeline-label{font-size:9px;text-align:center;color:var(--ink);font-weight:600;line-height:1.2;white-space:nowrap;}
-    .lm-timeline-date{font-size:8px;color:var(--ink-soft);margin-top:1px;}
+    .lm-tl2{position:relative;display:flex;justify-content:space-between;align-items:flex-start;padding-top:6px;}
+    .lm-tl2-track{position:absolute;left:14px;right:14px;top:16px;height:3px;background:var(--line);border-radius:2px;z-index:0;}
+    .lm-tl2-item{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;}
+    .lm-tl2-clicavel{cursor:pointer;}
+    .lm-tl2-clicavel:hover .lm-tl2-dot{transform:scale(1.2);}
+    .lm-tl2-dot{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);transition:.15s;}
+    .lm-tl2-label{font-size:10.5px;font-weight:700;color:var(--ink);}
+    .lm-tl2-date{font-size:9px;color:var(--ink-soft);}
+    .lm-tl2-detalhe-card{background:var(--bg);border-radius:10px;padding:12px 14px;}
+    .lm-tl2-detalhe-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px;}
+    .lm-tl2-detalhe-item:last-child{border-bottom:none;}
   </style>
   <div class="modal-overlay" id="lmModalOverlay">
     <div class="modal-panel" style="max-width:1275px;">
@@ -8251,28 +8262,51 @@ function abrirModalLadroesMaximasTalhao(rec){
       </div>
 
       <div class="lm-modal-sec" style="animation-delay:.14s;">
-        <h3>Linha do tempo — Plantio e Avaliações</h3>
-        ${pontosLinha.length ? `
-        <div class="lm-timeline">
-          <div class="lm-timeline-track"></div>
-          ${pontosLinha.map((p,i)=>{
-            const pct = spanMs>0 ? ((p.data.getTime()-dataMin)/spanMs)*100 : 0;
-            const cima = i%2===1;
-            const corSub = p.sub==='no prazo' ? '#2ecc71' : (p.sub ? '#e67e22' : 'transparent');
-            return `<div class="lm-timeline-pt ${cima?'cima':''}" style="left:${pct}%;">
-              <div class="lm-timeline-dot" style="background:${p.cor};"></div>
-              <div class="lm-timeline-label">${p.label}</div>
-              <div class="lm-timeline-date">${p.data.toLocaleDateString('pt-BR')}</div>
-              ${p.sub?`<div class="lm-timeline-date" style="color:${corSub};font-weight:700;">${p.sub}</div>`:''}
-            </div>`;
-          }).join('')}
-        </div>` : `<p class="sub" style="margin:0;">Nenhuma data preenchida ainda (nem Data de Plantio, nem avaliações).</p>`}
+        <h3>Linha do tempo — Plantio e Estádios</h3>
+        <p class="sub" style="margin:0 0 8px;font-size:10.5px;">Clique num estádio pra ver as avaliações dele. 🔴 tem algo atrasado · 🟢 tudo em dia · ⚪ ainda só previsão.</p>
+        <div class="lm-tl2">
+          <div class="lm-tl2-track"></div>
+          <div class="lm-tl2-item">
+            <div class="lm-tl2-dot" style="background:#5c7a3f;"></div>
+            <div class="lm-tl2-label">Plantio</div>
+            <div class="lm-tl2-date">${dataPlantioObj ? dataPlantioObj.toLocaleDateString('pt-BR') : '—'}</div>
+          </div>
+          ${gruposEstagio.map((g,i)=>`<div class="lm-tl2-item lm-tl2-clicavel" data-tl-idx="${i}">
+            <div class="lm-tl2-dot" style="background:${g.cor};"></div>
+            <div class="lm-tl2-label">${g.estagio}</div>
+            <div class="lm-tl2-date">${g.data ? g.data.toLocaleDateString('pt-BR') : '—'}</div>
+          </div>`).join('')}
+        </div>
+        <div id="lmTl2Detalhe" style="margin-top:14px;"></div>
       </div>
     </div>
   </div>`;
   const fechar = ()=>{ modalRoot.innerHTML = ''; };
   document.getElementById('lmModalFechar').addEventListener('click', fechar);
   document.getElementById('lmModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmModalOverlay') fechar(); });
+
+  const detalheEl = document.getElementById('lmTl2Detalhe');
+  document.querySelectorAll('.lm-tl2-clicavel').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      const idx = Number(item.dataset.tlIdx);
+      const jaAberto = item.classList.contains('aberto');
+      document.querySelectorAll('.lm-tl2-clicavel').forEach(i=>i.classList.remove('aberto'));
+      if(jaAberto){ detalheEl.innerHTML = ''; return; }
+      item.classList.add('aberto');
+      const g = gruposEstagio[idx];
+      detalheEl.innerHTML = `
+      <div class="lm-tl2-detalhe-card">
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px;">${g.estagio} · esperado ${g.data?g.data.toLocaleDateString('pt-BR'):'—'} (±${g.faixa} dias)</div>
+        ${g.detalhes.map(d=>{
+          const cor = d.status==='no_prazo' ? '#2ecc71' : d.status==='adiantado' ? '#2ecc71' : d.status==='atrasado' ? '#e74c3c' : '#9aa08e';
+          return `<div class="lm-tl2-detalhe-item">
+            <span>${d.label}</span>
+            <span style="color:${cor};font-weight:700;">${d.sub}${d.data?' — '+d.data.toLocaleDateString('pt-BR'):''}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+  });
 
   const canvasHist = document.getElementById('lmHistChart');
   if(canvasHist){
@@ -8456,6 +8490,12 @@ function renderLadroesMaximasMapa(){
               ${linhas.map(r=>{
                 const key = cronogramaKey(r);
                 const entry = getLmAcompEntry(key);
+                const dataPlantioLinha = r.data_plantio ? new Date(r.data_plantio+'T00:00:00') : null;
+                function dataPrevistaStr(oc){
+                  if(!dataPlantioLinha) return '';
+                  const d = new Date(dataPlantioLinha); d.setDate(d.getDate()+oc.dap);
+                  return d.toISOString().slice(0,10); // YYYY-MM-DD, formato aceito pelo <input type="date">
+                }
                 return `<tr>
                   <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
                   <td>${r.cultivar||'—'}</td>
@@ -8463,7 +8503,7 @@ function renderLadroesMaximasMapa(){
                   <td class="mono-td">${fmtNum(r.area,1)}</td>
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" value="${entry[oc.campoKey+'_data']||''}"></td>`).join('')}
+                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
                   <td style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
@@ -8520,7 +8560,14 @@ function renderLadroesMaximasMapa(){
       const key = decodeURIComponent(btn.dataset.lmKey);
       const msgEl = container.querySelector(`.lm-acomp-msg[data-lm-msg-key="${btn.dataset.lmKey}"]`);
       const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      // lê o que está exibido na tela (não só o que já tinha sido alterado/salvo) — pega também datas
+      // previstas que a pessoa deixou como estavam, sem precisar clicar no campo antes de salvar
       const entry = getLmAcompEntry(key);
+      container.querySelectorAll(`.lm-acomp-input[data-lm-key="${btn.dataset.lmKey}"]`).forEach(el=>{
+        entry[el.dataset.lmCampo] = el.value || null;
+      });
+      if(!state.lmAcomp[key]) state.lmAcomp[key] = {};
+      Object.assign(state.lmAcomp[key], entry);
       const textoOriginal = btn.textContent;
       btn.disabled = true; btn.textContent = '⏳ Salvando…';
       if(msgEl) msgEl.textContent = '';
