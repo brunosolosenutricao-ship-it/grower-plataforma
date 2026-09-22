@@ -7065,12 +7065,12 @@ function renderEstruturacao(){
     <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Data de Plantio</th>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Data de Plantio</th>
           ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
           <th>Salvar</th>
         </tr></thead>
         <thead><tr>
-          <th></th><th></th><th></th><th></th>
+          <th></th><th></th><th></th><th></th><th></th>
           ${ESTR_ETAPAS.map(()=>`<th>Mês</th><th>Execução</th>`).join('')}
           <th></th>
         </tr></thead>
@@ -7080,6 +7080,7 @@ function renderEstruturacao(){
             const entry = getEstrAcompEntry(key);
             return `<tr>
               <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td>${r.cultivar||'—'}</td>
               <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
               ${ESTR_ETAPAS.map(e=>`
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes"><option value="">—</option>${MESES_OPTIONS.map(m=>`<option value="${m}" ${entry[e.key+'_mes']===m?'selected':''}>${m}</option>`).join('')}</select></td>
@@ -7090,7 +7091,7 @@ function renderEstruturacao(){
                 <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${4+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+          }).join('') || `<tr><td colspan="${5+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -8458,8 +8459,14 @@ function renderLadroesMaximasMapa(){
     // desmembra em duas tabelas — cada uma só do seu projeto, respeitando só o filtro de Cliente
     // (o pill de Projeto lá em cima continua controlando mapa/KPIs/gráfico, não essas duas tabelas)
     const porClienteLm = selecionados.filter(r=> filtroClienteLm==='Todos' || r.cliente===filtroClienteLm);
-    const linhasMaximas = porClienteLm.filter(r=>r.max_selecao==='Máximas').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
-    const linhasLadroes = porClienteLm.filter(r=>r.max_selecao==='Ladrões').sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+    const porDataPlantio = (a,b)=>{
+      if(!a.data_plantio && !b.data_plantio) return (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao);
+      if(!a.data_plantio) return 1; // sem data vai pro fim
+      if(!b.data_plantio) return -1;
+      return new Date(a.data_plantio) - new Date(b.data_plantio);
+    };
+    const linhasMaximas = porClienteLm.filter(r=>r.max_selecao==='Máximas').sort(porDataPlantio);
+    const linhasLadroes = porClienteLm.filter(r=>r.max_selecao==='Ladrões').sort(porDataPlantio);
 
     function montarTabelaAcompLm(titulo, cor, linhas, blocos){
       const ocorrencias = lmOcorrencias(blocos);
