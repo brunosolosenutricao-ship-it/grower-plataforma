@@ -6942,7 +6942,7 @@ function renderEstruturacao(){
   if(!container) return;
 
   const base = byPais(RECORDS);
-  const comTeste = base.filter(r=> (r.estr_tipo_teste==='Faixa' || r.estr_tipo_teste==='Lado a lado') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0);
+  const comTeste = base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0);
   const comUsoInfo = base.filter(r=> r.estr_uso_tecnologia==='Sim' || r.estr_uso_tecnologia==='Não');
   const comProduto = base.filter(r=> r.estr_produto!=null && r.estr_produto!=='');
   const oportunidade = base.filter(r=> r.estr_uso_tecnologia==='Não' && r.estr_acamamento!=null && Number(r.estr_acamamento)>0);
@@ -6982,8 +6982,16 @@ function renderEstruturacao(){
   const modoAtivo = state.estruturacaoMapModo;
   const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
 
-  const areaPorProduto = {};
-  comProduto.forEach(r=>{ areaPorProduto[r.estr_produto]=(areaPorProduto[r.estr_produto]||0)+(r.area||0); });
+  const areaProdutoConsultoria = {}, areaProdutoProjeto = {};
+  comProduto.forEach(r=>{
+    const projeto = Number(r.estr_area_projeto)||0;
+    const talhao = Number(r.area)||0;
+    const consultoria = Math.max(0, talhao - projeto); // trava — nunca negativo, mesmo se área do projeto > área do talhão por erro de digitação
+    areaProdutoConsultoria[r.estr_produto] = (areaProdutoConsultoria[r.estr_produto]||0) + consultoria;
+    areaProdutoProjeto[r.estr_produto] = (areaProdutoProjeto[r.estr_produto]||0) + projeto;
+  });
+  const produtosOrdenados = Object.keys({...areaProdutoConsultoria, ...areaProdutoProjeto})
+    .sort((a,b)=> (areaProdutoConsultoria[b]+areaProdutoProjeto[b]) - (areaProdutoConsultoria[a]+areaProdutoProjeto[a]));
 
   const areaPorConsultorEstr = {};
   base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0).forEach(r=>{
@@ -6991,18 +6999,20 @@ function renderEstruturacao(){
   });
   const adocaoConsultorPct = Object.entries(areaPorConsultorEstr).map(([c,v])=>[c, Math.round(v*10)/10]).sort((a,b)=>b[1]-a[1]);
 
-  const tipos = ['Faixa','Lado a lado'];
+  const tipos = ['Faixa','Lado a lado','Área total','—'];
   const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
   const tipoEstado = {};
   tipos.forEach(tp=> tipoEstado[tp] = {});
   comTeste.forEach(r=>{
     const uf = (r.estado||'').toUpperCase();
-    tipoEstado[r.estr_tipo_teste][uf] = (tipoEstado[r.estr_tipo_teste][uf]||0) + Number(r.estr_area_projeto);
+    const tipo = tipos.includes(r.estr_tipo_teste) ? r.estr_tipo_teste : '—';
+    tipoEstado[tipo][uf] = (tipoEstado[tipo][uf]||0) + Number(r.estr_area_projeto);
   });
 
   const areaProjetoPorEstado = {};
   comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaProjetoPorEstado[uf]=(areaProjetoPorEstado[uf]||0)+Number(r.estr_area_projeto); });
   const areaProjetoTotal = Object.values(areaProjetoPorEstado).reduce((a,b)=>a+b,0);
+  const areaProjetoTotalSimples = base.filter(r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0).reduce((a,r)=>a+Number(r.estr_area_projeto),0);
 
   const oportunidadePorEstado = {};
   oportunidade.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; oportunidadePorEstado[uf]=(oportunidadePorEstado[uf]||0)+Number(r.estr_acamamento); });
@@ -7041,12 +7051,15 @@ function renderEstruturacao(){
     .estr-map-card path:hover{filter:brightness(1.18) saturate(1.15);transform:scale(1.015);stroke:#5c2410;stroke-width:1.6;}
     .estr-mapa-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
     .estr-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .estr-produto-filtros{display:flex;gap:6px;margin-bottom:8px;}
+    .estr-produto-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;font-size:10px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .estr-produto-pill.active{background:#6b7a3f;color:#fff;border-color:#6b7a3f;}
     .estr-mapa-pill.active{background:#5c2410;color:#fff;border-color:#5c2410;}
     @media (max-width:1100px){ .estr-layout{grid-template-columns:1fr;} .estr-map-card{grid-column:1;} .estr-chart-grid{grid-column:1;grid-template-columns:repeat(2,1fr);} .estr-kpis{grid-template-columns:repeat(2,1fr);} }
   </style>
 
   <div class="estr-kpis">
-    <div class="estr-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
+    <div class="estr-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotalSimples.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Área do projeto &gt; 0)</div></div>
     <div class="estr-kpi" style="animation-delay:.06s"><div class="v">${qtdEstadosTeste}</div><div class="l">Estados com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/24)*1000)/10}% da meta (24)</div></div>
@@ -7072,7 +7085,12 @@ function renderEstruturacao(){
       </div>
       <div class="estr-card" style="animation-delay:.14s;">
         <h3>🧪 Área tratada por Produto</h3>
-        <p class="sub-sm">Área do talhão, por Nome do produto</p>
+        <p class="sub-sm">Área do projeto, por Nome do produto</p>
+        <div class="estr-produto-filtros">
+          <button class="estr-produto-pill ${(state.estrProdutoFiltro||'todos')==='todos'?'active':''}" data-produto-filtro="todos">Todos</button>
+          <button class="estr-produto-pill ${state.estrProdutoFiltro==='consultoria'?'active':''}" data-produto-filtro="consultoria">Consultoria</button>
+          <button class="estr-produto-pill ${state.estrProdutoFiltro==='projeto'?'active':''}" data-produto-filtro="projeto">Projeto</button>
+        </div>
         <canvas id="estrAreaProduto"></canvas>
       </div>
       <div class="estr-card" style="animation-delay:.18s;">
@@ -7140,6 +7158,12 @@ function renderEstruturacao(){
   container.querySelectorAll('.estr-mapa-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.estruturacaoMapModo = btn.dataset.mapaModo;
+      renderEstruturacao();
+    });
+  });
+  container.querySelectorAll('.estr-produto-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.estrProdutoFiltro = btn.dataset.produtoFiltro;
       renderEstruturacao();
     });
   });
@@ -7212,11 +7236,20 @@ function renderEstruturacao(){
 
   const canvasEstrAreaProduto = container.querySelector('#estrAreaProduto');
   if(canvasEstrAreaProduto){
-    const entradas = Object.entries(areaPorProduto).sort((a,b)=>b[1]-a[1]);
+    const filtroProduto = state.estrProdutoFiltro || 'todos';
+    const datasets = [];
+    if(filtroProduto==='todos' || filtroProduto==='consultoria'){
+      datasets.push({ label:'Consultoria', data: produtosOrdenados.map(p=>Math.round((areaProdutoConsultoria[p]||0)*10)/10), backgroundColor:'#c9a86b', hoverBackgroundColor:'#d9bd85', borderRadius:4, stack:'s' });
+    }
+    if(filtroProduto==='todos' || filtroProduto==='projeto'){
+      datasets.push({ label:'Projeto', data: produtosOrdenados.map(p=>Math.round((areaProdutoProjeto[p]||0)*10)/10), backgroundColor:'#a4432a', hoverBackgroundColor:'#bc5a3f', borderRadius:4, stack:'s' });
+    }
     estruturacaoCharts.areaProduto = new Chart(canvasEstrAreaProduto.getContext('2d'), {
       type:'bar',
-      data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:'#a4432a', hoverBackgroundColor:'#bc5a3f', borderRadius:4 }] },
-      options:{ responsive:true, indexAxis:'y', animation:CHART_ANIMACAO_ESTR, plugins:{legend:{display:false}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...estrDataLabelBase, display:true, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}}, scales:{ x:{beginAtZero:true} } }
+      data:{ labels: produtosOrdenados, datasets },
+      options:{ responsive:true, indexAxis:'y', animation:CHART_ANIMACAO_ESTR,
+        plugins:{legend:{display: filtroProduto==='todos'}, tooltip:estrTooltip({callbacks:{label:c=>` ${c.dataset.label}: ${c.formattedValue} ha`}}), datalabels:{color:'#fff', font:{size:9.5,weight:'700'}, anchor:'center', align:'center', display:v=>v.dataset.data[v.dataIndex]>0, formatter:v=>v>0?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):''}},
+        scales:{ x:{beginAtZero:true, stacked:true}, y:{stacked:true} } }
     });
   }
 
