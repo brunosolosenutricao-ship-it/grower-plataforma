@@ -8797,24 +8797,15 @@ function renderVidaNoSolo(){
   const base = byPais(RECORDS);
   const VNS_SIM_CAMPOS = ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado','vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia','vns_morte_plantas'];
   const comQualquerDado = base.filter(r=> r.vns_area_projeto!=null || VNS_SIM_CAMPOS.some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico);
-  const comTeste = base.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
+  const comTeste = base.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado' || r.vns_tipo_teste==='Área total') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
   const comPonto = base.filter(r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 && r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
   const NEMA_CAMPOS = ['vns_nema_lesoes','vns_nema_galhas','vns_nema_cisto','vns_nema_reniforme','vns_nema_espiralado'];
   const DOENCA_CAMPOS = ['vns_doenca_fusarium','vns_doenca_macrophomina','vns_doenca_mofo_branco','vns_doenca_rhizoctonia']; // morte de plantas fica de fora por enquanto
   const tabelaTalhoesVns = base.filter(r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0)
     .sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
-  const STATUS_COMPRA_OPCOES = [
-    { valor:'Comprado', cor:'#2ecc71' },
-    { valor:'Não comprado', cor:'#e74c3c' },
-    { valor:'Em negociação', cor:'#f1c40f' },
-    { valor:null, label:'Sem status', cor:'#9aa08e' },
-  ];
-  const areaPorStatusCompra = STATUS_COMPRA_OPCOES.map(o=> ({
-    ...o,
-    area: tabelaTalhoesVns.filter(r=> (r.vns_status_compra||null)===o.valor).reduce((a,r)=>a+(r.area||0),0),
-    qtd: tabelaTalhoesVns.filter(r=> (r.vns_status_compra||null)===o.valor).length,
-  }));
-
+  if(!state.vnsStatusCompraFiltro) state.vnsStatusCompraFiltro = new Set();
+  const filtroStatusVns = state.vnsStatusCompraFiltro;
+  const tabelaTalhoesVnsFiltrada = filtroStatusVns.size===0 ? tabelaTalhoesVns : tabelaTalhoesVns.filter(r=> filtroStatusVns.has(r.vns_status_compra||null));
   const NEMA_LABELS = { vns_nema_lesoes:'Lesões radiculares', vns_nema_galhas:'Galhas', vns_nema_cisto:'Cisto', vns_nema_reniforme:'Reniforme', vns_nema_espiralado:'Espiralado' };
   const DOENCA_LABELS = { vns_doenca_fusarium:'Fusarium', vns_doenca_macrophomina:'Macrophomina', vns_doenca_mofo_branco:'Mofo Branco', vns_doenca_rhizoctonia:'Rhizoctonia' };
   const areaPorNematoide = Object.entries(NEMA_LABELS).map(([campo,label])=>({
@@ -8844,8 +8835,20 @@ function renderVidaNoSolo(){
     (filtroConsultorVns==='Todos' || r.consultor===filtroConsultorVns)
   );
   const comQualquerDadoMapa = baseMapaVns.filter(r=> r.vns_area_projeto!=null || VNS_SIM_CAMPOS.some(c=>r[c]!=null) || r.vns_nematicida_biologico || r.vns_fungicida_biologico || r.vns_fungicida_quimico || r.vns_nematicida_quimico);
-  const comTesteMapa = baseMapaVns.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
+  const comTesteMapa = baseMapaVns.filter(r=> (r.vns_tipo_teste==='Faixa' || r.vns_tipo_teste==='Lado a lado' || r.vns_tipo_teste==='Área total') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0);
   const comPontoMapa = baseMapaVns.filter(r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 && r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
+
+  const STATUS_COMPRA_OPCOES = [
+    { valor:'Comprado', cor:'#2ecc71' },
+    { valor:'Não comprado', cor:'#e74c3c' },
+    { valor:'Em negociação', cor:'#f1c40f' },
+    { valor:null, label:'Sem status', cor:'#9aa08e' },
+  ];
+  const areaPorStatusCompra = STATUS_COMPRA_OPCOES.map(o=> ({
+    ...o,
+    area: comTesteMapa.filter(r=> (r.vns_status_compra||null)===o.valor).reduce((a,r)=>a+(Number(r.vns_area_projeto)||0),0),
+    qtd: comTesteMapa.filter(r=> (r.vns_status_compra||null)===o.valor).length,
+  }));
 
   const areaProjetoPorEstado = {};
   comTesteMapa.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaProjetoPorEstado[uf]=(areaProjetoPorEstado[uf]||0)+Number(r.vns_area_projeto); });
@@ -8870,13 +8873,16 @@ function renderVidaNoSolo(){
   const modoAtivo = state.vidaNoSoloMapModo;
   const { valores: mapaValores, unidade: mapaUnidade, tipo: mapaTipo } = calcularMapaPorModo(modoAtivo);
 
-  const areaPorNematBiol = {}, areaPorFungBiol = {}, areaPorFungQuim = {}, areaPorNematQuim = {};
-  comQualquerDado.forEach(r=>{
+  // área total de Soja de TODOS os clientes/consultores (ignora filtro de País/Cliente/Consultor do dashboard)
+  const areaSojaTotalGeral = RECORDS.filter(r=> r.cultura==='Soja').reduce((a,r)=>a+(r.area||0),0);
+  const areaPorNematBiol = {}, areaPorFungBiol = {}, areaPorFungQuim = {}, areaPorNematQuim = {};  comQualquerDado.forEach(r=>{
     if(r.vns_nematicida_biologico) areaPorNematBiol[r.vns_nematicida_biologico] = (areaPorNematBiol[r.vns_nematicida_biologico]||0)+(r.area||0);
     if(r.vns_fungicida_biologico) areaPorFungBiol[r.vns_fungicida_biologico] = (areaPorFungBiol[r.vns_fungicida_biologico]||0)+(r.area||0);
     if(r.vns_fungicida_quimico) areaPorFungQuim[r.vns_fungicida_quimico] = (areaPorFungQuim[r.vns_fungicida_quimico]||0)+(r.area||0);
     if(r.vns_nematicida_quimico) areaPorNematQuim[r.vns_nematicida_quimico] = (areaPorNematQuim[r.vns_nematicida_quimico]||0)+(r.area||0);
   });
+  const pctAdocaoNematBiol = areaSojaTotalGeral>0 ? (Object.values(areaPorNematBiol).reduce((a,b)=>a+b,0)/areaSojaTotalGeral*100) : 0;
+  const pctAdocaoFungBiol = areaSojaTotalGeral>0 ? (Object.values(areaPorFungBiol).reduce((a,b)=>a+b,0)/areaSojaTotalGeral*100) : 0;
 
   const tipos = ['Faixa','Lado a lado','Área total'];
   const estadosComTeste = [...new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean))].sort();
@@ -8907,7 +8913,14 @@ function renderVidaNoSolo(){
     .vns-card canvas{flex:1;min-height:0;width:100% !important;}
     .vns-card-wrap{position:relative;flex:1;min-height:0;}
     .vns-status-compra-pills{display:flex;gap:12px;flex-wrap:wrap;}
-    .vns-status-compra-pill{display:flex;align-items:center;gap:10px;border:1.5px solid;border-radius:999px;padding:8px 18px;background:var(--paper);}
+    .vns-status-compra-pill{display:flex;align-items:center;gap:10px;border:1.5px solid;border-radius:999px;padding:8px 18px;background:var(--paper);cursor:pointer;transition:.15s;}
+    .vns-status-compra-pill:hover{transform:translateY(-1px);}
+    .vns-status-compra-pill.ativo{box-shadow:0 0 0 2px currentColor inset;}
+    .vns-soja-kpi{font-size:10.5px;color:var(--ink-soft);background:var(--bg);border-radius:6px;padding:4px 8px;margin-bottom:6px;}
+    .vns-soja-kpi b{color:var(--ink);}
+    .vns-adocao-classe{text-align:center;margin-bottom:6px;}
+    .vns-adocao-classe .v{font-size:28px;font-weight:800;color:#2d4a1f;line-height:1;}
+    .vns-adocao-classe .l{font-size:9.5px;color:var(--ink-soft);margin-top:2px;}
     .vns-status-compra-pill .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
     .vns-status-compra-pill .v{font-size:14px;font-weight:700;color:var(--ink);}
     .vns-status-compra-pill .l{font-size:9.5px;color:var(--ink-soft);}
@@ -8964,7 +8977,7 @@ function renderVidaNoSolo(){
     <div class="vns-chart-grid">
       <div class="vns-card" style="animation-delay:.1s;">
         <h3>🥧 Área de projeto por Estado</h3>
-        <p class="sub-sm">Só Faixa / Lado a lado — clique numa fatia pra detalhar</p>
+        <p class="sub-sm">Faixa / Lado a lado / Área total — clique numa fatia pra detalhar</p>
         <div class="vns-card-wrap"><canvas id="vnsPieEstado"></canvas></div>
       </div>
       <div class="vns-card" style="animation-delay:.14s;">
@@ -8974,12 +8987,16 @@ function renderVidaNoSolo(){
       </div>
       <div class="vns-card" style="animation-delay:.18s;">
         <h3>🧪 Nematicida biológico</h3>
-        <p class="sub-sm">Área tratada, por produto</p>
+        <p class="sub-sm">Área tratada, por produto · % em relação à área de Soja no tooltip</p>
+        <div class="vns-soja-kpi">🌱 Área total de Soja (todos os clientes): <b>${areaSojaTotalGeral.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</b></div>
+        <div class="vns-adocao-classe"><div class="v">${pctAdocaoNematBiol.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</div><div class="l">Adoção da classe na consultoria</div></div>
         <div class="vns-card-wrap"><canvas id="vnsNematBiol"></canvas></div>
       </div>
       <div class="vns-card" style="animation-delay:.22s;">
         <h3>🧪 Fungicida biológico</h3>
-        <p class="sub-sm">Área tratada, por produto</p>
+        <p class="sub-sm">Área tratada, por produto · % em relação à área de Soja no tooltip</p>
+        <div class="vns-soja-kpi">🌱 Área total de Soja (todos os clientes): <b>${areaSojaTotalGeral.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</b></div>
+        <div class="vns-adocao-classe"><div class="v">${pctAdocaoFungBiol.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</div><div class="l">Adoção da classe na consultoria</div></div>
         <div class="vns-card-wrap"><canvas id="vnsFungBiol"></canvas></div>
       </div>
       <div class="vns-card" style="animation-delay:.26s;">
@@ -8996,22 +9013,26 @@ function renderVidaNoSolo(){
 
     <div class="vns-card full-card" style="margin-top:12px;">
       <h3>🟢 Área por Status de compra</h3>
-      <p class="sub-sm">Soma da área do talhão, entre os que participam do projeto (Área do projeto &gt; 0)</p>
+      <p class="sub-sm">Soma da Área do projeto (Faixa/Lado a lado/Área total) — mesmo escopo do "ha de projeto" no topo. Clique pra filtrar a tabela abaixo (pode marcar mais de um).</p>
       <div class="vns-status-compra-pills">
-        ${areaPorStatusCompra.map(o=>`
-          <div class="vns-status-compra-pill" style="border-color:${o.cor};">
+        ${areaPorStatusCompra.map(o=>{
+          const valorAttr = o.valor===null ? '__null__' : encodeURIComponent(o.valor);
+          const ativo = filtroStatusVns.has(o.valor);
+          return `
+          <div class="vns-status-compra-pill ${ativo?'ativo':''}" style="border-color:${o.cor};${ativo?`background:${o.cor}22;`:''}" data-status-valor="${valorAttr}">
             <span class="dot" style="background:${o.cor};"></span>
             <div>
               <div class="v">${o.area.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</div>
               <div class="l">${o.label||o.valor} · ${o.qtd} talhão(ões)</div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>
 
     <div class="vns-card full-card" style="margin-top:12px;">
       <h3>📋 Talhões do projeto</h3>
-      <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVns.length} no total</p>
+      <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
       <div class="table-scroll vns-tabela-limitada">
         <table>
           <thead><tr>
@@ -9024,7 +9045,7 @@ function renderVidaNoSolo(){
             ${VNS_ETAPAS.map(()=>`<th>Status</th><th>Data</th>`).join('')}
           </tr></thead>
           <tbody>
-            ${tabelaTalhoesVns.map(r=>{
+            ${tabelaTalhoesVnsFiltrada.map(r=>{
               const temNema = NEMA_CAMPOS.some(c=>r[c]==='Sim');
               const temDoenca = DOENCA_CAMPOS.some(c=>r[c]==='Sim');
               const participa = r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0;
@@ -9034,12 +9055,7 @@ function renderVidaNoSolo(){
                 <td><span style="color:${temNema?'#e74c3c':'var(--ink-soft)'};font-weight:${temNema?'700':'400'};">${temNema?'Sim':'Não'}</span></td>
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
-                <td><select class="cell-input vns-status-compra-input" data-vns-talhao-id="${r.id}">
-                  <option value="" ${!r.vns_status_compra?'selected':''}>—</option>
-                  <option value="Comprado" ${r.vns_status_compra==='Comprado'?'selected':''}>Comprado</option>
-                  <option value="Não comprado" ${r.vns_status_compra==='Não comprado'?'selected':''}>Não comprado</option>
-                  <option value="Em negociação" ${r.vns_status_compra==='Em negociação'?'selected':''}>Em negociação</option>
-                </select></td>
+                <td><span style="color:${r.vns_status_compra==='Comprado'?'#2ecc71':r.vns_status_compra==='Não comprado'?'#e74c3c':r.vns_status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)'};font-weight:700;">${r.vns_status_compra||'—'}</span></td>
                 ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" value="${r['vns_'+e.key+'_data']||''}"></td>`).join('')}
                 <td style="white-space:nowrap;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
@@ -9091,9 +9107,13 @@ function renderVidaNoSolo(){
     criarMapaCoropleticoLeaflet('vnsLeafletMap', mapaValores, { unidade: mapaUnidade });
   }
 
-  container.querySelectorAll('.vns-status-compra-input').forEach(el=>{
-    el.addEventListener('change', ()=>{
-      salvarStatusCompraVns(el.dataset.vnsTalhaoId, el.value || null, el);
+  container.querySelectorAll('.vns-status-compra-pill').forEach(pill=>{
+    pill.addEventListener('click', ()=>{
+      const attr = pill.dataset.statusValor;
+      const valor = attr==='__null__' ? null : decodeURIComponent(attr);
+      if(state.vnsStatusCompraFiltro.has(valor)) state.vnsStatusCompraFiltro.delete(valor);
+      else state.vnsStatusCompraFiltro.add(valor);
+      renderVidaNoSolo();
     });
   });
   container.querySelectorAll('.vns-etapa-input').forEach(el=>{
@@ -9105,11 +9125,9 @@ function renderVidaNoSolo(){
     btn.addEventListener('click', async ()=>{
       const talhaoId = btn.dataset.vnsTalhaoId;
       const msgEl = container.querySelector(`.vns-linha-msg[data-vns-msg-id="${talhaoId}"]`);
-      // lê tudo que está na tela pra essa linha (status de compra + as 6 etapas), inclusive
-      // valores que a pessoa não mexeu, garantindo que o botão salva exatamente o que está visível
-      const entry = {};
-      const selCompra = container.querySelector(`.vns-status-compra-input[data-vns-talhao-id="${talhaoId}"]`);
-      entry.status_compra = selCompra ? (selCompra.value || null) : null;
+      const recLinha = RECORDS.find(r=>r.id===talhaoId) || SEM_AREA.find(r=>r.id===talhaoId);
+      // Status de compra não é mais editável aqui — só na Alimentação; aqui só reforça o valor que já está lá
+      const entry = { status_compra: recLinha ? (recLinha.vns_status_compra || null) : null };
       container.querySelectorAll(`.vns-etapa-input[data-vns-talhao-id="${talhaoId}"]`).forEach(el=>{
         entry[el.dataset.vnsCampo] = el.value || null;
       });
@@ -9173,7 +9191,7 @@ function renderVidaNoSolo(){
     });
   }
 
-  function montarBarraProduto(id, mapaArea, cor, destaque){
+  function montarBarraProduto(id, mapaArea, cor, destaque, areaSojaRef){
     const canvas = container.querySelector('#'+id);
     if(!canvas) return;
     const entradas = Object.entries(mapaArea).sort((a,b)=>b[1]-a[1]);
@@ -9182,12 +9200,17 @@ function renderVidaNoSolo(){
       type:'bar',
       data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'ha', data: entradas.map(e=>Math.round(e[1]*10)/10), backgroundColor:cores, borderRadius:4 }] },
       options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:CHART_ANIMACAO_VNS,
-        plugins:{legend:{display:false}, tooltip:vnsTooltip({callbacks:{label:c=>` ${c.formattedValue} ha`}}), datalabels:{...vnsDataLabelBase, display:true, font:{size:8.5,weight:'700'}, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}},
+        plugins:{legend:{display:false}, tooltip:vnsTooltip({callbacks:{label:c=>{
+          const base = ` ${c.formattedValue} ha`;
+          if(!areaSojaRef) return base;
+          const pct = areaSojaRef>0 ? (c.parsed.x/areaSojaRef*100) : 0;
+          return `${base} (${pct.toLocaleString('pt-BR',{maximumFractionDigits:1})}% da área de Soja)`;
+        }}}), datalabels:{...vnsDataLabelBase, display:true, font:{size:8.5,weight:'700'}, formatter:v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1})}},
         scales:{ x:{beginAtZero:true}, y:{ticks:{font:{size:9}}} } }
     });
   }
-  montarBarraProduto('vnsNematBiol', areaPorNematBiol, '#5c7a3f', 'NemaControl');
-  montarBarraProduto('vnsFungBiol', areaPorFungBiol, '#2c4a7a', 'EficazControl');
+  montarBarraProduto('vnsNematBiol', areaPorNematBiol, '#5c7a3f', 'NemaControl', areaSojaTotalGeral);
+  montarBarraProduto('vnsFungBiol', areaPorFungBiol, '#2c4a7a', 'EficazControl', areaSojaTotalGeral);
   montarBarraProduto('vnsFungQuim', areaPorFungQuim, '#8a5a4a');
   montarBarraProduto('vnsNematQuim', areaPorNematQuim, '#6b3f7a');
 
