@@ -175,6 +175,8 @@
   .sinaleiro-input{width:50px;}
   .sinaleiro-dot{width:14px;height:14px;min-width:14px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.18);box-shadow:0 0 0 1px rgba(255,255,255,.4) inset;flex-shrink:0;}
   .row-save{padding:5px 10px;font-size:11.5px;border-radius:6px;border:1px solid var(--green-deep);background:var(--green-deep);color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .row-edit-btn{padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-family:inherit;}
+  .row-edit-btn:hover{background:var(--bg);}
   .row-save:hover{background:var(--green);}
   .row-save.saved{background:var(--lime);border-color:var(--lime);color:var(--green-deep);}
   .row-save.erro{background:var(--red);border-color:var(--red);}
@@ -1607,7 +1609,7 @@ function renderAlimentacaoTable(){
               </select></td>
               ${geralCamposVisiveis.map(c=> c.__placeholder ? `<td class="col-oculta">···</td>` : `<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
               ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
-              <td><button class="row-save">Salvar</button></td>
+              <td><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
@@ -1677,6 +1679,10 @@ function renderAlimentacaoTable(){
   }
 
   area.querySelectorAll('.row-save').forEach(btn=> btn.addEventListener('click', ()=> salvarLinha(btn)));
+  area.querySelectorAll('.row-edit-btn').forEach(btn=> btn.addEventListener('click', ()=>{
+    const t = pageRows.find(r=>r.id===btn.dataset.talhaoId);
+    if(t) abrirPainelEditarTalhao(t);
+  }));
 
   area.querySelectorAll('[data-msbtn]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
@@ -2327,7 +2333,169 @@ async function salvarNovoTalhaoRapido(clientesConhecidos, renderPainel){
   document.getElementById('ftFazenda').focus();
 }
 
-/* ===================== IMPORTAÇÃO EM MASSA (ADMIN) ===================== */
+/* ===================== EDITAR TALHÃO (mesmo modal, pré-preenchido, salva como UPDATE) ===================== */
+function abrirPainelEditarTalhao(t){
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="editTalhaoOverlay">
+    <div class="modal-panel" style="max-width:520px;">
+      <h2>Editar talhão · ${t.cliente} / ${t.fazenda} / ${t.talhao}</h2>
+      <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Altere ou apague qualquer campo. A linha do talhão continua existindo mesmo se você limpar um campo — excluir o talhão inteiro só é feito pelo Excel, por enquanto.</p>
+
+      <div class="form-grid">
+        <div class="form-section-label">Cadastro mestre</div>
+        <div><label>Cliente *</label><input type="text" id="ftCliente" value="${t.cliente||''}"></div>
+        <div><label>Estado</label><input type="text" id="ftEstado" maxlength="2" value="${t.estado||''}"></div>
+        <div><label>Cidade</label><input type="text" id="ftCidade" value="${t.cidade||''}"></div>
+        <div><label>Fazenda *</label><input type="text" id="ftFazenda" value="${t.fazenda||''}"></div>
+        <div><label>Talhão *</label><input type="text" id="ftTalhao" value="${t.talhao||''}"></div>
+        <div><label>Área (ha)</label><input type="text" inputmode="decimal" id="ftArea" value="${t.area_ha!=null?String(t.area_ha).replace('.',','):''}"></div>
+        <div><label>Cultura</label><select id="ftCultura">
+          ${CULTURA_OPTIONS.map(c=>`<option value="${c}" ${t.cultura===c?'selected':''}>${c}</option>`).join('')}
+        </select></div>
+
+        <div class="form-section-label">Geral (Cadastro)</div>
+        ${GERAL_CAMPOS.map(c=>{
+          const inputId = 'ft_'+c.key;
+          const valor = t[c.key];
+          if(c.type==='calc' || c.type==='calc-sinaleiro' || c.type==='mirror' || c.type==='mirror-sinaleiro'){
+            return ''; // calculados/espelhados, não editáveis diretamente aqui
+          }
+          if(c.type==='select'){
+            return `<div><label>${c.label}</label><select id="${inputId}">
+              <option value="">—</option>
+              ${c.options.map(o=>`<option value="${o}" ${valor===o?'selected':''}>${o}</option>`).join('')}
+            </select></div>`;
+          }
+          if(c.type==='sinaleiro'){
+            return `<div><label>${c.label}</label>
+              <div class="sinaleiro-wrap">
+                <input type="text" inputmode="decimal" id="${inputId}" value="${valor??''}" oninput="atualizarSinaleiroDot(this)">
+                <span class="sinaleiro-dot" style="background:${sinaleiroColor(valor)}"></span>
+              </div>
+            </div>`;
+          }
+          if(c.type==='date'){
+            return `<div><label>${c.label}</label><input type="date" id="${inputId}" value="${valor||''}"></div>`;
+          }
+          const inputMode = c.type==='number' ? 'decimal' : 'text';
+          const valorExibido = c.type==='number' && valor!=null ? String(valor).replace('.',',') : (valor??'');
+          return `<div><label>${c.label}</label><input type="text" inputmode="${inputMode}" id="${inputId}" value="${valorExibido}"></div>`;
+        }).join('')}
+
+        ${PROJETOS_CONFIG.map(proj=>`
+          <div class="form-section-label">${proj.badge}</div>
+          ${proj.campos.map(c=>{
+            const inputId = 'ft_'+c.key;
+            const valor = t[c.key];
+            if(c.type==='mirror' || c.type==='mirror-sinaleiro'){
+              return ''; // vive no Geral, já editável acima
+            }
+            if(c.type==='select'){
+              return `<div><label>${c.label}</label><select id="${inputId}">
+                <option value="">—</option>
+                ${c.options.map(o=>`<option value="${o}" ${valor===o?'selected':''}>${o}</option>`).join('')}
+              </select></div>`;
+            }
+            if(c.type==='sinaleiro'){
+              return `<div><label>${c.label}</label>
+                <div class="sinaleiro-wrap">
+                  <input type="text" inputmode="decimal" id="${inputId}" value="${valor??''}" oninput="atualizarSinaleiroDot(this)">
+                  <span class="sinaleiro-dot" style="background:${sinaleiroColor(valor)}"></span>
+                </div>
+              </div>`;
+            }
+            const inputMode = c.type==='number' ? 'decimal' : 'text';
+            const valorExibido = c.type==='number' && valor!=null ? String(valor).replace('.',',') : (valor??'');
+            return `<div><label>${c.label}</label><input type="text" inputmode="${inputMode}" id="${inputId}" value="${valorExibido}"></div>`;
+          }).join('')}
+        `).join('')}
+      </div>
+
+      <div class="form-msg" id="ftMsg"></div>
+
+      <div class="modal-actions">
+        <button class="btn ghost" id="ftCancelBtn">Fechar</button>
+        <button class="btn" id="ftSalvarBtn">Salvar alterações</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('ftCancelBtn').addEventListener('click', ()=>{ modalRoot.innerHTML=''; loadAlimentacao(); });
+  document.getElementById('editTalhaoOverlay').addEventListener('click', (e)=>{ if(e.target.id==='editTalhaoOverlay'){ modalRoot.innerHTML=''; loadAlimentacao(); } });
+  document.getElementById('ftSalvarBtn').addEventListener('click', ()=> salvarEdicaoTalhao(t.id));
+}
+
+async function salvarEdicaoTalhao(talhaoId){
+  const msg = document.getElementById('ftMsg');
+  msg.className = 'form-msg'; msg.textContent = '';
+
+  const cliente = document.getElementById('ftCliente').value.trim();
+  const estado = document.getElementById('ftEstado').value.trim() || null;
+  const cidade = document.getElementById('ftCidade').value.trim() || null;
+  const fazenda = document.getElementById('ftFazenda').value.trim();
+  const talhao = document.getElementById('ftTalhao').value.trim();
+  const area_ha = parseNum(document.getElementById('ftArea').value);
+  const cultura = document.getElementById('ftCultura').value;
+
+  if(!cliente || !fazenda || !talhao){
+    msg.className = 'form-msg erro'; msg.textContent = 'Cliente, Fazenda e Talhão não podem ficar vazios.';
+    return;
+  }
+
+  const btn = document.getElementById('ftSalvarBtn');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+
+  const { error: errUpd } = await sb.from('talhoes').update({
+    cliente, estado, cidade, fazenda, talhao, area_ha, cultura,
+  }).eq('id', talhaoId);
+
+  if(errUpd){
+    btn.disabled = false; btn.textContent = 'Salvar alterações';
+    msg.className = 'form-msg erro';
+    msg.textContent = errUpd.message.includes('duplicate') || errUpd.code === '23505'
+      ? 'Já existe outro talhão com esse Cliente + Fazenda + Talhão pra esse consultor.'
+      : 'Erro ao salvar: ' + errUpd.message;
+    return;
+  }
+
+  const { data: { user } } = await sb.auth.getUser();
+
+  // Geral (Cadastro) — colunas reais na tabela talhoes
+  const geralUpdate = {};
+  GERAL_CAMPOS.forEach(c=>{
+    if(c.type==='calc' || c.type==='calc-sinaleiro' || c.type==='mirror' || c.type==='mirror-sinaleiro') return;
+    const el = document.getElementById('ft_'+c.key);
+    if(el) geralUpdate[c.key] = c.type==='number' ? parseNum(el.value) : (el.value || null);
+  });
+  if(Object.keys(geralUpdate).length){
+    await sb.from('talhoes').update(geralUpdate).eq('id', talhaoId);
+  }
+
+  for(const proj of PROJETOS_CONFIG){
+    // busca o jsonb já existente pra mesclar — sem isso, campos de Acompanhamento (etapas, status de
+    // compra, avaliações etc, que não fazem parte deste formulário) seriam apagados sem querer
+    const { data: existente } = await sb.from('dados_projeto')
+      .select('dados').eq('talhao_id', talhaoId).eq('projeto_id', projetosIds[proj.slug]).maybeSingle();
+    const dados = { ...(existente ? existente.dados : {}) };
+    proj.campos.forEach(c=>{
+      if(c.type==='mirror' || c.type==='mirror-sinaleiro') return; // vive no Geral, já gravado acima
+      const el = document.getElementById('ft_'+c.key);
+      if(el) dados[c.key] = c.type==='number' ? parseNum(el.value) : (el.value || null);
+    });
+    await sb.from('dados_projeto').upsert({
+      talhao_id: talhaoId, projeto_id: projetosIds[proj.slug], dados,
+      updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+    }, { onConflict: 'talhao_id,projeto_id' });
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar alterações';
+  msg.className = 'form-msg ok';
+  msg.textContent = `✅ Talhão "${talhao}" atualizado com sucesso.`;
+  setTimeout(()=>{ document.getElementById('modalRoot').innerHTML=''; loadAlimentacao(); }, 900);
+}
+
+
 document.getElementById('massImportBtn').addEventListener('click', ()=> document.getElementById('massImportFileInput').click());
 document.getElementById('massImportFileInput').addEventListener('change', (e)=>{
   if(e.target.files[0]) processarImportacaoMassa(e.target.files[0]);
