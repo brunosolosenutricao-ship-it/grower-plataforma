@@ -1492,6 +1492,7 @@ function renderAlimentacaoTable(){
     }
     if(campo.type==='select'){
       return `<select class="cell-input" data-field="${campo.key}">
+        <option value="" ${!valor?'selected':''}>—</option>
         ${campo.options.map(o=>`<option value="${o}" ${valor===o?'selected':''}>${o}</option>`).join('')}
       </select>`;
     }
@@ -2205,6 +2206,7 @@ async function abrirPainelAddTalhao(){
               }
               if(c.type==='select'){
                 return `<div><label>${c.label}</label><select id="${inputId}">
+                  <option value="">—</option>
                   ${c.options.map(o=>`<option value="${o}">${o}</option>`).join('')}
                 </select></div>`;
               }
@@ -7009,7 +7011,9 @@ function renderEstruturacao(){
   const qtdEstadosTeste = new Set(comTeste.map(r=>(r.estado||'').toUpperCase()).filter(Boolean)).size;
   const qtdFazendasTeste = new Set(comTeste.map(r=>`${r.cliente}||${r.fazenda}`)).size;
   const qtdProdutoresTeste = new Set(comTeste.map(r=>r.cliente)).size;
-  const pctAdocaoGeral = comUsoInfo.length ? Math.round((comUsoInfo.filter(r=>r.estr_uso_tecnologia==='Sim').length / comUsoInfo.length) * 1000)/10 : 0;
+  const areaSojaTotalGeralEstr = RECORDS.filter(r=> r.cultura==='Soja').reduce((a,r)=>a+(r.area||0),0);
+  const areaSojaComSimEstr = RECORDS.filter(r=> r.cultura==='Soja' && r.estr_uso_tecnologia==='Sim').reduce((a,r)=>a+(r.area||0),0);
+  const pctAdocaoGeral = areaSojaTotalGeralEstr>0 ? Math.round((areaSojaComSimEstr / areaSojaTotalGeralEstr) * 1000)/10 : 0;
 
   const CORES_ESTADO_ESTR = ['#a4432a','#6b7a3f','#a68a2e','#7a5b3f','#8a5a4a','#5b7a5f','#9a6c3f','#7a4a3a','#6b8a9f','#a4823a'];
   const coresPorEstadoEstr = {}; estadosComTeste.forEach((uf,i)=> coresPorEstadoEstr[uf]=CORES_ESTADO_ESTR[i%CORES_ESTADO_ESTR.length]);
@@ -7046,7 +7050,7 @@ function renderEstruturacao(){
     <div class="estr-kpi" style="animation-delay:.06s"><div class="v">${qtdEstadosTeste}</div><div class="l">Estados com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/24)*1000)/10}% da meta (24)</div></div>
-    <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia</div></div>
+    <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia (área de Soja, todos os consultores)</div></div>
   </div>
 
   <div class="estr-layout">
