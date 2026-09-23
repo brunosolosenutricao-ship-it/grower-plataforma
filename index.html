@@ -2629,14 +2629,18 @@ const EXECUCAO_OPTIONS = ['Pendente','Feito'];
 const ESTR_ETAPAS = [
   { key:'altura_v4', label:'Altura V4' },
   { key:'foto_v4', label:'Foto V4' },
-  { key:'vagens_planta', label:'Número de vagens p/ planta' },
-  { key:'hastes_planta', label:'N de hastes p/ planta' },
-  { key:'nos_hastes', label:'N de nós (haste prin. e lateral)' },
-  { key:'distrib_vagens', label:'Distribuição de vagens por terço' },
-  { key:'fotos', label:'Fotos' },
+  { key:'ground_cover_v4', label:'Ground Cover V4' },
+  { key:'vagens_planta', label:'Número de vagens p/ planta', bloco:'R5/R6' },
+  { key:'hastes_planta', label:'N de hastes p/ planta', bloco:'R5/R6' },
+  { key:'nos_hastes', label:'N de nós (haste prin. e lateral)', bloco:'R5/R6' },
+  { key:'nos_produtivos_haste', label:'Número de nós produtivos na haste principal', bloco:'R5/R6' },
+  { key:'fotos', label:'Fotos', bloco:'R5/R6' },
+  { key:'ground_cover_r5r6', label:'Ground Cover R5/R6', bloco:'R5/R6' },
 ];
+const ESTR_TIPO_MATERIAL_OPTIONS = ['Precoce','Médio','Tardio'];
+const ESTR_STATUS_PLANTIO_OPTIONS = ['Plantado','Estimativa'];
 function getEstrAcompEntry(key){
-  const defaults = {};
+  const defaults = { ciclo: null, tipo_material: '', status_plantio: '' };
   ESTR_ETAPAS.forEach(e=>{ defaults[e.key+'_mes'] = null; defaults[e.key+'_exec'] = 'Pendente'; });
   const found = state.estrAcomp[key];
   return found ? {...defaults, ...found} : defaults;
@@ -3144,6 +3148,9 @@ async function carregarDadosDoSupabase(){
         estr_dose_padrao: destr.dose_padrao_fazenda_estr ?? null,
         estr_uso_tecnologia: destr.historico_uso_tecnologia_estr ?? null,
         estr_acamamento: destr.historico_acamamento_estr ?? null,
+        estr_acomp_ciclo: destr.ciclo_acomp ?? null,
+        estr_acomp_tipo_material: destr.tipo_material_acomp ?? null,
+        estr_acomp_status_plantio: destr.status_plantio_acomp ?? null,
         estr_acomp_altura_v4_mes: destr.acomp_altura_v4_mes ?? null,
         estr_acomp_altura_v4_exec: destr.acomp_altura_v4_exec ?? null,
         estr_acomp_foto_v4_mes: destr.acomp_foto_v4_mes ?? null,
@@ -3253,10 +3260,10 @@ async function carregarDadosDoSupabase(){
     state.talhoesSelecionados = new Set(); state.talhoesResumoOpen = false;
     state.estrAcomp = {};
     RECORDS.forEach(r=>{
-      const temAlgo = ESTR_ETAPAS.some(e=> r['estr_acomp_'+e.key+'_mes']!=null || r['estr_acomp_'+e.key+'_exec']!=null);
+      const temAlgo = r.estr_acomp_ciclo!=null || r.estr_acomp_tipo_material!=null || r.estr_acomp_status_plantio!=null || ESTR_ETAPAS.some(e=> r['estr_acomp_'+e.key+'_mes']!=null || r['estr_acomp_'+e.key+'_exec']!=null);
       if(!temAlgo) return;
       const key = cronogramaKey(r);
-      const entry = {};
+      const entry = { ciclo: r.estr_acomp_ciclo ?? null, tipo_material: r.estr_acomp_tipo_material || '', status_plantio: r.estr_acomp_status_plantio || '' };
       ESTR_ETAPAS.forEach(e=>{
         entry[e.key+'_mes'] = r['estr_acomp_'+e.key+'_mes'] || null;
         entry[e.key+'_exec'] = r['estr_acomp_'+e.key+'_exec'] || 'Pendente';
@@ -7122,12 +7129,26 @@ function renderEstruturacao(){
     <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Data de Plantio</th>
+          <th colspan="8"></th>
+          ${(()=>{
+            // agrupa etapas consecutivas do mesmo bloco numa única célula colspan; sem bloco = célula vazia por etapa
+            const grupos = [];
+            ESTR_ETAPAS.forEach(e=>{
+              const ultimo = grupos[grupos.length-1];
+              if(e.bloco && ultimo && ultimo.bloco===e.bloco) ultimo.qtd++;
+              else grupos.push({ bloco: e.bloco||null, qtd:1 });
+            });
+            return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:#6b7a3f;color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
+          })()}
+          <th></th>
+        </tr></thead>
+        <thead><tr>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Data de Plantio</th><th>Status do Plantio</th><th>Ciclo</th><th>Tipo de material</th>
           ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
           <th>Salvar</th>
         </tr></thead>
         <thead><tr>
-          <th></th><th></th><th></th><th></th><th></th>
+          <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
           ${ESTR_ETAPAS.map(()=>`<th>Mês</th><th>Execução</th>`).join('')}
           <th></th>
         </tr></thead>
@@ -7139,6 +7160,13 @@ function renderEstruturacao(){
               <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
               <td>${r.cultivar||'—'}</td>
               <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+              <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="status_plantio" style="background:${entry.status_plantio==='Plantado'?'#c8e6c9':entry.status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;">
+                <option value="" ${!entry.status_plantio?'selected':''}>—</option>
+                <option value="Plantado" ${entry.status_plantio==='Plantado'?'selected':''}>Plantado</option>
+                <option value="Estimativa" ${entry.status_plantio==='Estimativa'?'selected':''}>Estimativa</option>
+              </select></td>
+              <td><input type="text" inputmode="numeric" class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="ciclo" value="${entry.ciclo!=null?entry.ciclo:''}" placeholder="—" style="width:50px;"></td>
+              <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="tipo_material"><option value="" ${!entry.tipo_material?'selected':''}>—</option>${ESTR_TIPO_MATERIAL_OPTIONS.map(o=>`<option value="${o}" ${entry.tipo_material===o?'selected':''}>${o}</option>`).join('')}</select></td>
               ${ESTR_ETAPAS.map(e=>`
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes"><option value="">—</option>${MESES_OPTIONS.map(m=>`<option value="${m}" ${entry[e.key+'_mes']===m?'selected':''}>${m}</option>`).join('')}</select></td>
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec">${EXECUCAO_OPTIONS.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
@@ -7148,7 +7176,7 @@ function renderEstruturacao(){
                 <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${5+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+          }).join('') || `<tr><td colspan="${8+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -7182,6 +7210,9 @@ function renderEstruturacao(){
         ESTR_ETAPAS.forEach(e=>{ state.estrAcomp[key][e.key+'_mes'] = null; state.estrAcomp[key][e.key+'_exec'] = 'Pendente'; });
       }
       state.estrAcomp[key][campo] = valor;
+      if(campo==='status_plantio'){
+        el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff';
+      }
       salvarEstrAcompCampo(key, campo, valor, el);
     });
   });
@@ -9545,6 +9576,9 @@ function montarDadosEstrBase(rec){
     dose_padrao_fazenda_estr: rec.estr_dose_padrao ?? null,
     historico_uso_tecnologia_estr: rec.estr_uso_tecnologia ?? null,
     historico_acamamento_estr: rec.estr_acamamento ?? null,
+    ciclo_acomp: rec.estr_acomp_ciclo ?? null,
+    tipo_material_acomp: rec.estr_acomp_tipo_material ?? null,
+    status_plantio_acomp: rec.estr_acomp_status_plantio ?? null,
   };
 }
 async function salvarEstrAcompCampo(key, campoKey, valor, el){
@@ -9554,6 +9588,9 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
     return;
   }
   const dados = montarDadosEstrBase(rec);
+  if(campoKey==='ciclo') dados.ciclo_acomp = valor;
+  if(campoKey==='tipo_material') dados.tipo_material_acomp = valor;
+  if(campoKey==='status_plantio') dados.status_plantio_acomp = valor;
   ESTR_ETAPAS.forEach(e=>{
     dados['acomp_'+e.key+'_mes'] = campoKey===(e.key+'_mes') ? valor : (rec['estr_acomp_'+e.key+'_mes'] ?? null);
     dados['acomp_'+e.key+'_exec'] = campoKey===(e.key+'_exec') ? valor : (rec['estr_acomp_'+e.key+'_exec'] ?? null);
@@ -9574,6 +9611,9 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
 async function salvarEstrAcompEntradaCompleta(rec, entry, user){
   if(!rec || !projetosIds['projeto-estruturacao']) return { error: 'talhão ou projeto não encontrado' };
   const dados = montarDadosEstrBase(rec);
+  dados.ciclo_acomp = entry.ciclo ?? null;
+  dados.tipo_material_acomp = entry.tipo_material ?? null;
+  dados.status_plantio_acomp = entry.status_plantio ?? null;
   ESTR_ETAPAS.forEach(e=>{
     dados['acomp_'+e.key+'_mes'] = entry[e.key+'_mes'] ?? null;
     dados['acomp_'+e.key+'_exec'] = entry[e.key+'_exec'] ?? null;
@@ -9583,6 +9623,9 @@ async function salvarEstrAcompEntradaCompleta(rec, entry, user){
     updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
   }, { onConflict: 'talhao_id,projeto_id' });
   if(!error){
+    rec.estr_acomp_ciclo = entry.ciclo ?? null;
+    rec.estr_acomp_tipo_material = entry.tipo_material ?? null;
+    rec.estr_acomp_status_plantio = entry.status_plantio ?? null;
     ESTR_ETAPAS.forEach(e=>{
       rec['estr_acomp_'+e.key+'_mes'] = entry[e.key+'_mes'] ?? null;
       rec['estr_acomp_'+e.key+'_exec'] = entry[e.key+'_exec'] ?? null;
