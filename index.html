@@ -8895,8 +8895,8 @@ function renderVidaNoSolo(){
   });
 
   const qtdEstados = new Set(comQualquerDado.map(r=>(r.estado||'').toUpperCase()).filter(Boolean)).size;
-  const qtdFazendas = new Set(comQualquerDado.map(r=>`${r.cliente}||${r.fazenda}`)).size;
-  const qtdProdutores = new Set(comQualquerDado.map(r=>r.cliente)).size;
+  const qtdFazendas = new Set(tabelaTalhoesVns.map(r=>`${r.cliente}||${r.fazenda}`)).size;
+  const qtdProdutores = new Set(tabelaTalhoesVns.map(r=>r.cliente)).size;
 
   const CORES_ESTADO_VNS = ['#5c7a3f','#8a5a4a','#2c4a7a','#a68a2e','#6b3f7a','#3f8891','#8a3a3a','#5b7a99','#a4432a','#7a6b3f'];
   const coresPorEstado = {}; estadosComTeste.forEach((uf,i)=> coresPorEstado[uf]=CORES_ESTADO_VNS[i%CORES_ESTADO_VNS.length]);
@@ -8950,8 +8950,8 @@ function renderVidaNoSolo(){
   <div class="vns-kpis">
     <div class="vns-kpi" style="animation-delay:.02s"><div class="v">${areaProjetoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="l">ha de projeto (Faixa + Lado a lado)</div></div>
     <div class="vns-kpi" style="animation-delay:.06s"><div class="v">${qtdEstados}</div><div class="l">Estados com dado do projeto</div></div>
-    <div class="vns-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendas}</div><div class="l">Fazendas com dado do projeto</div></div>
-    <div class="vns-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutores}</div><div class="l">Produtores com dado do projeto</div></div>
+    <div class="vns-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendas}</div><div class="l">Fazendas no Projeto</div></div>
+    <div class="vns-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutores}</div><div class="l">Produtores no Projeto</div></div>
   </div>
 
   <div class="vns-layout">
