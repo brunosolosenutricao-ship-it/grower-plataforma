@@ -2757,6 +2757,27 @@ const ETAPA_LABELS = [
 const ETAPA_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Aplicado','Colhido','Não necessário, laudo já 2026'];
 const PARTICIPACAO_OPTIONS = ['Pendente','Vai participar','Negado'];
 
+// Acompanhamento próprio da aba Óxido de Magnésio — opções e cores por etapa (independente do Cronograma acima)
+const OXC_PARTICIPACAO_OPTIONS = ['Vai participar','Pendente','Negado'];
+const OXC_ETAPA_OPCOES = {
+  etapa1: ['Pendente','Coletado','No laboratório','Laudo recebido','Não necessário, laudo já 2026','Análise antiga recebida'],
+  etapa2: ['Pendente','Aplicado','Não vai aplicar'],
+  etapa3: ['Pendente','Coletado','Laudo recebido','No laboratório','Não coletou'],
+  etapa4: ['Pendente','Coletado','No laboratório','Laudo recebido','Não necessário, laudo já 2026','Análise antiga recebida'],
+};
+const OXC_COR_MAPA = {
+  participacao: { 'Vai participar':'verde', 'Pendente':'amarelo', 'Negado':'vermelho' },
+  etapa1: { 'Não necessário, laudo já 2026':'verde', 'Laudo recebido':'verde', 'Análise antiga recebida':'verde', 'No laboratório':'amarelo', 'Coletado':'amarelo', 'Pendente':'vermelho' },
+  etapa2: { 'Aplicado':'verde', 'Pendente':'amarelo', 'Não vai aplicar':'vermelho' },
+  etapa3: { 'Coletado':'verde', 'Laudo recebido':'verde', 'No laboratório':'amarelo', 'Não coletou':'vermelho', 'Pendente':'vermelho' },
+  etapa4: { 'Não necessário, laudo já 2026':'verde', 'Laudo recebido':'verde', 'Análise antiga recebida':'verde', 'No laboratório':'amarelo', 'Coletado':'amarelo', 'Pendente':'vermelho' },
+};
+const OXC_COR_HEX = { verde:'#c8e6c9', amarelo:'#fff3b0', vermelho:'#ffcdd2' };
+function oxcCorFundo(campo, valor){
+  const cor = (OXC_COR_MAPA[campo]||{})[valor];
+  return cor ? OXC_COR_HEX[cor] : '#fff';
+}
+
 const ETAPA_COLOR_MAP = {
   'Pendente':                       ['#eef1e6','#d8dccb','#4d5648'],
   'Coletado':                       ['#fdf1dc','#c99a3d','#7a5b1c'],
@@ -7699,7 +7720,13 @@ function renderOxidoConsumo(){
     if(state.oxidoConsumoFiltroCliente!=='Todos' && r.cliente!==state.oxidoConsumoFiltroCliente) return false;
     if(!buscaTxt) return true;
     return `${r.cliente} ${r.fazenda} ${r.talhao}`.toLowerCase().includes(buscaTxt);
-  }).sort((a,b)=> (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao));
+  }).sort((a,b)=>{
+    const da = calcularDataColeta(a.data_plantio), db = calcularDataColeta(b.data_plantio);
+    if(!da && !db) return (a.cliente+a.fazenda+a.talhao).localeCompare(b.cliente+b.fazenda+b.talhao);
+    if(!da) return 1; // sem data vai pro fim
+    if(!db) return -1;
+    return da - db;
+  });
   const PAGINA_TAM = 20;
   const totalPaginas = Math.max(1, Math.ceil(acompanhamentoLista.length / PAGINA_TAM));
   if(state.oxidoConsumoPagina > totalPaginas) state.oxidoConsumoPagina = totalPaginas;
@@ -7841,10 +7868,10 @@ function renderOxidoConsumo(){
               <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
               <td class="mono-td">${fmtNum(Number(r.dose_oxido),1)}</td>
               <td>${r.status||'—'}</td>
-              <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao">${PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao" style="background:${oxcCorFundo('participacao',entry.participacao)};font-weight:700;">${OXC_PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
               <td>${fmtData(dataPlantio)}</td>
               <td>${fmtData(dataColeta)}</td>
-              ${ETAPA_KEYS.map(k=>`<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}">${ETAPA_OPTIONS.map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
+              ${ETAPA_KEYS.map(k=>`<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
               <td style="white-space:nowrap;">
                 <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
@@ -7890,6 +7917,7 @@ function renderOxidoConsumo(){
       const valor = el.value;
       if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente' };
       state.oxcAcomp[key][campo] = valor;
+      el.style.background = oxcCorFundo(campo, valor);
       salvarOxcAcompCampo(key, campo, valor, el);
     });
   });
