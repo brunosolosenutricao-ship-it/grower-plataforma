@@ -1777,7 +1777,11 @@ async function salvarLinha(btn){
   let erroProjeto = null;
   for(const proj of PROJETOS_CONFIG){
     if(state.colunasOcultas.has(proj.slug)) continue; // colunas ocultas no momento — não mexe nesse projeto
-    const dados = {};
+    // busca o jsonb já existente e mescla — sem isso, campos de Acompanhamento/Cronograma que não
+    // aparecem na Alimentação (etapas, status de compra, ciclo, etc) seriam apagados sem querer
+    const { data: existente } = await sb.from('dados_projeto')
+      .select('dados').eq('talhao_id', talhaoId).eq('projeto_id', projetosIds[proj.slug]).maybeSingle();
+    const dados = { ...(existente ? existente.dados : {}) };
     proj.campos.forEach(c=>{
       if(c.type==='mirror' || c.type==='mirror-sinaleiro') return; // vive no Geral agora, não salva de novo aqui
       const el = tr.querySelector(`[data-field="${c.key}"]`);
@@ -2101,9 +2105,18 @@ async function confirmarImportacao(plan){
       const { error: errUpd } = await sb.from('talhoes').upsert(updatesTalhoes, { onConflict: 'id' });
       if(errUpd) throw errUpd;
 
+      const idsAtualizados = plan.atualizados.map(a=>a.id);
       for(const proj of PROJETOS_CONFIG){
+        // busca o jsonb já existente de cada talhão pra mesclar — sem isso, campos de Acompanhamento/
+        // Cronograma que não vêm no Excel (etapas, status de compra, ciclo, etc) seriam apagados
+        const { data: existentes } = await fetchByIdsChunked(
+          'dados_projeto', 'talhao_id, dados', 'talhao_id', idsAtualizados,
+          (q)=> q.eq('projeto_id', projetosIds[proj.slug])
+        );
+        const existentePorId = {};
+        (existentes||[]).forEach(d=>{ existentePorId[d.talhao_id] = d.dados || {}; });
         const updatesDados = plan.atualizados.map(a=>{
-          const dados = {};
+          const dados = { ...(existentePorId[a.id] || {}) };
           proj.campos.forEach(c=>{ if(c.type!=='mirror' && c.type!=='mirror-sinaleiro') dados[c.key] = a.linha[c.key] ?? null; });
           return {
             talhao_id: a.id, projeto_id: projetosIds[proj.slug], dados,
