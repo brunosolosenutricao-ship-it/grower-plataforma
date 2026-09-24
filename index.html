@@ -3273,6 +3273,11 @@ async function carregarDadosDoSupabase(){
         crono_etapa2: d.crono_etapa2 ?? null,
         crono_etapa3: d.crono_etapa3 ?? null,
         crono_etapa4: d.crono_etapa4 ?? null,
+        oxc_acomp_participacao: d.oxc_acomp_participacao ?? null,
+        oxc_acomp_etapa1: d.oxc_acomp_etapa1 ?? null,
+        oxc_acomp_etapa2: d.oxc_acomp_etapa2 ?? null,
+        oxc_acomp_etapa3: d.oxc_acomp_etapa3 ?? null,
+        oxc_acomp_etapa4: d.oxc_acomp_etapa4 ?? null,
         // campos do Máximas Produtividades / Ladrões — histórico produtivo mora no Geral (t),
         // só Sistema e IPI continuam no jsonb próprio do projeto
         max_sistema: dm.sistema ?? null,
@@ -3464,6 +3469,19 @@ async function carregarDadosDoSupabase(){
         entry[e.key+'_data'] = r['vns_'+e.key+'_data'] || null;
       });
       state.vnsEtapas[key] = entry;
+    });
+    state.oxcAcomp = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = r.oxc_acomp_participacao!=null || r.oxc_acomp_etapa1!=null || r.oxc_acomp_etapa2!=null || r.oxc_acomp_etapa3!=null || r.oxc_acomp_etapa4!=null;
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      state.oxcAcomp[key] = {
+        participacao: r.oxc_acomp_participacao || 'Pendente',
+        etapa1: r.oxc_acomp_etapa1 || 'Pendente',
+        etapa2: r.oxc_acomp_etapa2 || 'Pendente',
+        etapa3: r.oxc_acomp_etapa3 || 'Pendente',
+        etapa4: r.oxc_acomp_etapa4 || 'Pendente',
+      };
     });
     state.lmAcomp = {};
     RECORDS.forEach(r=>{
@@ -7793,8 +7811,8 @@ function renderOxidoConsumo(){
   </div>
 
   <div class="oxc-card full-card" style="margin-top:12px;animation-delay:.3s;">
-    <h3>🗓️ Acompanhamento (Cronograma)</h3>
-    <p class="sub-sm">Mesmos talhões dos cards acima (Dose Óxido &gt; 0, respeitando o filtro de Status) — participação, progresso das 4 etapas, e a data de coleta prevista (Data de plantio + 45 dias).</p>
+    <h3>🗓️ Acompanhamento</h3>
+    <p class="sub-sm">Mesmos talhões dos cards acima (Dose Óxido &gt; 0, respeitando o filtro de Status) — Status e Dose vêm da Alimentação (só leitura); Participação e as 4 etapas são só desta aba, não compartilham dado com a aba separada "Cronograma".</p>
     <input type="text" class="oxc-acomp-busca" id="oxcAcompBusca" placeholder="Buscar por cliente, fazenda ou talhão…" value="${state.oxidoConsumoBusca}">
     <div class="oxc-acomp-filtros">
       <select class="oxc-acomp-select" id="oxcAcompConsultor">
@@ -7809,38 +7827,32 @@ function renderOxidoConsumo(){
     <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th><th>Progresso</th>
+          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
+          ${ETAPA_LABELS.map(l=>`<th>${l}</th>`).join('')}
+          <th>Salvar</th>
         </tr></thead>
         <tbody>
           ${paginaAtual.map(r=>{
             const key = cronogramaKey(r);
-            const entry = getCronogramaEntry(key);
-            const [pBg,,pText] = PARTICIPACAO_COLOR_MAP[entry.participacao] || PARTICIPACAO_COLOR_MAP['Pendente'];
+            const entry = getOxcAcompEntry(key);
             const dataPlantio = r.data_plantio ? new Date(r.data_plantio+'T00:00:00') : null;
             const dataColeta = calcularDataColeta(r.data_plantio);
             return `<tr>
               <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
               <td class="mono-td">${fmtNum(Number(r.dose_oxido),1)}</td>
               <td>${r.status||'—'}</td>
-              <td><span class="oxc-acomp-badge" style="background:${pBg};color:${pText};">${entry.participacao}</span></td>
+              <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao">${PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
               <td>${fmtData(dataPlantio)}</td>
               <td>${fmtData(dataColeta)}</td>
-              <td>
-                <div class="oxc-progress" title="${ETAPA_LABELS.map((l,i)=>`${l}: ${entry[ETAPA_KEYS[i]]}`).join(' · ')}">
-                  ${ETAPA_KEYS.map((k,i)=>{
-                    const [,border,text] = ETAPA_COLOR_MAP[entry[k]] || ETAPA_COLOR_MAP['Pendente'];
-                    const corTexto = entry[k]==='Pendente' ? text : '#fff';
-                    return `<div class="oxc-progress-seg" style="background:${border};color:${corTexto};" title="${ETAPA_LABELS[i]}: ${entry[k]}">E${i+1}</div>`;
-                  }).join('')}
-                </div>
+              ${ETAPA_KEYS.map(k=>`<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}">${ETAPA_OPTIONS.map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
+              <td style="white-space:nowrap;">
+                <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="9">Nenhum talhão encontrado.</td></tr>`}
+          }).join('') || `<tr><td colspan="${9+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
-    </div>
-    <div class="oxc-progress-legenda">
-      ${ETAPA_LABELS.map((l,i)=>`<span><b>E${i+1}</b> = ${l}</span>`).join('')}
     </div>
     <div class="oxc-acomp-pag">
       <button id="oxcAcompPrev" ${state.oxidoConsumoPagina<=1?'disabled':''}>◀ anterior</button>
@@ -7871,6 +7883,38 @@ function renderOxidoConsumo(){
       onClickEstado: (uf)=> abrirModalOxidoConsumoEstado(uf, comDose),
     });
   }
+  container.querySelectorAll('.oxc-acomp-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const key = decodeURIComponent(el.dataset.oxcKey);
+      const campo = el.dataset.oxcCampo;
+      const valor = el.value;
+      if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente' };
+      state.oxcAcomp[key][campo] = valor;
+      salvarOxcAcompCampo(key, campo, valor, el);
+    });
+  });
+  container.querySelectorAll('.oxc-acomp-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = decodeURIComponent(btn.dataset.oxcKey);
+      const msgEl = container.querySelector(`.oxc-acomp-msg[data-oxc-msg-key="${btn.dataset.oxcKey}"]`);
+      const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const entry = getOxcAcompEntry(key);
+      container.querySelectorAll(`.oxc-acomp-input[data-oxc-key="${btn.dataset.oxcKey}"]`).forEach(el=>{
+        entry[el.dataset.oxcCampo] = el.value;
+      });
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarOxcAcompEntradaCompleta(rec, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
+        else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
+    });
+  });
   container.querySelectorAll('.oxc-status-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const s = decodeURIComponent(btn.dataset.status);
@@ -9690,6 +9734,23 @@ function renderVisaoGeral(){
 }
 
 /* ---------------- TAB CRONOGRAMA ---------------- */
+function montarDadosOxidoBase(rec){
+  return {
+    dose_oxido: rec.dose_oxido ?? null,
+    dose_calcario: rec.dose_calcario ?? null,
+    status: rec.status && rec.status!=='Sem Informação' ? rec.status : null,
+    crono_participacao: rec.crono_participacao ?? null,
+    crono_etapa1: rec.crono_etapa1 ?? null,
+    crono_etapa2: rec.crono_etapa2 ?? null,
+    crono_etapa3: rec.crono_etapa3 ?? null,
+    crono_etapa4: rec.crono_etapa4 ?? null,
+    oxc_acomp_participacao: rec.oxc_acomp_participacao ?? null,
+    oxc_acomp_etapa1: rec.oxc_acomp_etapa1 ?? null,
+    oxc_acomp_etapa2: rec.oxc_acomp_etapa2 ?? null,
+    oxc_acomp_etapa3: rec.oxc_acomp_etapa3 ?? null,
+    oxc_acomp_etapa4: rec.oxc_acomp_etapa4 ?? null,
+  };
+}
 async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
   if(!rec || !projetosIds['oxido-magnesio']){
@@ -9697,17 +9758,9 @@ async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
     return;
   }
 
-  // reconstrói o jsonb do projeto — mg_solo/ano_analise migraram pro Geral, não vivem mais aqui
-  const dados = {
-    dose_oxido: rec.dose_oxido ?? null,
-    dose_calcario: rec.dose_calcario ?? null,
-    status: rec.status && rec.status!=='Sem Informação' ? rec.status : null,
-    crono_participacao: etapaKey==='participacao' ? valor : (rec.crono_participacao ?? null),
-    crono_etapa1: etapaKey==='etapa1' ? valor : (rec.crono_etapa1 ?? null),
-    crono_etapa2: etapaKey==='etapa2' ? valor : (rec.crono_etapa2 ?? null),
-    crono_etapa3: etapaKey==='etapa3' ? valor : (rec.crono_etapa3 ?? null),
-    crono_etapa4: etapaKey==='etapa4' ? valor : (rec.crono_etapa4 ?? null),
-  };
+  // reconstrói o jsonb do projeto inteiro (preserva o Acompanhamento próprio da aba Óxido também)
+  const dados = montarDadosOxidoBase(rec);
+  dados['crono_'+etapaKey] = valor;
 
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -9729,16 +9782,12 @@ async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
 // Salva participação + as 4 etapas de uma vez só num único talhão — usada pela importação em massa do Cronograma
 async function salvarCronogramaEntradaCompleta(rec, entry, user){
   if(!rec || !projetosIds['oxido-magnesio']) return { error: 'talhão ou projeto não encontrado' };
-  const dados = {
-    dose_oxido: rec.dose_oxido ?? null,
-    dose_calcario: rec.dose_calcario ?? null,
-    status: rec.status && rec.status!=='Sem Informação' ? rec.status : null,
-    crono_participacao: entry.participacao ?? null,
-    crono_etapa1: entry.etapa1 ?? null,
-    crono_etapa2: entry.etapa2 ?? null,
-    crono_etapa3: entry.etapa3 ?? null,
-    crono_etapa4: entry.etapa4 ?? null,
-  };
+  const dados = montarDadosOxidoBase(rec);
+  dados.crono_participacao = entry.participacao ?? null;
+  dados.crono_etapa1 = entry.etapa1 ?? null;
+  dados.crono_etapa2 = entry.etapa2 ?? null;
+  dados.crono_etapa3 = entry.etapa3 ?? null;
+  dados.crono_etapa4 = entry.etapa4 ?? null;
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
     updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
@@ -9749,6 +9798,55 @@ async function salvarCronogramaEntradaCompleta(rec, entry, user){
     rec.crono_etapa2 = entry.etapa2 ?? null;
     rec.crono_etapa3 = entry.etapa3 ?? null;
     rec.crono_etapa4 = entry.etapa4 ?? null;
+  }
+  return { error };
+}
+
+// Acompanhamento próprio da aba Óxido de Magnésio — desvinculado do Cronograma (campos oxc_acomp_*)
+function getOxcAcompEntry(key){
+  const defaults = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente' };
+  const found = state.oxcAcomp[key];
+  return found ? {...defaults, ...found} : defaults;
+}
+async function salvarOxcAcompCampo(key, campoKey, valor, el){
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+  if(!rec || !projetosIds['oxido-magnesio']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = montarDadosOxidoBase(rec);
+  dados['oxc_acomp_'+campoKey] = valor;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec['oxc_acomp_'+campoKey] = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+async function salvarOxcAcompEntradaCompleta(rec, entry, user){
+  if(!rec || !projetosIds['oxido-magnesio']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = montarDadosOxidoBase(rec);
+  dados.oxc_acomp_participacao = entry.participacao ?? null;
+  dados.oxc_acomp_etapa1 = entry.etapa1 ?? null;
+  dados.oxc_acomp_etapa2 = entry.etapa2 ?? null;
+  dados.oxc_acomp_etapa3 = entry.etapa3 ?? null;
+  dados.oxc_acomp_etapa4 = entry.etapa4 ?? null;
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    rec.oxc_acomp_participacao = entry.participacao ?? null;
+    rec.oxc_acomp_etapa1 = entry.etapa1 ?? null;
+    rec.oxc_acomp_etapa2 = entry.etapa2 ?? null;
+    rec.oxc_acomp_etapa3 = entry.etapa3 ?? null;
+    rec.oxc_acomp_etapa4 = entry.etapa4 ?? null;
   }
   return { error };
 }
