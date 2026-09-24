@@ -169,6 +169,15 @@
   .freeze-5{left:385px;width:55px;min-width:55px;max-width:55px;}
   .freeze-6{left:440px;width:100px;min-width:100px;max-width:100px;}
   .freeze-7{left:540px;width:140px;min-width:140px;max-width:140px;box-shadow:2px 0 4px rgba(0,0,0,.08);}
+  .freeze-right{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:110px;min-width:110px;max-width:110px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+  thead .freeze-right{z-index:4;}
+  tbody .freeze-right{background:#fff;}
+  tbody tr:hover .freeze-right{background:var(--bg);}
+  /* cabeçalho fixo (sticky) só na tabela principal da Alimentação — as 2 linhas de cima grudam
+     no topo da tela ao rolar, sem afetar as tabelas de outros dashboards */
+  #alimentacaoArea thead th{position:sticky;z-index:3;background:var(--paper);}
+  #alimentacaoArea thead tr:first-child th{top:0;}
+  #alimentacaoArea thead .freeze-col, #alimentacaoArea thead .freeze-right{z-index:6;}
   .cell-input:focus{outline:none;border-color:var(--teal);}
   select.cell-input{width:130px;}
   .sinaleiro-wrap{display:flex;align-items:center;gap:6px;}
@@ -1568,7 +1577,7 @@ function renderAlimentacaoTable(){
   area.innerHTML = `
     ${filterPanelHtml}
     <div class="table-scroll-top" id="alimScrollTop"><div class="table-scroll-top-thumb" id="alimScrollTopThumb"></div></div>
-    <div class="table-scroll" id="alimScrollMain">
+    <div class="table-scroll" id="alimScrollMain" style="max-height:75vh;overflow-y:auto;">
       <table>
         <thead>
           <tr>
@@ -1588,14 +1597,14 @@ function renderAlimentacaoTable(){
             <th class="freeze-col freeze-5"></th><th class="freeze-col freeze-6"></th><th class="freeze-col freeze-7"></th>
             ${subgrupoCellsHtml(geralCamposVisiveis)}
             ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : `<th colspan="${p.campos.length}"></th>`).join('')}
-            <th></th>
+            <th class="freeze-right"></th>
           </tr>
           <tr>
             <th class="freeze-col freeze-1">Cliente</th><th class="freeze-col freeze-2">Fazenda</th><th class="freeze-col freeze-3">Talhão</th><th class="freeze-col freeze-4">Área (ha)</th>
             <th class="freeze-col freeze-5">Estado</th><th class="freeze-col freeze-6">Cidade</th><th class="freeze-col freeze-7">Cultura</th>
             ${geralCamposVisiveis.map(c=>`<th>${c.label}</th>`).join('')}
             ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : p.campos.map(c=>`<th>${c.label}</th>`).join('')).join('')}
-            <th></th>
+            <th class="freeze-right"></th>
           </tr>
         </thead>
         <tbody>
@@ -1609,7 +1618,7 @@ function renderAlimentacaoTable(){
               </select></td>
               ${geralCamposVisiveis.map(c=> c.__placeholder ? `<td class="col-oculta">···</td>` : `<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
               ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
-              <td><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button></td>
+              <td class="freeze-right"><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
@@ -1683,6 +1692,15 @@ function renderAlimentacaoTable(){
     const t = pageRows.find(r=>r.id===btn.dataset.talhaoId);
     if(t) abrirPainelEditarTalhao(t);
   }));
+
+  // posiciona cada linha do cabeçalho logo abaixo da anterior (mede a altura real de cada uma,
+  // em vez de supor 2 linhas fixas — essa tabela tem 3: badges dos projetos, espaçador, e os rótulos)
+  const linhasCabecalho = area.querySelectorAll('thead tr');
+  let acumulado = 0;
+  linhasCabecalho.forEach(tr=>{
+    tr.querySelectorAll('th').forEach(th=> th.style.top = acumulado+'px');
+    acumulado += tr.getBoundingClientRect().height;
+  });
 
   area.querySelectorAll('[data-msbtn]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
