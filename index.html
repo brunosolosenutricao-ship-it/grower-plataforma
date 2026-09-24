@@ -7068,6 +7068,7 @@ const ESTR_MAPA_MODOS = [
   { key:'acamamento', label:'Histórico de acamamento' },
   { key:'adocao', label:'% Adoção da tecnologia' },
   { key:'area_projeto', label:'Área do projeto' },
+  { key:'talhoes', label:'Talhões' },
 ];
 function abrirModalEstruturacaoEstado(uf, comTeste){
   const linhas = comTeste.filter(r=> (r.estado||'').toUpperCase()===uf);
@@ -7135,6 +7136,9 @@ function renderEstruturacao(){
   }
 
   function calcularMapaPorModo(modo){
+    if(modo==='talhoes'){
+      return { valores: {}, unidade: '', tipo:'pontos' };
+    }
     if(modo==='acamamento'){
       const out = {};
       base.forEach(r=>{
@@ -7142,20 +7146,21 @@ function renderEstruturacao(){
         const uf=(r.estado||'').toUpperCase(); if(!uf) return;
         out[uf]=(out[uf]||0)+Number(r.estr_acamamento);
       });
-      return { valores: out, unidade: 'ha (histórico total)' };
+      return { valores: out, unidade: 'ha (histórico total)', tipo:'coropletico' };
     }
     if(modo==='adocao'){
       const simN = {}, totalN = {};
       comUsoInfo.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; totalN[uf]=(totalN[uf]||0)+1; if(r.estr_uso_tecnologia==='Sim') simN[uf]=(simN[uf]||0)+1; });
       const out = {}; Object.keys(totalN).forEach(uf=> out[uf]=Math.round(((simN[uf]||0)/totalN[uf])*1000)/10);
-      return { valores: out, unidade: '% adoção' };
+      return { valores: out, unidade: '% adoção', tipo:'coropletico' };
     }
     const out = {};
     comTeste.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; out[uf]=(out[uf]||0)+Number(r.estr_area_projeto); });
-    return { valores: out, unidade: 'ha de projeto' };
+    return { valores: out, unidade: 'ha de projeto', tipo:'coropletico' };
   }
   const modoAtivo = state.estruturacaoMapModo;
-  const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
+  const { valores: mapaValores, unidade: mapaUnidade, tipo: mapaTipo } = calcularMapaPorModo(modoAtivo);
+  const comPontoEstr = comTeste.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
 
   const areaProdutoConsultoria = {}, areaProdutoProjeto = {};
   comProduto.forEach(r=>{
@@ -7249,8 +7254,8 @@ function renderEstruturacao(){
         ${ESTR_MAPA_MODOS.map(m=>`<button class="estr-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
       </div>
       <div id="estrLeafletMap" style="flex:1;min-height:0;border-radius:8px;"></div>
-      <div class="estr-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>
-      <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>
+      ${mapaTipo==='pontos' ? '' : `<div class="estr-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`}
+      <p class="sub-sm" style="margin-top:4px;text-align:center;">${mapaTipo==='pontos' ? `${comPontoEstr.length} talhão(ões) plotados · bolinha verde` : `Unidade: ${mapaUnidade}`}</p>
     </div>
     <div class="estr-chart-grid">
       <div class="estr-card" style="animation-delay:.1s;">
@@ -7363,10 +7368,20 @@ function renderEstruturacao(){
       renderEstruturacao();
     });
   });
-  criarMapaCoropleticoLeaflet('estrLeafletMap', mapaValores, {
-    unidade: mapaUnidade,
-    onClickEstado: (uf)=> abrirModalEstruturacaoEstado(uf, comTeste),
-  });
+  if(mapaTipo==='pontos'){
+    criarMapaPontosLeaflet('estrLeafletMap', comPontoEstr.map(r=>({
+      lat: Number(r.max_latitude), lon: Number(r.max_longitude),
+      titulo: `${r.fazenda} — Talhão ${r.talhao} · ${fmtNum(Number(r.estr_area_projeto),1)} ha de projeto`,
+      item: r,
+    })), {
+      corPonto: ()=> '#6b7a3f',
+    });
+  } else {
+    criarMapaCoropleticoLeaflet('estrLeafletMap', mapaValores, {
+      unidade: mapaUnidade,
+      onClickEstado: (uf)=> abrirModalEstruturacaoEstado(uf, comTeste),
+    });
+  }
 
   container.querySelectorAll('.estr-acomp-input').forEach(el=>{
     el.addEventListener('change', ()=>{
@@ -7513,6 +7528,7 @@ const OXC_MAPA_MODOS = [
   { key:'dose_media', label:'Dose de óxido média' },
   { key:'mg_medio', label:'Teor de Mg médio 0-20cm' },
   { key:'area_tratada', label:'Área tratada' },
+  { key:'talhoes', label:'Talhões' },
 ];
 function abrirModalOxidoConsumoEstado(uf, comDose){
   const linhas = comDose.filter(r=> (r.estado||'').toUpperCase()===uf);
@@ -7579,24 +7595,28 @@ function renderOxidoConsumo(){
   }
 
   function calcularMapaPorModo(modo){
+    if(modo==='talhoes'){
+      return { valores: {}, unidade: '', tipo:'pontos' };
+    }
     if(modo==='dose_media'){
       const somaN = {}, contN = {};
       comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.dose_oxido); contN[uf]=(contN[uf]||0)+1; });
       const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
-      return { valores: out, unidade: 'ton/ha (média)' };
+      return { valores: out, unidade: 'ton/ha (média)', tipo:'coropletico' };
     }
     if(modo==='mg_medio'){
       const somaN = {}, contN = {};
       comMg.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; somaN[uf]=(somaN[uf]||0)+Number(r.mg); contN[uf]=(contN[uf]||0)+1; });
       const out = {}; Object.keys(somaN).forEach(uf=> out[uf]=somaN[uf]/contN[uf]);
-      return { valores: out, unidade: 'cmolc/dm³ (média)' };
+      return { valores: out, unidade: 'cmolc/dm³ (média)', tipo:'coropletico' };
     }
     const out = {};
     comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; out[uf]=(out[uf]||0)+(r.area||0); });
-    return { valores: out, unidade: 'ha tratados' };
+    return { valores: out, unidade: 'ha tratados', tipo:'coropletico' };
   }
   const modoAtivo = state.oxidoConsumoMapModo;
-  const { valores: mapaValores, unidade: mapaUnidade } = calcularMapaPorModo(modoAtivo);
+  const { valores: mapaValores, unidade: mapaUnidade, tipo: mapaTipo } = calcularMapaPorModo(modoAtivo);
+  const comPontoOxc = comDose.filter(r=> r.max_latitude!=null && r.max_longitude!=null && !isNaN(Number(r.max_latitude)) && !isNaN(Number(r.max_longitude)));
 
   const areaPorEstado = {};
   comDose.forEach(r=>{ const uf=(r.estado||'').toUpperCase(); if(!uf) return; areaPorEstado[uf]=(areaPorEstado[uf]||0)+(r.area||0); });
@@ -7722,10 +7742,10 @@ function renderOxidoConsumo(){
         ${OXC_MAPA_MODOS.map(m=>`<button class="oxc-mapa-pill ${m.key===modoAtivo?'active':''}" data-mapa-modo="${m.key}">${m.label}</button>`).join('')}
       </div>
       <div id="oxcLeafletMap" style="flex:1;min-height:0;border-radius:8px;"></div>
-      ${modoAtivo==='mg_medio'
+      ${mapaTipo==='pontos' ? '' : (modoAtivo==='mg_medio'
         ? `<div class="oxc-faixas-legend">${FAIXAS_MG.map(f=>`<span class="oxc-faixa-item"><span class="oxc-faixa-dot" style="background:${f.cor}"></span>${f.label}</span>`).join('')}</div>`
-        : `<div class="oxc-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`}
-      <p class="sub-sm" style="margin-top:4px;text-align:center;">Unidade: ${mapaUnidade}</p>
+        : `<div class="oxc-map-legend"><span>menor</span><div class="bar"></div><span>maior</span></div>`)}
+      <p class="sub-sm" style="margin-top:4px;text-align:center;">${mapaTipo==='pontos' ? `${comPontoOxc.length} talhão(ões) plotados · bolinha dourada` : `Unidade: ${mapaUnidade}`}</p>
     </div>
     <div class="oxc-chart-grid">
       <div class="oxc-card" style="animation-delay:.1s;">
@@ -7820,11 +7840,21 @@ function renderOxidoConsumo(){
       renderOxidoConsumo();
     });
   });
-  criarMapaCoropleticoLeaflet('oxcLeafletMap', mapaValores, {
-    unidade: mapaUnidade,
-    corFn: modoAtivo==='mg_medio' ? (v)=>corPorFaixaGenerica(v, FAIXAS_MG) : undefined,
-    onClickEstado: (uf)=> abrirModalOxidoConsumoEstado(uf, comDose),
-  });
+  if(mapaTipo==='pontos'){
+    criarMapaPontosLeaflet('oxcLeafletMap', comPontoOxc.map(r=>({
+      lat: Number(r.max_latitude), lon: Number(r.max_longitude),
+      titulo: `${r.fazenda} — Talhão ${r.talhao} · ${fmtNum(Number(r.dose_oxido),1)} ton/ha`,
+      item: r,
+    })), {
+      corPonto: ()=> '#a68a2e',
+    });
+  } else {
+    criarMapaCoropleticoLeaflet('oxcLeafletMap', mapaValores, {
+      unidade: mapaUnidade,
+      corFn: modoAtivo==='mg_medio' ? (v)=>corPorFaixaGenerica(v, FAIXAS_MG) : undefined,
+      onClickEstado: (uf)=> abrirModalOxidoConsumoEstado(uf, comDose),
+    });
+  }
   container.querySelectorAll('.oxc-status-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const s = decodeURIComponent(btn.dataset.status);
