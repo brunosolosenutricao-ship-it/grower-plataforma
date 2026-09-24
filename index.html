@@ -2781,11 +2781,11 @@ const OXC_ETAPA_OPCOES = {
 const OXC_COR_MAPA = {
   participacao: { 'Vai participar':'verde', 'Pendente':'amarelo', 'Negado':'vermelho' },
   etapa1: { 'Não necessário, laudo já 2026':'verde', 'Laudo recebido':'verde', 'Análise antiga recebida':'verde', 'No laboratório':'amarelo', 'Coletado':'amarelo', 'Pendente':'vermelho' },
-  etapa2: { 'Aplicado':'verde', 'Pendente':'amarelo', 'Não vai aplicar':'vermelho' },
+  etapa2: { 'Aplicado':'verde', 'Sem Informação':'amarelo', 'Sem Reunião':'amarelo', 'Sem recomendação':'amarelo', 'Em Análise':'amarelo', 'Comprado':'laranja', 'Não comprado':'vermelho' },
   etapa3: { 'Coletado':'verde', 'Laudo recebido':'verde', 'No laboratório':'amarelo', 'Não coletou':'vermelho', 'Pendente':'vermelho' },
   etapa4: { 'Não necessário, laudo já 2026':'verde', 'Laudo recebido':'verde', 'Análise antiga recebida':'verde', 'No laboratório':'amarelo', 'Coletado':'amarelo', 'Pendente':'vermelho' },
 };
-const OXC_COR_HEX = { verde:'#c8e6c9', amarelo:'#fff3b0', vermelho:'#ffcdd2' };
+const OXC_COR_HEX = { verde:'#c8e6c9', amarelo:'#fff3b0', laranja:'#ffd8a8', vermelho:'#ffcdd2' };
 function oxcCorFundo(campo, valor){
   const cor = (OXC_COR_MAPA[campo]||{})[valor];
   return cor ? OXC_COR_HEX[cor] : '#fff';
@@ -7868,7 +7868,7 @@ function renderOxidoConsumo(){
       <table>
         <thead><tr>
           <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
-          ${ETAPA_LABELS.map(l=>`<th>${l}</th>`).join('')}
+          ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
           <th>Salvar</th>
         </tr></thead>
         <tbody>
@@ -7884,7 +7884,10 @@ function renderOxidoConsumo(){
               <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao" style="background:${oxcCorFundo('participacao',entry.participacao)};font-weight:700;">${OXC_PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
               <td>${fmtData(dataPlantio)}</td>
               <td>${fmtData(dataColeta)}</td>
-              ${ETAPA_KEYS.map(k=>`<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
+              ${ETAPA_KEYS.map(k=> k==='etapa2'
+                ? `<td style="background:${oxcCorFundo('etapa2', r.status)};font-weight:700;text-align:center;">${r.status||'—'}</td>`
+                : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`
+              ).join('')}
               <td style="white-space:nowrap;">
                 <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
