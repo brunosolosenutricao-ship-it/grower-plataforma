@@ -579,6 +579,7 @@
       <div class="nav-item" data-view="ladroesmaximas-mapa-dash">📍 Ladrões/Máximas</div>
       <div class="nav-item" data-view="vidanosolo-dash">🦠 Vida no Solo</div>
       <div class="nav-item" data-view="visaogeral-dash">🌍 Visão Geral de Projetos</div>
+      <div class="nav-item" data-view="coletafoliar-dash">🌿 Coleta Foliar 2026.27</div>
       </div>
     </div>
     <div class="sidebar-user">
@@ -912,6 +913,28 @@
       </div>
       <div id="visaoGeralApp" style="display:none;">
         <div id="tab-visao-geral"></div>
+      </div>
+    </div>
+
+    <div id="viewColetaFoliar" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🌿 Projeto de Coleta Foliar 2026.27</h2>
+          <p class="sub">Talhões de Soja com Data de Plantio informada — lembretes e status da coleta foliar.</p>
+        </div>
+        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+      </div>
+      <div class="empty-wrap" id="coletaFoliarLoading" style="display:flex;">
+        <div class="dropzone" style="text-align:center;">
+          <div class="drop-icon">🌿</div>
+          <h2>Carregando dados do projeto…</h2>
+          <p>Buscando talhões e dados da Alimentação direto do banco.</p>
+          <div class="load-progress-track"><div class="load-progress-fill" style="width:0%;"></div></div>
+          <p class="load-progress-text">0%</p>
+        </div>
+      </div>
+      <div id="coletaFoliarApp" style="display:none;">
+        <div id="tab-coleta-foliar"></div>
       </div>
     </div>
   </div>
@@ -2746,7 +2769,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewLadroesMaximasMapa').style.display = view==='ladroesmaximas-mapa-dash' ? 'block' : 'none';
     document.getElementById('viewVidaNoSolo').style.display = view==='vidanosolo-dash' ? 'block' : 'none';
     document.getElementById('viewVisaoGeral').style.display = view==='visaogeral-dash' ? 'block' : 'none';
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash' || view==='vidanosolo-dash' || view==='visaogeral-dash') && !dashMgJaCarregado){
+    document.getElementById('viewColetaFoliar').style.display = view==='coletafoliar-dash' ? 'block' : 'none';
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash' || view==='vidanosolo-dash' || view==='visaogeral-dash' || view==='coletafoliar-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -2863,6 +2887,63 @@ const ESTR_BLOCO_DAP = {
 };
 const ESTR_TIPO_MATERIAL_OPTIONS = ['Precoce','Médio','Tardio'];
 const ESTR_STATUS_PLANTIO_OPTIONS = ['Plantado','Estimativa'];
+
+// Coleta Foliar 2026.27 — R1 (coleta) = 42 DAP; Msg 1 = 7 dias antes (35 DAP); Msg 2 = 45 DAP; coleta prevista = 45 DAP
+const CF_DAP_COLETA = 42;
+const CF_DAP_MSG1 = 35;
+const CF_DAP_MSG2 = 45;
+const CF_DAP_COLETA_PREVISTA = 45;
+const CF_MSG_OPTIONS = ['Pendente','Enviado'];
+const CF_COLETA_STATUS_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente'];
+function getCfEntry(key){
+  const defaults = { msg1_status:'Pendente', msg1_data:null, msg2_status:'Pendente', msg2_data:null, coleta_data:null, coleta_status:'Pendente' };
+  const found = state.cfAcomp[key];
+  return found ? {...defaults, ...found} : defaults;
+}
+function montarDadosCfBase(rec){
+  return {
+    msg1_status: rec.cf_msg1_status ?? null,
+    msg1_data: rec.cf_msg1_data ?? null,
+    msg2_status: rec.cf_msg2_status ?? null,
+    msg2_data: rec.cf_msg2_data ?? null,
+    coleta_data: rec.cf_coleta_data ?? null,
+    coleta_status: rec.cf_coleta_status ?? null,
+  };
+}
+async function salvarCfCampo(talhaoId, campo, valor, el){
+  const rec = RECORDS.find(r=>r.id===talhaoId) || SEM_AREA.find(r=>r.id===talhaoId);
+  if(!rec || !projetosIds['coleta-foliar-2627']){
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
+    return;
+  }
+  const dados = montarDadosCfBase(rec);
+  dados[campo] = valor;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: talhaoId, projeto_id: projetosIds['coleta-foliar-2627'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(error){
+    console.error(error);
+    if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
+    return;
+  }
+  rec['cf_'+campo] = valor;
+  if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+async function salvarCfEntradaCompleta(talhaoId, entry, user){
+  const rec = RECORDS.find(r=>r.id===talhaoId) || SEM_AREA.find(r=>r.id===talhaoId);
+  if(!rec || !projetosIds['coleta-foliar-2627']) return { error: 'talhão ou projeto não encontrado' };
+  const dados = { ...montarDadosCfBase(rec), ...entry };
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: talhaoId, projeto_id: projetosIds['coleta-foliar-2627'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  if(!error){
+    Object.keys(entry).forEach(k=>{ rec['cf_'+k] = entry[k] ?? null; });
+  }
+  return { error };
+}
 function getEstrAcompEntry(key){
   const defaults = { ciclo: null, tipo_material: '', status_plantio: '' };
   ESTR_ETAPAS.forEach(e=>{ defaults[e.key+'_mes'] = null; defaults[e.key+'_exec'] = 'Pendente'; });
@@ -3184,6 +3265,8 @@ async function carregarDadosDoSupabase(){
   const vnsAppEl = document.getElementById('vidaNoSoloApp');
   const vgLoadingEl = document.getElementById('visaoGeralLoading');
   const vgAppEl = document.getElementById('visaoGeralApp');
+  const cfLoadingEl = document.getElementById('coletaFoliarLoading');
+  const cfAppEl = document.getElementById('coletaFoliarApp');
   if(loadingEl) loadingEl.style.display = 'flex';
   if(appEl) appEl.style.display = 'none';
   if(ladLoadingEl) ladLoadingEl.style.display = 'flex';
@@ -3206,6 +3289,8 @@ async function carregarDadosDoSupabase(){
   if(vnsAppEl) vnsAppEl.style.display = 'none';
   if(vgLoadingEl) vgLoadingEl.style.display = 'flex';
   if(vgAppEl) vgAppEl.style.display = 'none';
+  if(cfLoadingEl) cfLoadingEl.style.display = 'flex';
+  if(cfAppEl) cfAppEl.style.display = 'none';
 
   try{
     // busca TODOS os talhões do projeto (todos os consultores) — o dashboard é uma visão do projeto inteiro
@@ -3248,10 +3333,15 @@ async function carregarDadosDoSupabase(){
     let projetoIdVns = null;
     const projResVns = await sb.from('projetos').select('id').eq('slug', 'vida-no-solo').single();
     if(!projResVns.error) projetoIdVns = projResVns.data.id;
+
+    // projeto Coleta Foliar 2026.27 — mesma lógica, opcional
+    let projetoIdCf = null;
+    const projResCf = await sb.from('projetos').select('id').eq('slug', 'coleta-foliar-2627').single();
+    if(!projResCf.error) projetoIdCf = projResCf.data.id;
     atualizarProgresso(15);
 
     const ids = talhoes.map(t=>t.id);
-    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {}, dadosMapVns = {};
+    let dadosMap = {}, dadosMapMax = {}, dadosMapCond = {}, dadosMapOp = {}, dadosMapEstr = {}, dadosMapMicro = {}, dadosMapVns = {}, dadosMapCf = {};
     const CHUNK_IDS = 150;
     for(let i=0;i<ids.length;i+=CHUNK_IDS){
       const bloco = ids.slice(i, i+CHUNK_IDS);
@@ -3290,6 +3380,11 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdVns).in('talhao_id', bloco);
         if(!errDVns && dadosVns) dadosVns.forEach(d=>{ dadosMapVns[d.talhao_id] = d.dados || {}; });
       }
+      if(projetoIdCf){
+        const { data: dadosCf, error: errDCf } = await sb.from('dados_projeto')
+          .select('talhao_id, dados').eq('projeto_id', projetoIdCf).in('talhao_id', bloco);
+        if(!errDCf && dadosCf) dadosCf.forEach(d=>{ dadosMapCf[d.talhao_id] = d.dados || {}; });
+      }
       atualizarProgresso(15 + ((i+CHUNK_IDS) / Math.max(ids.length,1)) * 75);
     }
     atualizarProgresso(90);
@@ -3303,6 +3398,7 @@ async function carregarDadosDoSupabase(){
       const destr = dadosMapEstr[t.id] || {};
       const dmicro = dadosMapMicro[t.id] || {};
       const dvns = dadosMapVns[t.id] || {};
+      const dcf = dadosMapCf[t.id] || {};
       const areaNum = t.area_ha!=null ? parseFloat(t.area_ha) : 0;
       const mgNum = (t.mg_0_20!=null && t.mg_0_20!=='') ? parseFloat(t.mg_0_20) : null;
       const estado = t.estado || '';
@@ -3412,6 +3508,12 @@ async function carregarDadosDoSupabase(){
         vns_area_projeto: dvns.area_projeto_vns ?? null,
         vns_tipo_teste: dvns.tipo_teste_vns ?? null,
         vns_status_compra: dvns.status_compra ?? null,
+        cf_msg1_status: dcf.msg1_status ?? null,
+        cf_msg1_data: dcf.msg1_data ?? null,
+        cf_msg2_status: dcf.msg2_status ?? null,
+        cf_msg2_data: dcf.msg2_data ?? null,
+        cf_coleta_data: dcf.coleta_data ?? null,
+        cf_coleta_status: dcf.coleta_status ?? null,
         vns_nema_lesoes: dvns.nematoide_lesoes_radiculares ?? null,
         vns_nema_galhas: dvns.nematoide_galhas ?? null,
         vns_nema_cisto: dvns.nematoide_cisto ?? null,
@@ -3535,6 +3637,17 @@ async function carregarDadosDoSupabase(){
         etapa4: r.oxc_acomp_etapa4 || 'Pendente',
       };
     });
+    state.cfAcomp = {};
+    RECORDS.forEach(r=>{
+      const temAlgo = r.cf_msg1_status!=null || r.cf_msg1_data!=null || r.cf_msg2_status!=null || r.cf_msg2_data!=null || r.cf_coleta_data!=null || r.cf_coleta_status!=null;
+      if(!temAlgo) return;
+      const key = cronogramaKey(r);
+      state.cfAcomp[key] = {
+        msg1_status: r.cf_msg1_status || 'Pendente', msg1_data: r.cf_msg1_data || null,
+        msg2_status: r.cf_msg2_status || 'Pendente', msg2_data: r.cf_msg2_data || null,
+        coleta_data: r.cf_coleta_data || null, coleta_status: r.cf_coleta_status || 'Pendente',
+      };
+    });
     state.lmAcomp = {};
     RECORDS.forEach(r=>{
       const temAlgo = LM_OCORRENCIAS_TODAS.some(oc=> r['max_aval_'+oc.campoKey]!=null || r['max_aval_'+oc.campoKey+'_data']!=null);
@@ -3573,6 +3686,8 @@ async function carregarDadosDoSupabase(){
     if(vnsAppEl) vnsAppEl.style.display = 'block';
     if(vgLoadingEl) vgLoadingEl.style.display = 'none';
     if(vgAppEl) vgAppEl.style.display = 'block';
+    if(cfLoadingEl) cfLoadingEl.style.display = 'none';
+    if(cfAppEl) cfAppEl.style.display = 'block';
     atualizarProgresso(100);
     renderAll();
     if(window.verificarRendersPendentes) window.verificarRendersPendentes();
@@ -3828,6 +3943,7 @@ function renderAll(){
   renderPreguicoso('viewLadroesMaximasMapa', renderLadroesMaximasMapa);
   renderPreguicoso('viewVidaNoSolo', renderVidaNoSolo);
   renderPreguicoso('viewVisaoGeral', renderVisaoGeral);
+  renderPreguicoso('viewColetaFoliar', renderColetaFoliar);
 }
 
 /* ---------------- CARD 1: ÁREA POTENCIAL ---------------- */
@@ -10253,6 +10369,140 @@ async function salvarLmAcompEntradaCompleta(rec, entry, user){
     });
   }
   return { error };
+}
+
+/* ---------------- TAB COLETA FOLIAR 2026.27 ---------------- */
+function renderColetaFoliar(){
+  const container = document.getElementById('tab-coleta-foliar');
+  if(!container) return;
+
+  const lista = RECORDS.filter(r=> r.cultura==='Soja' && r.data_plantio)
+    .sort((a,b)=> new Date(a.data_plantio) - new Date(b.data_plantio));
+
+  if(!lista.length){
+    container.innerHTML = `
+    <div class="card full-card">
+      <div class="eyebrow">Card · Coleta Foliar 2026.27</div>
+      <h2>Nenhum talhão de Soja com Data de Plantio ainda</h2>
+      <p class="sub">Assim que a Alimentação trouxer Cultura = Soja e Data de Plantio preenchida, os talhões aparecem aqui automaticamente.</p>
+    </div>`;
+    return;
+  }
+
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  function diasAteColeta(dataPlantio){
+    const dp = new Date(dataPlantio+'T00:00:00'); dp.setDate(dp.getDate()+CF_DAP_COLETA);
+    return Math.round((dp-hoje)/86400000);
+  }
+  function corDias(dias){
+    if(dias<=3) return '#e74c3c';
+    if(dias<=10) return '#f1c40f';
+    if(dias<=20) return '#8bc34a';
+    return '#2ecc71';
+  }
+  function dataPrevistaCf(dataPlantio, dap){
+    const dp = new Date(dataPlantio+'T00:00:00'); dp.setDate(dp.getDate()+dap);
+    return dp.toISOString().slice(0,10);
+  }
+
+  const totalColetas = lista.filter(r=> r.cf_coleta_status && r.cf_coleta_status!=='Pendente').length;
+  const porConsultor = {};
+  lista.forEach(r=>{ if(r.cf_coleta_status && r.cf_coleta_status!=='Pendente') porConsultor[r.consultor] = (porConsultor[r.consultor]||0)+1; });
+  const porEstadoCf = {};
+  lista.forEach(r=>{
+    if(r.cf_coleta_status && r.cf_coleta_status!=='Pendente'){
+      const uf=(r.estado||'').toUpperCase(); if(!uf) return;
+      porEstadoCf[uf] = (porEstadoCf[uf]||0)+1;
+    }
+  });
+
+  container.innerHTML = `
+  <style>
+    .cf-kpis{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+    .cf-kpi{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:10px 16px;min-width:140px;}
+    .cf-kpi .v{font-size:22px;font-weight:800;color:var(--ink);line-height:1;}
+    .cf-kpi .l{font-size:9.5px;color:var(--ink-soft);margin-top:3px;}
+    .cf-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;}
+  </style>
+  <div class="cf-kpis">
+    <div class="cf-kpi" style="border-left:4px solid #2d4a1f;"><div class="v">${totalColetas}</div><div class="l">Nº de coletas totais (realizadas)</div></div>
+    ${Object.entries(porConsultor).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<div class="cf-kpi"><div class="v">${n}</div><div class="l">Coletados · ${c}</div></div>`).join('')}
+  </div>
+
+  <div class="cf-card">
+    <h3 style="margin:0 0 8px;">🗺️ Coletas realizadas por Estado</h3>
+    <div id="cfLeafletMap" style="height:420px;border-radius:8px;"></div>
+  </div>
+
+  <div class="cf-card full-card">
+    <h3 style="margin:0 0 4px;">🗓️ Acompanhamento</h3>
+    <p class="sub-sm" style="margin:0 0 8px;">Soja com Data de Plantio informada · ${lista.length} talhão(ões). "Dias até coleta" = Plantio + ${CF_DAP_COLETA} DAP − hoje.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Talhão</th><th>Fazenda</th><th>Consultor</th><th>Data Plantio</th><th>Cultivar</th><th>Área</th>
+          <th>Dias até coleta</th>
+          <th>Msg 1 (Status)</th><th>Msg 1 (Data)</th>
+          <th>Msg 2 (Status)</th><th>Msg 2 (Data)</th>
+          <th>Data da coleta</th><th>Status da coleta</th>
+          <th>Salvar</th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(r=>{
+            const key = cronogramaKey(r);
+            const entry = getCfEntry(key);
+            const dias = diasAteColeta(r.data_plantio);
+            return `<tr>
+              <td>${r.talhao}</td><td>${r.fazenda}</td><td>${r.consultor}</td>
+              <td class="mono-td">${new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR')}</td>
+              <td>${r.cultivar||'—'}</td>
+              <td class="mono-td">${fmtNum(r.area,1)}</td>
+              <td style="background:${corDias(dias)};color:#fff;font-weight:700;text-align:center;">${dias} dia(s)</td>
+              <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg1_status">${CF_MSG_OPTIONS.map(o=>`<option value="${o}" ${entry.msg1_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg1_data" value="${entry.msg1_data||dataPrevistaCf(r.data_plantio,CF_DAP_MSG1)}"></td>
+              <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg2_status">${CF_MSG_OPTIONS.map(o=>`<option value="${o}" ${entry.msg2_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg2_data" value="${entry.msg2_data||dataPrevistaCf(r.data_plantio,CF_DAP_MSG2)}"></td>
+              <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="coleta_data" value="${entry.coleta_data||dataPrevistaCf(r.data_plantio,CF_DAP_COLETA_PREVISTA)}"></td>
+              <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="coleta_status">${CF_COLETA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${entry.coleta_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
+              <td style="white-space:nowrap;">
+                <button class="row-save cf-save-btn" data-cf-id="${r.id}">💾 Salvar</button>
+                <span class="cf-msg" data-cf-msg-id="${r.id}"></span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  `;
+
+  container.querySelectorAll('.cf-input').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      salvarCfCampo(el.dataset.cfId, el.dataset.cfCampo, el.value || null, el);
+    });
+  });
+  container.querySelectorAll('.cf-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const talhaoId = btn.dataset.cfId;
+      const msgEl = container.querySelector(`.cf-msg[data-cf-msg-id="${talhaoId}"]`);
+      const entry = {};
+      container.querySelectorAll(`.cf-input[data-cf-id="${talhaoId}"]`).forEach(el=>{ entry[el.dataset.cfCampo] = el.value || null; });
+      const textoOriginal = btn.textContent;
+      btn.disabled = true; btn.textContent = '⏳ Salvando…';
+      if(msgEl) msgEl.textContent = '';
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await salvarCfEntradaCompleta(talhaoId, entry, user);
+      btn.disabled = false; btn.textContent = textoOriginal;
+      if(msgEl){
+        if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
+        else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
+        setTimeout(()=>{ if(msgEl) msgEl.textContent = ''; }, 3000);
+      }
+    });
+  });
+
+  criarMapaCoropleticoLeaflet('cfLeafletMap', porEstadoCf, { unidade: 'coleta(s)' });
+  adicionarBotoesZoomGraficos(container);
 }
 
 function renderCronograma(){
