@@ -7393,6 +7393,9 @@ function renderEstruturacao(){
   const qtdProdutoresTeste = new Set(comTeste.map(r=>r.cliente)).size;
   const areaSojaTotalGeralEstr = RECORDS.filter(r=> r.cultura==='Soja').reduce((a,r)=>a+(r.area||0),0);
   const areaSojaComSimEstr = RECORDS.filter(r=> r.cultura==='Soja' && r.estr_uso_tecnologia==='Sim').reduce((a,r)=>a+(r.area||0),0);
+  const produtoresSojaTotalEstr = new Set(RECORDS.filter(r=> r.cultura==='Soja').map(r=>r.cliente)).size;
+  const produtoresSojaComSimEstr = new Set(RECORDS.filter(r=> r.cultura==='Soja' && r.estr_uso_tecnologia==='Sim').map(r=>r.cliente)).size;
+  const pctProdutoresAdocao = produtoresSojaTotalEstr>0 ? Math.round((produtoresSojaComSimEstr / produtoresSojaTotalEstr) * 1000)/10 : 0;
   const pctAdocaoGeral = areaSojaTotalGeralEstr>0 ? Math.round((areaSojaComSimEstr / areaSojaTotalGeralEstr) * 1000)/10 : 0;
 
   const CORES_ESTADO_ESTR = ['#a4432a','#6b7a3f','#a68a2e','#7a5b3f','#8a5a4a','#5b7a5f','#9a6c3f','#7a4a3a','#6b8a9f','#a4823a'];
@@ -7434,6 +7437,7 @@ function renderEstruturacao(){
     <div class="estr-kpi" style="animation-delay:.1s"><div class="v">${qtdFazendasTeste}</div><div class="l">Fazendas com teste</div></div>
     <div class="estr-kpi" style="animation-delay:.14s"><div class="v">${qtdProdutoresTeste}</div><div class="l">Produtores com teste</div><div class="l" style="margin-top:2px;color:var(--teal);font-weight:700;">${Math.round((qtdProdutoresTeste/24)*1000)/10}% da meta (24)</div></div>
     <div class="estr-kpi" style="animation-delay:.18s"><div class="v">${pctAdocaoGeral}%</div><div class="l">Adoção geral da tecnologia (área de Soja, todos os consultores)</div></div>
+    <div class="estr-kpi" style="animation-delay:.2s"><div class="v">${pctProdutoresAdocao}%</div><div class="l">Produtores com adoção Sim (${produtoresSojaComSimEstr} de ${produtoresSojaTotalEstr} produtores de Soja)</div></div>
   </div>
 
   <div class="estr-layout">
