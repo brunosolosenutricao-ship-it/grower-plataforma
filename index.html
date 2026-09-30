@@ -8715,6 +8715,180 @@ function abrirModalLadroesMaximasLista(uf, projeto, lista){
   document.getElementById('lmListaModalFechar').addEventListener('click', fechar);
   document.getElementById('lmListaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmListaModalOverlay') fechar(); });
 }
+const CG_MESES = [
+  {key:'2026-09', label:'Set/26'}, {key:'2026-10', label:'Out/26'}, {key:'2026-11', label:'Nov/26'}, {key:'2026-12', label:'Dez/26'},
+  {key:'2027-01', label:'Jan/27'}, {key:'2027-02', label:'Fev/27'}, {key:'2027-03', label:'Mar/27'}, {key:'2027-04', label:'Abr/27'},
+];
+function abrirCronogramaGeralLM(){
+  if(!state.cgFiltroProjeto) state.cgFiltroProjeto = new Set();
+  if(!state.cgFiltroMes) state.cgFiltroMes = new Set();
+  if(!state.cgFiltroEstado) state.cgFiltroEstado = new Set();
+
+  const inicioRange = new Date(2026,8,1);
+  const fimRange = new Date(2027,4,0);
+  const talhoesLmTodos = RECORDS.filter(r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas');
+
+  const pontos = [];
+  talhoesLmTodos.forEach(r=>{
+    if(!r.data_plantio) return;
+    const ocorrencias = r.max_selecao==='Ladrões' ? LM_OCORRENCIAS_LADROES : LM_OCORRENCIAS_MAXIMAS;
+    const dataPlantioObj = new Date(r.data_plantio+'T00:00:00');
+    ocorrencias.forEach(oc=>{
+      const prevista = new Date(dataPlantioObj); prevista.setDate(prevista.getDate()+oc.dap);
+      if(prevista<inicioRange || prevista>fimRange) return;
+      pontos.push({
+        dataStr: prevista.toISOString().slice(0,10), mesStr: prevista.toISOString().slice(0,7),
+        projeto: r.max_selecao, estado: (r.estado||'').toUpperCase(),
+        cliente: r.cliente, fazenda: r.fazenda, talhao: r.talhao, avaliacao: oc.avaliacaoLabel, estagio: oc.estagio,
+      });
+    });
+  });
+  const estadosDisp = [...new Set(pontos.map(p=>p.estado).filter(Boolean))].sort();
+
+  const modalRoot = document.getElementById('modalRoot');
+  function render(){
+    const filtrados = pontos.filter(p=>
+      (state.cgFiltroProjeto.size===0 || state.cgFiltroProjeto.has(p.projeto)) &&
+      (state.cgFiltroEstado.size===0 || state.cgFiltroEstado.has(p.estado)) &&
+      (state.cgFiltroMes.size===0 || state.cgFiltroMes.has(p.mesStr))
+    );
+    const porDia = {};
+    filtrados.forEach(p=>{
+      const grupoKey = p.dataStr+'|'+p.cliente+'|'+p.fazenda+'|'+p.talhao;
+      if(!porDia[p.dataStr]) porDia[p.dataStr] = {};
+      if(!porDia[p.dataStr][grupoKey]) porDia[p.dataStr][grupoKey] = { ...p, avaliacoes: [] };
+      porDia[p.dataStr][grupoKey].avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
+    });
+
+    // se só 1 mês estiver marcado no filtro, dá um "zoom" nele — mostra dia a dia em vez do período inteiro
+    let rangeInicio = inicioRange, rangeFim = fimRange, zoomMes = null;
+    if(state.cgFiltroMes.size===1){
+      zoomMes = [...state.cgFiltroMes][0];
+      const [ano, mes] = zoomMes.split('-').map(Number);
+      rangeInicio = new Date(ano, mes-1, 1);
+      rangeFim = new Date(ano, mes, 0);
+    }
+    const totalMs = rangeFim - rangeInicio;
+    const pctDe = (d)=> ((new Date(d+'T00:00:00') - rangeInicio) / totalMs) * 100;
+
+    let eixoHtml;
+    if(zoomMes){
+      const diasNoMes = rangeFim.getDate();
+      const labels = [];
+      for(let d=1; d<=diasNoMes; d+= (diasNoMes>20?2:1)){ // pula de 2 em 2 se o mês tiver muito dia, pra não amontoar os números
+        const dataDia = new Date(rangeInicio.getFullYear(), rangeInicio.getMonth(), d);
+        labels.push(`<div class="cg-mes-label" style="left:${((dataDia-rangeInicio)/totalMs)*100}%;">${d}</div>`);
+      }
+      eixoHtml = labels.join('');
+    } else {
+      eixoHtml = CG_MESES.map(m=>`<div class="cg-mes-label" style="left:${pctDe(m.key+'-01')}%;">${m.label}</div>`).join('');
+    }
+
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const linhaHojeHtml = (hoje>=rangeInicio && hoje<=rangeFim)
+      ? `<div class="cg-hoje-linha" style="left:${((hoje-rangeInicio)/totalMs)*100}%;" title="Hoje"></div><div class="cg-hoje-label" style="left:${((hoje-rangeInicio)/totalMs)*100}%;">Hoje</div>`
+      : '';
+
+    const dotsHtml = Object.entries(porDia).map(([dia, grupos])=> Object.values(grupos).map((p,i)=>{
+      const cor = p.projeto==='Ladrões' ? '#b8352a' : '#2e6e76';
+      return `<div class="cg-dot" style="left:${pctDe(dia)}%;bottom:${4+i*13}px;background:${cor};" data-cg='${encodeURIComponent(JSON.stringify(p))}' title="${p.fazenda} — ${p.talhao} (${p.avaliacoes.length} avaliação(ões))"></div>`;
+    }).join('')).join('');
+
+    modalRoot.innerHTML = `
+    <style>
+      .cg-timeline-wrap{overflow-x:auto;padding-bottom:6px;}
+      .cg-timeline{position:relative;height:160px;min-width:900px;margin:30px 10px 0;}
+      .cg-timeline-eixo{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--line);}
+      .cg-mes-label{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:10px;color:var(--ink-soft);font-weight:700;}
+      .cg-hoje-linha{position:absolute;top:0;bottom:0;width:1.5px;background:#e67e22;z-index:1;}
+      .cg-hoje-label{position:absolute;top:-16px;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#e67e22;}
+      .cg-dot{position:absolute;width:9px;height:9px;border-radius:50%;transform:translateX(-50%);cursor:pointer;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15);}
+      .cg-dot:hover{transform:translateX(-50%) scale(1.4);}
+      .cg-detalhe{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12.5px;min-height:20px;margin-top:22px;}
+      .cg-checklist{max-height:110px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;min-width:140px;}
+    </style>
+    <div class="modal-overlay" id="cgOverlay">
+      <div class="modal-panel" style="max-width:96vw;width:1400px;max-height:94vh;display:flex;flex-direction:column;">
+        <h2>📅 Cronograma Geral — Ladrões/Máximas</h2>
+        <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Datas previstas (Plantio + DAP) de todas as avaliações, Set/2026 a Abr/2027.</p>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+          <div class="fitem">
+            <label>Projeto</label>
+            <div class="cg-checklist" id="cgChkProjeto">
+              ${['Ladrões','Máximas'].map(o=>`<label class="checklist-item"><input type="checkbox" value="${o}" ${state.cgFiltroProjeto.has(o)?'checked':''}> ${o}</label>`).join('')}
+            </div>
+            <div class="ms-actions"><button data-todos="cgChkProjeto">Marcar todos</button><button data-limpar="cgChkProjeto">Limpar</button></div>
+          </div>
+          <div class="fitem">
+            <label>Mês</label>
+            <div class="cg-checklist" id="cgChkMes">
+              ${CG_MESES.map(m=>`<label class="checklist-item"><input type="checkbox" value="${m.key}" ${state.cgFiltroMes.has(m.key)?'checked':''}> ${m.label}</label>`).join('')}
+            </div>
+            <div class="ms-actions"><button data-todos="cgChkMes">Marcar todos</button><button data-limpar="cgChkMes">Limpar</button></div>
+          </div>
+          <div class="fitem">
+            <label>Estado</label>
+            <div class="cg-checklist" id="cgChkEstado">
+              ${estadosDisp.map(uf=>`<label class="checklist-item"><input type="checkbox" value="${uf}" ${state.cgFiltroEstado.has(uf)?'checked':''}> ${uf}</label>`).join('')}
+            </div>
+            <div class="ms-actions"><button data-todos="cgChkEstado">Marcar todos</button><button data-limpar="cgChkEstado">Limpar</button></div>
+          </div>
+        </div>
+
+        <div class="cg-timeline-wrap">
+          <div class="cg-timeline">
+            <div class="cg-timeline-eixo"></div>
+            ${eixoHtml}
+            ${linhaHojeHtml}
+            ${dotsHtml}
+          </div>
+        </div>
+        <div class="cg-detalhe" id="cgDetalhe">Clique numa bolinha pra ver o que é. 🔴 Ladrões · 🔵 Máximas</div>
+        <p class="sub-sm" style="margin-top:6px;">${filtrados.length} avaliação(ões) prevista(s) nesse filtro.</p>
+
+        <div class="modal-actions">
+          <button class="btn ghost" id="cgFecharBtn">Fechar</button>
+        </div>
+      </div>
+    </div>`;
+
+    function ligarChecklist(elId, targetSet){
+      const box = document.getElementById(elId);
+      box.addEventListener('change', ()=>{
+        targetSet.clear();
+        box.querySelectorAll('input:checked').forEach(cb=> targetSet.add(cb.value));
+        render();
+      });
+    }
+    ligarChecklist('cgChkProjeto', state.cgFiltroProjeto);
+    ligarChecklist('cgChkMes', state.cgFiltroMes);
+    ligarChecklist('cgChkEstado', state.cgFiltroEstado);
+    document.querySelectorAll('[data-todos]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const box = document.getElementById(btn.dataset.todos);
+      const sets = { cgChkProjeto: state.cgFiltroProjeto, cgChkMes: state.cgFiltroMes, cgChkEstado: state.cgFiltroEstado };
+      box.querySelectorAll('input').forEach(cb=>{ cb.checked = true; sets[btn.dataset.todos].add(cb.value); });
+      render();
+    }));
+    document.querySelectorAll('[data-limpar]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const sets = { cgChkProjeto: state.cgFiltroProjeto, cgChkMes: state.cgFiltroMes, cgChkEstado: state.cgFiltroEstado };
+      sets[btn.dataset.limpar].clear();
+      render();
+    }));
+    document.getElementById('cgFecharBtn').addEventListener('click', ()=>{ modalRoot.innerHTML=''; });
+    document.getElementById('cgOverlay').addEventListener('click', (e)=>{ if(e.target.id==='cgOverlay') modalRoot.innerHTML=''; });
+    document.querySelectorAll('.cg-dot').forEach(dot=>{
+      dot.addEventListener('click', ()=>{
+        const p = JSON.parse(decodeURIComponent(dot.dataset.cg));
+        const det = document.getElementById('cgDetalhe');
+        const lista = p.avaliacoes.map(a=>`${a.avaliacao} (${a.estagio})`).join(', ');
+        det.innerHTML = `<b>${p.cliente} / ${p.fazenda} / ${p.talhao}</b> (${p.projeto}, ${p.estado}) — previstas pra ${new Date(p.dataStr+'T00:00:00').toLocaleDateString('pt-BR')}: <b>${lista}</b>`;
+      });
+    });
+  }
+  render();
+}
+
 function abrirModalLadroesMaximasTalhao(rec){
   const modalRoot = document.getElementById('modalRoot');
   const soloCampos = GERAL_CAMPOS.filter(c=> c.subgrupo==='solo1' || c.subgrupo==='solo2');
@@ -9015,6 +9189,7 @@ function renderLadroesMaximasMapa(){
       </select>
     </div>
     <span style="font-size:10.5px;color:var(--ink-soft);">${selFiltrados.length} de ${selecionados.length} talhão(ões) — controla o mapa, os KPIs, o gráfico e a tabela abaixo</span>
+    <button class="btn" id="lmCronogramaGeralBtn" style="margin-left:auto;">📅 Cronograma Geral</button>
   </div>
 
   <div class="lm-proxima-row">
@@ -9143,6 +9318,7 @@ function renderLadroesMaximasMapa(){
     onClickPonto: (rec)=> abrirModalLadroesMaximasTalhao(rec),
   });
 
+  container.querySelector('#lmCronogramaGeralBtn').addEventListener('click', ()=> abrirCronogramaGeralLM());
   container.querySelector('#lmFiltroProjetoSel').addEventListener('change', (e)=>{
     state.lmFiltroProjeto = e.target.value;
     renderLadroesMaximasMapa();
@@ -10682,6 +10858,14 @@ function renderRegenera(){
     .regenera-mapa-pills{display:flex;gap:6px;margin-bottom:8px;}
     .regenera-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
     .regenera-mapa-pill.active{background:#2d4a1f;color:#fff;border-color:#2d4a1f;}
+    .reg-freeze{position:sticky !important;background:var(--paper);z-index:2;box-shadow:2px 0 4px rgba(0,0,0,.08);}
+    thead .reg-freeze{z-index:4;}
+    tbody .reg-freeze{background:#fff;}
+    .reg-freeze-1{left:0px;width:130px;min-width:130px;max-width:130px;}
+    .reg-freeze-2{left:130px;width:130px;min-width:130px;max-width:130px;}
+    .reg-freeze-3{left:260px;width:60px;min-width:60px;max-width:60px;}
+    .reg-freeze-4{left:320px;width:110px;min-width:110px;max-width:110px;}
+    .reg-freeze-5{left:430px;width:100px;min-width:100px;max-width:100px;box-shadow:2px 0 6px rgba(0,0,0,.12);}
   </style>
 
   <div class="regenera-kpis">
@@ -10713,7 +10897,7 @@ function renderRegenera(){
     <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Estado</th><th>Cidade</th><th>Talhão</th><th>Latitude</th><th>Longitude</th><th>Área</th><th>Cultura</th><th>Data de Plantio</th><th>Variedade</th>
+          <th class="reg-freeze reg-freeze-1">Cliente</th><th class="reg-freeze reg-freeze-2">Fazenda</th><th class="reg-freeze reg-freeze-3">Estado</th><th class="reg-freeze reg-freeze-4">Cidade</th><th class="reg-freeze reg-freeze-5">Talhão</th><th>Latitude</th><th>Longitude</th><th>Área</th><th>Cultura</th><th>Data de Plantio</th><th>Variedade</th>
           <th>Nematoides</th><th>Descrição Nematoides</th><th>Doenças de solo</th><th>Descrição Doenças</th>
           <th>Nematicida biológico</th><th>Fungicida biológico</th><th>Fungicida químico</th><th>Nematicida químico</th>
           ${REGENERA_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
@@ -10728,7 +10912,7 @@ function renderRegenera(){
           ${filtrados.map(r=>{
             const etapasEntry = getRegeneraEtapasEntry(r);
             return `<tr>
-            <td>${r.cliente||''}</td><td>${r.fazenda||''}</td><td>${r.estado||''}</td><td>${r.cidade||''}</td><td>${r.talhao||''}</td>
+            <td class="reg-freeze reg-freeze-1">${r.cliente||''}</td><td class="reg-freeze reg-freeze-2">${r.fazenda||''}</td><td class="reg-freeze reg-freeze-3">${r.estado||''}</td><td class="reg-freeze reg-freeze-4">${r.cidade||''}</td><td class="reg-freeze reg-freeze-5">${r.talhao||''}</td>
             <td class="mono-td">${r.latitude??''}</td><td class="mono-td">${r.longitude??''}</td>
             <td class="mono-td">${r.area!=null?fmtNum(Number(r.area),1):''}</td>
             <td>${r.cultura||''}</td>
