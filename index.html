@@ -169,7 +169,7 @@
   .freeze-5{left:385px;width:55px;min-width:55px;max-width:55px;}
   .freeze-6{left:440px;width:100px;min-width:100px;max-width:100px;}
   .freeze-7{left:540px;width:140px;min-width:140px;max-width:140px;box-shadow:2px 0 4px rgba(0,0,0,.08);}
-  .freeze-right{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:110px;min-width:110px;max-width:110px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+  .freeze-right{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:150px;min-width:150px;max-width:150px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
   thead .freeze-right{z-index:4;}
   tbody .freeze-right{background:#fff;}
   tbody tr:hover .freeze-right{background:var(--bg);}
@@ -186,6 +186,31 @@
   .row-save{padding:5px 10px;font-size:11.5px;border-radius:6px;border:1px solid var(--green-deep);background:var(--green-deep);color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .row-edit-btn{padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-family:inherit;}
   .row-edit-btn:hover{background:var(--bg);}
+  .vns-freeze{position:sticky !important;background:var(--paper);z-index:2;box-shadow:2px 0 4px rgba(0,0,0,.08);}
+  thead .vns-freeze{z-index:4;white-space:normal !important;}
+  tbody .vns-freeze{background:#fff;}
+  .vns-freeze-1{left:0px;width:150px;min-width:150px;max-width:150px;}
+  .vns-freeze-2{left:150px;width:150px;min-width:150px;max-width:150px;}
+  .vns-freeze-3{left:300px;width:110px;min-width:110px;max-width:110px;}
+  .vns-freeze-4{left:410px;width:120px;min-width:120px;max-width:120px;box-shadow:2px 0 6px rgba(0,0,0,.12);}
+  .vns-olho{float:right;border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:13px;line-height:1.3;font-family:inherit;}
+  .vns-olho:hover{background:var(--bg);}
+  .vns-card-oculto > *:not(h3){display:none !important;}
+  input.dt-br{min-width:118px;padding-right:26px !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");background-repeat:no-repeat;background-position:right 6px center;background-size:15px;}
+  input.dt-br.dt-invalida{outline:2px solid var(--red);}
+  .cf-btn{border:1px solid var(--line);background:#fff;border-radius:5px;font-size:9px;line-height:1;padding:2px 4px;margin-left:4px;cursor:pointer;color:var(--ink-soft);vertical-align:middle;font-family:inherit;text-transform:none;letter-spacing:0;}
+  .cf-btn:hover{background:var(--bg);}
+  .cf-btn.active{background:#111;color:#fff;border-color:#111;font-weight:700;}
+  .cf-pop{position:fixed;z-index:4500;width:256px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:10px;font-size:12px;text-transform:none;letter-spacing:0;}
+  .cf-pop-tit{font-weight:700;font-size:11px;color:var(--ink);margin-bottom:6px;}
+  .cf-busca{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:12px;margin-bottom:6px;}
+  .cf-lista{max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:7px;padding:4px 6px;background:#fff;}
+  .cf-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;color:var(--ink);}
+  .cf-acoes{display:flex;gap:6px;margin-top:8px;}
+  .cf-acoes button{flex:1;padding:6px 8px;border:1px solid var(--line);background:#fff;border-radius:7px;font-family:inherit;font-size:11px;cursor:pointer;}
+  .cf-acoes button:hover{background:var(--bg);}
+  .cf-resumo{display:none;align-items:center;gap:10px;font-size:11px;color:var(--ink-soft);margin:6px 0 2px;}
+  .cf-limpar-tudo{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 9px;font-family:inherit;font-size:11px;cursor:pointer;}
   .row-save:hover{background:var(--green);}
   .row-save.saved{background:var(--lime);border-color:var(--lime);color:var(--green-deep);}
   .row-save.erro{background:var(--red);border-color:var(--red);}
@@ -300,6 +325,9 @@
   }
   .btn:hover{background:rgba(255,255,255,.12);}
   .btn.solid{background:var(--lime);border-color:var(--lime);color:#1a2019;font-weight:600;}
+  .btn.btn-preto{background:#111;border:1px solid #111;color:#fff;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.35);}
+  .btn.btn-preto:hover{background:#000;}
+  .btn.btn-preto:disabled{opacity:.6;cursor:default;}
   .btn.solid:hover{background:#8fb763;}
   #fileInput{display:none;}
 
@@ -618,7 +646,7 @@
         <button class="btn ghost" id="toggleFiltersBtn">🔍 Filtros</button>
         <span class="count-line" id="countLine"></span>
         <span style="flex:1;"></span>
-        <button class="btn" id="addTalhaoBtn">+ Adicionar talhão</button>
+        <button class="btn btn-preto" id="addTalhaoBtn">+ Adicionar talhão</button>
         <button class="btn ghost" id="exportBtn">📤 Exportar Excel</button>
         <button class="btn ghost" id="importBtn">📥 Importar Excel</button>
         <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display:none;">
@@ -791,7 +819,7 @@
           <h2>🌾 Projeto Estruturação</h2>
           <p class="sub">Histórico de acamamento, adoção da tecnologia e oportunidades por estado — mapa modulável e ranking de oportunidade.</p>
         </div>
-        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('estr')">📅 Cronograma</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="estruturacaoLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -813,7 +841,7 @@
           <h2>🧪 Óxido de Magnésio</h2>
           <p class="sub">Consumo de Óxido por estado — mapa modulável (dose média, teor de Mg médio, área tratada), volume aplicado e adoção por consultor.</p>
         </div>
-        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('oxc')">📅 Cronograma</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="oxidoConsumoLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -879,7 +907,7 @@
           <h2>🦠 Vida no Solo</h2>
           <p class="sub">Mapa modulável (nematoides, doenças e talhões por ponto), área do projeto, área por produto e tipo de teste.</p>
         </div>
-        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('vns')">📅 Cronograma</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="vidaNoSoloLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -901,7 +929,7 @@
           <h2>🌍 Visão Geral de Projetos</h2>
           <p class="sub">Mapa de pontos (Latitude/Longitude) de todos os 7 projetos, cada um com sua cor, e tabela de participação por talhão.</p>
         </div>
-        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('geral')">📅 Cronograma Geral</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="visaoGeralLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -923,7 +951,7 @@
           <h2>🌿 Projeto de Coleta Foliar 2026.27</h2>
           <p class="sub">Talhões de Soja com Data de Plantio informada — lembretes e status da coleta foliar.</p>
         </div>
-        <button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('cf')">📅 Cronograma</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="coletaFoliarLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -946,7 +974,7 @@
           <p class="sub">Clientes extras deste projeto — dados retidos só aqui, não fazem parte da base principal da Alimentação.</p>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn" id="regeneraAddBtn" style="font-size:16px;padding:14px 22px;box-shadow:0 3px 10px rgba(45,74,31,.35);">➕ Adicionar talhão</button>
+          <button class="btn btn-preto" id="regeneraAddBtn" style="font-size:16px;padding:14px 22px;box-shadow:0 3px 10px rgba(45,74,31,.35);">➕ Adicionar talhão</button>
           <button class="atualizar-dash-btn" onclick="carregarDadosRegenera(true)">🔄 Atualizar</button>
         </div>
       </div>
@@ -1667,7 +1695,7 @@ function renderAlimentacaoTable(){
               </select></td>
               ${geralCamposVisiveis.map(c=> c.__placeholder ? `<td class="col-oculta">···</td>` : `<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
               ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
-              <td class="freeze-right"><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button></td>
+              <td class="freeze-right"><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button> <button class="row-edit-btn row-del-btn" data-talhao-id="${t.id}" title="Excluir este talhão">🗑️</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
@@ -1737,6 +1765,17 @@ function renderAlimentacaoTable(){
   }
 
   area.querySelectorAll('.row-save').forEach(btn=> btn.addEventListener('click', ()=> salvarLinha(btn)));
+  area.querySelectorAll('.row-del-btn').forEach(btn=> btn.addEventListener('click', async ()=>{
+    const t = pageRows.find(r=>r.id===btn.dataset.talhaoId);
+    if(!t) return;
+    const nome = `${t.cliente} / ${t.fazenda} / ${t.talhao}`;
+    if(!confirm(`Excluir o talhão "${nome}"?`)) return;
+    if(!confirm(`ÚLTIMO AVISO: "${nome}" será apagado DEFINITIVAMENTE, junto com os dados de todos os projetos dele. Não dá pra desfazer. Confirmar exclusão?`)) return;
+    btn.disabled = true;
+    const { error } = await sb.from('talhoes').delete().eq('id', t.id);
+    if(error){ btn.disabled = false; alert('Erro ao excluir: '+error.message); return; }
+    await loadAlimentacao();
+  }));
   area.querySelectorAll('.row-edit-btn').forEach(btn=> btn.addEventListener('click', ()=>{
     const t = pageRows.find(r=>r.id===btn.dataset.talhaoId);
     if(t) abrirPainelEditarTalhao(t);
@@ -2315,7 +2354,7 @@ async function abrirPainelAddTalhao(){
 
         <div class="modal-actions">
           <button class="btn ghost" id="ftCancelBtn">Fechar</button>
-          <button class="btn" id="ftSalvarBtn">Salvar e adicionar outro</button>
+          <button class="btn btn-preto" id="ftSalvarBtn">Salvar e adicionar outro</button>
         </div>
       </div>
     </div>`;
@@ -2497,7 +2536,7 @@ function abrirPainelEditarTalhao(t){
 
       <div class="modal-actions">
         <button class="btn ghost" id="ftCancelBtn">Fechar</button>
-        <button class="btn" id="ftSalvarBtn">Salvar alterações</button>
+        <button class="btn btn-preto" id="ftSalvarBtn">Salvar alterações</button>
       </div>
     </div>
   </div>`;
@@ -2818,6 +2857,279 @@ sb.auth.getSession().then(({data:{session}})=>{
 });
 </script>
 <script>
+/* ===== FILTRO POR COLUNA GENÉRICO — qualquer <table data-colfilter="chave"> ganha um ▾ em cada cabeçalho ===== */
+const COLFILTROS = {}; // chaveTabela -> { rotuloColuna: Set(valores marcados) }
+let cfPop = null;
+function cfTextoTh(th){
+  const cl = th.cloneNode(true);
+  cl.querySelectorAll('.cf-btn').forEach(b=>b.remove());
+  return cl.textContent.replace(/\s+/g,' ').trim();
+}
+function cfValorCelula(td){
+  if(!td) return '(vazio)';
+  let v;
+  const sel = td.querySelector('select');
+  if(sel){ const o = sel.options[sel.selectedIndex]; v = o ? o.text : ''; }
+  else {
+    const inp = td.querySelector('input:not([type=checkbox])');
+    if(inp){
+      v = inp.value;
+      if((inp.type==='date' || inp.dataset.dtBr) && v && /^\d{4}-\d{2}-\d{2}$/.test(v)){ const p = v.split('-'); v = p[2]+'/'+p[1]+'/'+p[0]; }
+    } else v = td.textContent;
+  }
+  v = (v||'').replace(/\s+/g,' ').trim();
+  return (v==='' || v==='—') ? '(vazio)' : v;
+}
+function cfMapearColunas(table){
+  const rows = [...table.querySelectorAll('thead tr')];
+  const ocupado = [], cobre = [];
+  rows.forEach((tr,r)=>{
+    ocupado[r] = ocupado[r] || [];
+    let c = 0;
+    [...tr.children].forEach(th=>{
+      while(ocupado[r][c]) c++;
+      const cs = th.colSpan||1, rs = th.rowSpan||1;
+      for(let dr=0; dr<rs; dr++){
+        ocupado[r+dr] = ocupado[r+dr] || [];
+        for(let dc=0; dc<cs; dc++) ocupado[r+dr][c+dc] = true;
+      }
+      for(let dc=0; dc<cs; dc++) (cobre[c+dc] = cobre[c+dc] || []).push({ th, row:r });
+      c += cs;
+    });
+  });
+  const cols = [];
+  for(let c=0; c<cobre.length; c++){
+    const comTxt = (cobre[c]||[]).map(x=>({ th:x.th, row:x.row, txt:cfTextoTh(x.th) })).filter(x=>x.txt).sort((a,b)=>a.row-b.row);
+    const col = { idx:c, th:null, label:'', skip:true, btn:null };
+    if(comTxt.length){
+      const ultimo = comTxt[comTxt.length-1];
+      col.th = ultimo.th;
+      col.label = comTxt.slice(-3).map(x=>x.txt).join(' · ');
+      col.skip = /^(salvar|ações|acoes)$/i.test(ultimo.txt);
+    }
+    cols.push(col);
+  }
+  return cols;
+}
+function cfCalc(table){
+  const linhas = [...table.querySelectorAll('tbody tr')].filter(tr=> !(tr.children.length===1 && tr.children[0].colSpan>1));
+  const vals = linhas.map(tr=> table._cfCols.map(col=> cfValorCelula(tr.children[col.idx])));
+  return { linhas, vals };
+}
+// devolve o Set de valores do filtro daquela coluna, ou null se não há filtro efetivo
+function cfSetAtivo(table, col, calc){
+  const st = (COLFILTROS[table.dataset.colfilter]||{})[col.label];
+  if(!st || st.size===0) return null;
+  const distintos = new Set(calc.vals.map(v=>v[col.idx]));
+  let todos = true;
+  distintos.forEach(v=>{ if(!st.has(v)) todos = false; });
+  return todos ? null : st; // marcar tudo = sem filtro
+}
+function cfAplicar(table){
+  const calc = cfCalc(table), cols = table._cfCols;
+  const ativos = cols.map(col=> col.skip ? null : cfSetAtivo(table, col, calc));
+  let visiveis = 0;
+  calc.linhas.forEach((tr,r)=>{
+    const ok = ativos.every((s,c)=> !s || s.has(calc.vals[r][c]));
+    tr.style.display = ok ? '' : 'none';
+    if(ok) visiveis++;
+  });
+  cols.forEach((col,c)=>{
+    if(!col.btn) return;
+    const s = ativos[c];
+    col.btn.classList.toggle('active', !!s);
+    col.btn.textContent = s ? '▾ '+s.size : '▾';
+  });
+  if(table._cfResumo){
+    const algum = ativos.some(Boolean);
+    table._cfResumo.style.display = algum ? 'flex' : 'none';
+    table._cfResumo.querySelector('.cf-resumo-txt').textContent = 'Filtros por coluna ativos: mostrando '+visiveis+' de '+calc.linhas.length+' linhas.';
+  }
+  return calc;
+}
+function cfFecharPop(){ if(cfPop){ cfPop.remove(); cfPop = null; } }
+function cfAbrirPop(table, col, btn){
+  cfFecharPop();
+  const chave = table.dataset.colfilter;
+  COLFILTROS[chave] = COLFILTROS[chave] || {};
+  const pop = document.createElement('div');
+  pop.className = 'cf-pop';
+  pop.innerHTML = '<div class="cf-pop-tit"></div><input class="cf-busca" type="text" placeholder="Buscar valor…"><div class="cf-lista"></div><div class="cf-acoes"><button type="button" data-a="todos">Marcar todos</button><button type="button" data-a="limpar">Limpar seleção</button></div>';
+  pop.querySelector('.cf-pop-tit').textContent = col.label;
+  document.body.appendChild(pop);
+  cfPop = pop;
+  const busca = pop.querySelector('.cf-busca'), lista = pop.querySelector('.cf-lista');
+  const getSet = ()=> (COLFILTROS[chave][col.label] = COLFILTROS[chave][col.label] || new Set());
+  // opções dinâmicas: só valores das linhas que passam nos filtros das OUTRAS colunas
+  function opcoes(){
+    const calc = cfCalc(table);
+    const outros = table._cfCols.map(c=> (c.skip || c.idx===col.idx) ? null : cfSetAtivo(table, c, calc));
+    const set = new Set();
+    calc.linhas.forEach((tr,r)=>{ if(outros.every((s,c)=> !s || s.has(calc.vals[r][c]))) set.add(calc.vals[r][col.idx]); });
+    getSet().forEach(v=>set.add(v));
+    return [...set].sort((a,b)=> a==='(vazio)' ? 1 : b==='(vazio)' ? -1 : a.localeCompare(b,'pt-BR',{numeric:true}));
+  }
+  function desenhar(){
+    const termo = busca.value.trim().toLowerCase(), sel = getSet(), rolagem = lista.scrollTop;
+    lista.innerHTML = '';
+    opcoes().filter(v=> !termo || v.toLowerCase().includes(termo)).forEach(v=>{
+      const lb = document.createElement('label'); lb.className = 'cf-item';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sel.has(v);
+      cb.addEventListener('change', ()=>{ if(cb.checked) sel.add(v); else sel.delete(v); cfAplicar(table); desenhar(); });
+      const sp = document.createElement('span'); sp.textContent = v;
+      lb.appendChild(cb); lb.appendChild(sp); lista.appendChild(lb);
+    });
+    if(!lista.children.length) lista.textContent = 'Nenhum valor.';
+    lista.scrollTop = rolagem;
+  }
+  pop.querySelector('[data-a=todos]').addEventListener('click', ()=>{
+    const sel = getSet();
+    lista.querySelectorAll('.cf-item span').forEach(sp=> sel.add(sp.textContent));
+    cfAplicar(table); desenhar();
+  });
+  pop.querySelector('[data-a=limpar]').addEventListener('click', ()=>{ getSet().clear(); cfAplicar(table); desenhar(); });
+  busca.addEventListener('input', desenhar);
+  desenhar();
+  const r = btn.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth-270))+'px';
+  pop.style.top = Math.max(8, Math.min(r.bottom+4, window.innerHeight-360))+'px';
+  busca.focus();
+}
+function cfEnhance(table){
+  if(table.dataset.cfOk) return;
+  const chave = table.dataset.colfilter;
+  table._cfCols = cfMapearColunas(table);
+  table._cfCols.forEach(col=>{
+    if(col.skip || !col.th) return;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'cf-btn'; b.textContent = '▾'; b.title = 'Filtrar: '+col.label;
+    b.addEventListener('click', e=>{ e.stopPropagation(); cfAbrirPop(table, col, b); });
+    col.th.appendChild(b); col.btn = b;
+  });
+  const wrap = table.closest('.table-scroll, .vg-table-wrap') || table;
+  const res = document.createElement('div');
+  res.className = 'cf-resumo'; res.style.display = 'none';
+  res.innerHTML = '<span class="cf-resumo-txt"></span><button type="button" class="cf-limpar-tudo">Limpar todos os filtros</button>';
+  res.querySelector('button').addEventListener('click', ()=>{ COLFILTROS[chave] = {}; cfAplicar(table); });
+  wrap.after(res);
+  table._cfResumo = res;
+  table.dataset.cfOk = '1';
+  cfAplicar(table); // reaplica filtros guardados quando a tabela é redesenhada
+}
+function cfVarrer(){ document.querySelectorAll('table[data-colfilter]:not([data-cf-ok])').forEach(cfEnhance); }
+
+/* ===== COR DOS DROPDOWNS DE STATUS (Pendente/Executado/Feito) =====
+   Executado/Feito = verde. Pendente = sempre vermelho, do mais claro (ainda longe da data prevista)
+   ao mais escuro (já passou da data). Sem data prevista (modo simples) = vermelho médio. */
+function estiloStatusPorData(status, dataStr, usaData){
+  if(status==='Executado' || status==='Feito') return { bg:'#c8e6c9', fg:'#1b3a1f' };
+  let t;
+  if(!usaData) t = 0.3;
+  else if(!dataStr || isNaN(new Date(dataStr+'T00:00:00').getTime())) t = 0;
+  else {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const dias = Math.round((hoje - new Date(dataStr+'T00:00:00'))/86400000); // positivo = já passou da data prevista
+    t = Math.max(0, Math.min(1, (dias + 30) / 44)); // 30 dias antes = mais claro · 14 dias depois (ou mais) = mais escuro
+  }
+  const claro = [253,238,236], escuro = [198,40,40];
+  const rgb = claro.map((v,i)=> Math.round(v + (escuro[i]-v)*t));
+  return { bg:'rgb('+rgb.join(',')+')', fg: t>=0.55 ? '#fff' : '#4a1a1a' };
+}
+function corStatusPorData(status, dataStr, faixa){ return estiloStatusPorData(status, dataStr, faixa!==null).bg; }
+function recolorirStatusData(el){
+  const tr = el.closest('tr'); if(!tr) return;
+  const uid = el.dataset.corStatus !== undefined ? el.dataset.corStatus : el.dataset.corData;
+  const sel = tr.querySelector('[data-cor-status="'+uid+'"]');
+  if(!sel) return;
+  const dt = tr.querySelector('[data-cor-data="'+uid+'"]');
+  const e = estiloStatusPorData(sel.value, dt ? dt.value : '', sel.dataset.corFaixa!==undefined);
+  sel.style.background = e.bg; sel.style.color = e.fg; sel.style.fontWeight = '700';
+}
+
+/* ===== CAMPOS DE DATA SEMPRE EM dd/mm/aaaa =====
+   O seletor nativo (type=date) segue o idioma do navegador e aparece mm/dd/aaaa em navegador em inglês.
+   Aqui o próprio campo vira texto com máscara dd/mm/aaaa, mas continua devolvendo/aceitando aaaa-mm-dd em
+   .value — então todo o resto do app (salvar, cores, filtros) segue funcionando igual. O ícone 📅 à direita abre o calendário. */
+const DT_VALUE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+function dtIsoParaBr(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); return m ? m[3]+'/'+m[2]+'/'+m[1] : ''; }
+function dtBrParaIso(br){
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((br||'').trim());
+  if(!m) return '';
+  const d = +m[1], mo = +m[2], y = +m[3], dt = new Date(y, mo-1, d);
+  if(dt.getFullYear()!==y || dt.getMonth()!==mo-1 || dt.getDate()!==d) return '';
+  return m[3]+'-'+m[2]+'-'+m[1];
+}
+function dtMascara(txt){
+  const n = (txt||'').replace(/\D/g,'').slice(0,8);
+  if(n.length>4) return n.slice(0,2)+'/'+n.slice(2,4)+'/'+n.slice(4);
+  if(n.length>2) return n.slice(0,2)+'/'+n.slice(2);
+  return n;
+}
+function dtAbrirCalendario(el){
+  let h = document.getElementById('dtPickerGlobal');
+  if(!h){
+    h = document.createElement('input'); h.type = 'date'; h.id = 'dtPickerGlobal';
+    h.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+    document.body.appendChild(h);
+  }
+  const r = el.getBoundingClientRect();
+  h.style.left = r.left+'px'; h.style.top = r.bottom+'px';
+  h.value = el.value;
+  h.onchange = ()=>{ el.value = h.value; el.dispatchEvent(new Event('change', { bubbles:true })); };
+  if(h.showPicker){ try{ h.showPicker(); }catch(e){ h.focus(); } } else { h.focus(); h.click(); }
+}
+function dtEnhance(el){
+  if(el.dataset.dtBr) return;
+  const iso0 = el.value; // ainda é type=date: devolve aaaa-mm-dd
+  el.type = 'text';
+  el.dataset.dtBr = '1';
+  el.placeholder = 'dd/mm/aaaa'; el.maxLength = 10; el.inputMode = 'numeric'; el.autocomplete = 'off';
+  el.classList.add('dt-br');
+  Object.defineProperty(el, 'value', {
+    configurable:true,
+    get(){ return dtBrParaIso(DT_VALUE.get.call(el)); },
+    set(v){ DT_VALUE.set.call(el, dtIsoParaBr(v)); }
+  });
+  DT_VALUE.set.call(el, dtIsoParaBr(iso0));
+  el.dataset.dtUltimo = DT_VALUE.get.call(el);
+  el.addEventListener('input', ()=>{
+    const bruto = DT_VALUE.get.call(el), mascarado = dtMascara(bruto);
+    if(mascarado!==bruto) DT_VALUE.set.call(el, mascarado);
+    el.classList.remove('dt-invalida');
+  });
+  el.addEventListener('click', e=>{ if(e.offsetX > el.clientWidth - 26) dtAbrirCalendario(el); });
+}
+function dtVarrer(){ document.querySelectorAll('input[type=date]:not([data-dt-br]):not(#dtPickerGlobal)').forEach(dtEnhance); }
+// data digitada incompleta/inválida não chega nos handlers do app (evita apagar a data sem querer): volta pro último valor bom
+document.addEventListener('change', e=>{
+  const t = e.target;
+  if(!t || !t.classList || !t.classList.contains('dt-br')) return;
+  const bruto = DT_VALUE.get.call(t);
+  if(bruto!=='' && !dtBrParaIso(bruto)){
+    e.stopImmediatePropagation(); e.stopPropagation();
+    DT_VALUE.set.call(t, t.dataset.dtUltimo||'');
+    t.classList.add('dt-invalida'); setTimeout(()=>t.classList.remove('dt-invalida'), 1500);
+    return;
+  }
+  t.dataset.dtUltimo = bruto;
+}, true);
+function corVarrer(){
+  document.querySelectorAll('select[data-cor-status]:not([data-cor-ok])').forEach(s=>{ s.dataset.corOk = '1'; recolorirStatusData(s); });
+}
+document.addEventListener('change', e=>{
+  const t = e.target;
+  if(t && t.dataset && (t.dataset.corStatus!==undefined || t.dataset.corData!==undefined)) recolorirStatusData(t);
+});
+(function(){
+  let raf = null;
+  const agendar = ()=>{ if(raf) return; raf = requestAnimationFrame(()=>{ raf = null; dtVarrer(); cfVarrer(); corVarrer(); }); };
+  const iniciar = ()=>{ new MutationObserver(agendar).observe(document.body, { childList:true, subtree:true }); agendar(); };
+  if(document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
+  document.addEventListener('mousedown', e=>{ if(cfPop && !cfPop.contains(e.target) && !e.target.closest('.cf-btn')) cfFecharPop(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') cfFecharPop(); });
+  window.addEventListener('scroll', e=>{ if(cfPop && !cfPop.contains(e.target)) cfFecharPop(); }, true);
+})();
+
 (function(){
 
 /* ============================= ESTADO GLOBAL ============================= */
@@ -2913,6 +3225,7 @@ const ESTR_ETAPAS = [
   { key:'fotos', label:'Fotos', bloco:'R5/R6' },
   { key:'ground_cover_r5r6', label:'Ground Cover R5/R6', bloco:'R5/R6' },
 ];
+const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R5/R6':'#6b7a3f' };
 const ESTR_BLOCO_DAP = {
   'V4': { dap:25, faixa:3 },
   'R5/R6': { dap:80, faixa:5 },
@@ -2999,7 +3312,6 @@ function getMicroAcompEntry(key){
 
 // Estádios fenológicos da soja (ciclo ~125 dias) — DAP (dias após plantio) + janela de tolerância
 const VNS_ETAPAS = [
-  { key:'etapa1_plantio', label:'Etapa 1 – Plantio/Aplicação' },
   { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1)' },
   { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1)' },
   { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1)' },
@@ -3540,6 +3852,7 @@ async function carregarDadosDoSupabase(){
         vns_area_projeto: dvns.area_projeto_vns ?? null,
         vns_tipo_teste: dvns.tipo_teste_vns ?? null,
         vns_status_compra: dvns.status_compra ?? null,
+        vns_status_plantio: dvns.status_plantio ?? null,
         cf_msg1_status: dcf.msg1_status ?? null,
         cf_msg1_data: dcf.msg1_data ?? null,
         cf_msg2_status: dcf.msg2_status ?? null,
@@ -7526,7 +7839,7 @@ function renderEstruturacao(){
     <h3>🗓️ Acompanhamento</h3>
     <p class="sub-sm">Talhões com Área do projeto (Estruturação) &gt; 0 · ${acompRowsEstr.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
     <div class="table-scroll">
-      <table>
+      <table data-colfilter="estr-acomp">
         <thead><tr>
           <th colspan="8"></th>
           ${(()=>{
@@ -7537,7 +7850,7 @@ function renderEstruturacao(){
               if(e.bloco && ultimo && ultimo.bloco===e.bloco) ultimo.qtd++;
               else grupos.push({ bloco: e.bloco||null, qtd:1 });
             });
-            return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:#6b7a3f;color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
+            return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:${ESTR_BLOCO_COR[g.bloco]||'#6b7a3f'};color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
           })()}
           <th></th>
         </tr></thead>
@@ -7574,8 +7887,8 @@ function renderEstruturacao(){
               <td><input type="text" inputmode="numeric" class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="ciclo" value="${entry.ciclo!=null?entry.ciclo:''}" placeholder="—" style="width:50px;"></td>
               <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="tipo_material"><option value="" ${!entry.tipo_material?'selected':''}>—</option>${ESTR_TIPO_MATERIAL_OPTIONS.map(o=>`<option value="${o}" ${entry.tipo_material===o?'selected':''}>${o}</option>`).join('')}</select></td>
               ${ESTR_ETAPAS.map(e=>`
-                <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" value="${entry[e.key+'_mes']||dataPrevistaEstrStr(e.bloco)}"></td>
-                <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec">${EXECUCAO_OPTIONS.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
+                <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" value="${entry[e.key+'_mes']||dataPrevistaEstrStr(e.bloco)}"></td>
+                <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${e.key}" data-cor-faixa="${(ESTR_BLOCO_DAP[e.bloco]||{}).faixa||0}">${EXECUCAO_OPTIONS.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
               `).join('')}
               <td style="white-space:nowrap;">
                 <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button>
@@ -7915,7 +8228,7 @@ function renderOxidoConsumo(){
   if(state.oxidoConsumoPagina > totalPaginas) state.oxidoConsumoPagina = totalPaginas;
   if(state.oxidoConsumoPagina < 1) state.oxidoConsumoPagina = 1;
   const inicioPagina = (state.oxidoConsumoPagina-1)*PAGINA_TAM;
-  const paginaAtual = acompanhamentoLista.slice(inicioPagina, inicioPagina+PAGINA_TAM);
+  const paginaAtual = acompanhamentoLista; // todas as linhas — filtros por coluna cuidam do recorte
 
   container.innerHTML = `
   <style>
@@ -8035,7 +8348,7 @@ function renderOxidoConsumo(){
       </select>
     </div>
     <div class="table-scroll">
-      <table>
+      <table data-colfilter="oxc-acomp">
         <thead><tr>
           <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
           ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
@@ -8068,9 +8381,7 @@ function renderOxidoConsumo(){
       </table>
     </div>
     <div class="oxc-acomp-pag">
-      <button id="oxcAcompPrev" ${state.oxidoConsumoPagina<=1?'disabled':''}>◀ anterior</button>
-      <span>Página ${state.oxidoConsumoPagina} de ${totalPaginas} · ${acompanhamentoLista.length} talhão(ões)</span>
-      <button id="oxcAcompNext" ${state.oxidoConsumoPagina>=totalPaginas?'disabled':''}>próxima ▶</button>
+      <span>${acompanhamentoLista.length} talhão(ões)</span>
     </div>
   </div>
   `;
@@ -8715,179 +9026,234 @@ function abrirModalLadroesMaximasLista(uf, projeto, lista){
   document.getElementById('lmListaModalFechar').addEventListener('click', fechar);
   document.getElementById('lmListaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmListaModalOverlay') fechar(); });
 }
+/* ===== CRONOGRAMA — linha do tempo das avaliações previstas (Plantio + DAP). Um modal só, usado por
+   Vida no Solo, Estruturação, Óxido, Coleta Foliar, Ladrões/Máximas e Visão Geral ===== */
 const CG_MESES = [
   {key:'2026-09', label:'Set/26'}, {key:'2026-10', label:'Out/26'}, {key:'2026-11', label:'Nov/26'}, {key:'2026-12', label:'Dez/26'},
   {key:'2027-01', label:'Jan/27'}, {key:'2027-02', label:'Fev/27'}, {key:'2027-03', label:'Mar/27'}, {key:'2027-04', label:'Abr/27'},
 ];
-function abrirCronogramaGeralLM(){
-  if(!state.cgFiltroProjeto) state.cgFiltroProjeto = new Set();
-  if(!state.cgFiltroMes) state.cgFiltroMes = new Set();
-  if(!state.cgFiltroEstado) state.cgFiltroEstado = new Set();
-
-  const inicioRange = new Date(2026,8,1);
-  const fimRange = new Date(2027,4,0);
-  const talhoesLmTodos = RECORDS.filter(r=> r.max_selecao==='Ladrões' || r.max_selecao==='Máximas');
-
-  const pontos = [];
-  talhoesLmTodos.forEach(r=>{
-    if(!r.data_plantio) return;
-    const ocorrencias = r.max_selecao==='Ladrões' ? LM_OCORRENCIAS_LADROES : LM_OCORRENCIAS_MAXIMAS;
-    const dataPlantioObj = new Date(r.data_plantio+'T00:00:00');
-    ocorrencias.forEach(oc=>{
-      const prevista = new Date(dataPlantioObj); prevista.setDate(prevista.getDate()+oc.dap);
-      if(prevista<inicioRange || prevista>fimRange) return;
-      pontos.push({
-        dataStr: prevista.toISOString().slice(0,10), mesStr: prevista.toISOString().slice(0,7),
-        projeto: r.max_selecao, estado: (r.estado||'').toUpperCase(),
-        cliente: r.cliente, fazenda: r.fazenda, talhao: r.talhao, avaliacao: oc.avaliacaoLabel, estagio: oc.estagio,
-      });
+const CG_PROJ = {
+  ladroes: { label:'Ladrões', cor:'#b8352a' },
+  maximas: { label:'Máximas', cor:'#2e6e76' },
+  vns:     { label:'Vida no Solo', cor:'#1e88e5' },
+  estr:    { label:'Estruturação', cor:'#7cb342' },
+  oxc:     { label:'Óxido de Magnésio', cor:'#e6a700' },
+  cf:      { label:'Coleta Foliar', cor:'#8e44ad' },
+};
+const CG_CONTEXTOS = {
+  lm:    { titulo:'Cronograma Geral — Ladrões/Máximas', projetos:['ladroes','maximas'] },
+  vns:   { titulo:'Cronograma — Vida no Solo', projetos:['vns'] },
+  estr:  { titulo:'Cronograma — Estruturação', projetos:['estr'] },
+  oxc:   { titulo:'Cronograma — Óxido de Magnésio', projetos:['oxc'] },
+  cf:    { titulo:'Cronograma — Coleta Foliar 2026.27', projetos:['cf'] },
+  geral: { titulo:'Cronograma Geral — todos os projetos', projetos:['vns','estr','oxc','cf','ladroes','maximas'] },
+};
+function cgColetarPontos(projetos, ini, fim){
+  const out = [];
+  const add = (r, proj, dap, avaliacao, estagio)=>{
+    const d = new Date(r.data_plantio+'T00:00:00'); d.setDate(d.getDate()+dap);
+    if(d<ini || d>fim) return;
+    out.push({
+      dataStr:d.toISOString().slice(0,10), mesStr:d.toISOString().slice(0,7), projeto:proj,
+      estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', cliente:r.cliente||'', fazenda:r.fazenda||'', talhao:r.talhao||'',
+      avaliacao, estagio,
     });
+  };
+  RECORDS.forEach(r=>{
+    if(!r.data_plantio) return;
+    if(r.max_selecao==='Ladrões' && projetos.includes('ladroes')) LM_OCORRENCIAS_LADROES.forEach(oc=> add(r,'ladroes',oc.dap,oc.avaliacaoLabel,oc.estagio));
+    if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio));
+    if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
+      const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
+      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',42,rot(k),'R1'));
+      add(r,'vns',130,rot('etapa4_pos_colheita'),'Colheita');
+    }
+    if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
+      ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info) add(r,'estr',info.dap,e.label,e.bloco); });
+    }
+    if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',45,'Coleta foliar prevista (Etapa 3)','45 DAP');
+    if(projetos.includes('cf') && r.cultura==='Soja'){
+      add(r,'cf',CF_DAP_MSG1,'Mensagem de lembrete 1','35 DAP');
+      add(r,'cf',CF_DAP_MSG2,'Mensagem de lembrete 2','45 DAP');
+      add(r,'cf',CF_DAP_COLETA_PREVISTA,'Coleta foliar','45 DAP');
+    }
   });
-  const estadosDisp = [...new Set(pontos.map(p=>p.estado).filter(Boolean))].sort();
+  return out;
+}
+
+let cgPop = null, cgListeners = false;
+function cgFecharPop(){ if(cgPop){ cgPop.remove(); cgPop = null; } }
+function cgAbrirPop(btn, chave, titulo, getOpcoes, sel, aoMudar){
+  cgFecharPop();
+  const pop = document.createElement('div');
+  pop.className = 'cf-pop'; pop.style.zIndex = '6000'; pop.dataset.f = chave;
+  pop.innerHTML = '<div class="cf-pop-tit"></div><input class="cf-busca" type="text" placeholder="Buscar…"><div class="cf-lista"></div><div class="cf-acoes"><button type="button" data-a="todos">Marcar todos</button><button type="button" data-a="limpar">Limpar seleção</button></div>';
+  pop.querySelector('.cf-pop-tit').textContent = titulo;
+  document.body.appendChild(pop); cgPop = pop;
+  const busca = pop.querySelector('.cf-busca'), lista = pop.querySelector('.cf-lista');
+  function desenhar(){
+    const termo = busca.value.trim().toLowerCase(), rol = lista.scrollTop;
+    lista.innerHTML = '';
+    getOpcoes().filter(o=> !termo || o.l.toLowerCase().includes(termo)).forEach(o=>{
+      const lb = document.createElement('label'); lb.className = 'cf-item'; lb.dataset.v = o.v;
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sel.has(o.v);
+      cb.addEventListener('change', ()=>{ if(cb.checked) sel.add(o.v); else sel.delete(o.v); aoMudar(); desenhar(); });
+      const sp = document.createElement('span'); sp.textContent = o.l;
+      lb.appendChild(cb); lb.appendChild(sp); lista.appendChild(lb);
+    });
+    if(!lista.children.length) lista.textContent = 'Nenhum valor.';
+    lista.scrollTop = rol;
+  }
+  pop.querySelector('[data-a=todos]').addEventListener('click', ()=>{ lista.querySelectorAll('.cf-item').forEach(lb=> sel.add(lb.dataset.v)); aoMudar(); desenhar(); });
+  pop.querySelector('[data-a=limpar]').addEventListener('click', ()=>{ sel.clear(); aoMudar(); desenhar(); });
+  busca.addEventListener('input', desenhar);
+  desenhar();
+  const r = btn.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth-270))+'px';
+  pop.style.top = Math.max(8, Math.min(r.bottom+4, window.innerHeight-360))+'px';
+  busca.focus();
+}
+
+function abrirCronogramaGeral(ctxKey){
+  const ctx = CG_CONTEXTOS[ctxKey]; if(!ctx) return;
+  state.cgF = state.cgF || {};
+  const F = state.cgF[ctxKey] = state.cgF[ctxKey] || {};
+  const FILTROS = [
+    ...(ctx.projetos.length>1 ? [{k:'projeto', label:'Projeto'}] : []),
+    {k:'mes', label:'Mês'}, {k:'estado', label:'Estado'}, {k:'consultor', label:'Consultor'},
+    {k:'cliente', label:'Cliente'}, {k:'fazenda', label:'Fazenda'}, {k:'talhao', label:'Talhão'},
+  ];
+  FILTROS.forEach(f=>{ if(!F[f.k]) F[f.k] = new Set(); });
+  const inicioRange = new Date(2026,8,1), fimRange = new Date(2027,4,0);
+  const pontos = cgColetarPontos(ctx.projetos, inicioRange, fimRange);
+
+  const valorDe = (p,k)=> k==='projeto' ? p.projeto : k==='mes' ? p.mesStr : p[k];
+  const rotuloDe = (k,v)=> k==='projeto' ? CG_PROJ[v].label : k==='mes' ? ((CG_MESES.find(m=>m.key===v)||{}).label||v) : v;
+  const passa = (p, ignorar)=> FILTROS.every(f=> f.k===ignorar || F[f.k].size===0 || F[f.k].has(valorDe(p,f.k)));
+  const opcoesDe = k=>{
+    const set = new Set(); pontos.forEach(p=>{ if(passa(p,k)) set.add(valorDe(p,k)); });
+    F[k].forEach(v=>set.add(v));
+    return [...set].sort((a,b)=> a.localeCompare(b,'pt-BR',{numeric:true})).map(v=>({v, l:rotuloDe(k,v)}));
+  };
+  const textoBtn = f=>{
+    const s = F[f.k];
+    if(s.size===0) return f.label+': Todos';
+    if(s.size===1) return f.label+': '+rotuloDe(f.k,[...s][0]);
+    return f.label+': '+s.size+' selec.';
+  };
 
   const modalRoot = document.getElementById('modalRoot');
-  function render(){
-    const filtrados = pontos.filter(p=>
-      (state.cgFiltroProjeto.size===0 || state.cgFiltroProjeto.has(p.projeto)) &&
-      (state.cgFiltroEstado.size===0 || state.cgFiltroEstado.has(p.estado)) &&
-      (state.cgFiltroMes.size===0 || state.cgFiltroMes.has(p.mesStr))
-    );
-    const porDia = {};
-    filtrados.forEach(p=>{
-      const grupoKey = p.dataStr+'|'+p.cliente+'|'+p.fazenda+'|'+p.talhao;
-      if(!porDia[p.dataStr]) porDia[p.dataStr] = {};
-      if(!porDia[p.dataStr][grupoKey]) porDia[p.dataStr][grupoKey] = { ...p, avaliacoes: [] };
-      porDia[p.dataStr][grupoKey].avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
-    });
+  modalRoot.innerHTML = `
+  <style>
+    .cg-timeline-wrap{overflow-x:auto;padding-bottom:6px;}
+    .cg-timeline{position:relative;min-width:900px;margin:30px 10px 0;}
+    .cg-timeline-eixo{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--line);}
+    .cg-mes-label{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:10px;color:var(--ink-soft);font-weight:700;}
+    .cg-hoje-linha{position:absolute;top:0;bottom:0;width:1.5px;background:#e67e22;z-index:1;}
+    .cg-hoje-label{position:absolute;top:-16px;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#e67e22;}
+    .cg-dot{position:absolute;width:9px;height:9px;border-radius:50%;transform:translateX(-50%);cursor:pointer;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2);z-index:2;}
+    .cg-dot:hover{transform:translateX(-50%) scale(1.5);}
+    .cg-detalhe{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12.5px;min-height:20px;margin-top:26px;}
+    .cg-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;}
+    .cg-fbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
+    .cg-fbtn:hover{background:var(--bg);}
+    .cg-fbtn.ativo{background:#111;color:#fff;border-color:#111;}
+    .cg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
+    .cg-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
+    .cg-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+  </style>
+  <div class="modal-overlay" id="cgOverlay">
+    <div class="modal-panel" style="max-width:96vw;width:1400px;max-height:94vh;display:flex;flex-direction:column;">
+      <h2>📅 ${ctx.titulo}</h2>
+      <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Datas previstas (Plantio + DAP) das avaliações, Set/2026 a Abr/2027.</p>
+      <div class="cg-filtros" id="cgBarra"></div>
+      <div id="cgLeg"></div>
+      <div id="cgArea"></div>
+      <div class="cg-detalhe" id="cgDetalhe"></div>
+      <p class="sub-sm" id="cgContagem" style="margin-top:6px;"></p>
+      <div class="modal-actions"><button class="btn ghost" id="cgFecharBtn">Fechar</button></div>
+    </div>
+  </div>`;
+  const detEl = document.getElementById('cgDetalhe');
+  const fechar = ()=>{ cgFecharPop(); modalRoot.innerHTML = ''; };
+  document.getElementById('cgFecharBtn').addEventListener('click', fechar);
+  document.getElementById('cgOverlay').addEventListener('click', e=>{ if(e.target.id==='cgOverlay') fechar(); });
+  if(!cgListeners){
+    cgListeners = true;
+    document.addEventListener('mousedown', e=>{ if(cgPop && !cgPop.contains(e.target) && !e.target.closest('.cg-fbtn')) cgFecharPop(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') cgFecharPop(); });
+  }
 
-    // se só 1 mês estiver marcado no filtro, dá um "zoom" nele — mostra dia a dia em vez do período inteiro
+  function desenharBarra(){
+    const barra = document.getElementById('cgBarra');
+    barra.innerHTML = FILTROS.map(f=>`<button type="button" class="cg-fbtn ${F[f.k].size?'ativo':''}" data-f="${f.k}">${textoBtn(f)} ▾</button>`).join('')
+      + (FILTROS.some(f=>F[f.k].size) ? '<button type="button" class="cg-limpar" id="cgLimparTudo">Limpar todos os filtros</button>' : '');
+    barra.querySelectorAll('.cg-fbtn').forEach(btn=> btn.addEventListener('click', ()=>{
+      const f = FILTROS.find(x=>x.k===btn.dataset.f);
+      if(cgPop && cgPop.dataset.f===f.k){ cgFecharPop(); return; }
+      cgAbrirPop(btn, f.k, f.label, ()=>opcoesDe(f.k), F[f.k], ()=>{ desenharBarra(); desenharTimeline(); });
+    }));
+    const lt = document.getElementById('cgLimparTudo');
+    if(lt) lt.addEventListener('click', ()=>{ FILTROS.forEach(f=>F[f.k].clear()); cgFecharPop(); desenharBarra(); desenharTimeline(); });
+  }
+
+  function desenharTimeline(){
+    const filtrados = pontos.filter(p=>passa(p,null));
+    const mapa = new Map();
+    filtrados.forEach(p=>{
+      const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
+      if(!mapa.has(chave)) mapa.set(chave, { ...p, avaliacoes:[] });
+      mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
+    });
+    const grupos = [...mapa.values()];
+
     let rangeInicio = inicioRange, rangeFim = fimRange, zoomMes = null;
-    if(state.cgFiltroMes.size===1){
-      zoomMes = [...state.cgFiltroMes][0];
+    if(F.mes.size===1){
+      zoomMes = [...F.mes][0];
       const [ano, mes] = zoomMes.split('-').map(Number);
-      rangeInicio = new Date(ano, mes-1, 1);
-      rangeFim = new Date(ano, mes, 0);
+      rangeInicio = new Date(ano, mes-1, 1); rangeFim = new Date(ano, mes, 0);
     }
     const totalMs = rangeFim - rangeInicio;
-    const pctDe = (d)=> ((new Date(d+'T00:00:00') - rangeInicio) / totalMs) * 100;
+    const pctDe = d=> ((new Date(d+'T00:00:00') - rangeInicio) / totalMs) * 100;
 
-    let eixoHtml;
+    const pilha = {};
+    grupos.forEach(g=>{ g.i = pilha[g.dataStr] || 0; pilha[g.dataStr] = g.i + 1; });
+    const maxPilha = Math.max(0, ...Object.values(pilha));
+    const passo = maxPilha>0 ? Math.max(5, Math.min(13, Math.floor(380/maxPilha))) : 13;
+    const altura = Math.max(160, 34 + maxPilha*passo);
+
+    const dots = grupos.map((g,idx)=>`<div class="cg-dot" style="left:${pctDe(g.dataStr)}%;bottom:${4+g.i*passo}px;background:${CG_PROJ[g.projeto].cor};" data-g="${idx}" title="${g.fazenda} — ${g.talhao} (${CG_PROJ[g.projeto].label})"></div>`).join('');
+
+    let eixo = '';
     if(zoomMes){
-      const diasNoMes = rangeFim.getDate();
-      const labels = [];
-      for(let d=1; d<=diasNoMes; d+= (diasNoMes>20?2:1)){ // pula de 2 em 2 se o mês tiver muito dia, pra não amontoar os números
-        const dataDia = new Date(rangeInicio.getFullYear(), rangeInicio.getMonth(), d);
-        labels.push(`<div class="cg-mes-label" style="left:${((dataDia-rangeInicio)/totalMs)*100}%;">${d}</div>`);
+      const dias = rangeFim.getDate();
+      for(let d=1; d<=dias; d+=(dias>20?2:1)){
+        const dt = new Date(rangeInicio.getFullYear(), rangeInicio.getMonth(), d);
+        eixo += `<div class="cg-mes-label" style="left:${((dt-rangeInicio)/totalMs)*100}%;">${d}</div>`;
       }
-      eixoHtml = labels.join('');
     } else {
-      eixoHtml = CG_MESES.map(m=>`<div class="cg-mes-label" style="left:${pctDe(m.key+'-01')}%;">${m.label}</div>`).join('');
+      eixo = CG_MESES.map(m=>`<div class="cg-mes-label" style="left:${pctDe(m.key+'-01')}%;">${m.label}</div>`).join('');
     }
-
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const linhaHojeHtml = (hoje>=rangeInicio && hoje<=rangeFim)
-      ? `<div class="cg-hoje-linha" style="left:${((hoje-rangeInicio)/totalMs)*100}%;" title="Hoje"></div><div class="cg-hoje-label" style="left:${((hoje-rangeInicio)/totalMs)*100}%;">Hoje</div>`
-      : '';
+    const linhaHoje = (hoje>=rangeInicio && hoje<=rangeFim)
+      ? `<div class="cg-hoje-linha" style="left:${((hoje-rangeInicio)/totalMs)*100}%;"></div><div class="cg-hoje-label" style="left:${((hoje-rangeInicio)/totalMs)*100}%;">Hoje</div>` : '';
 
-    const dotsHtml = Object.entries(porDia).map(([dia, grupos])=> Object.values(grupos).map((p,i)=>{
-      const cor = p.projeto==='Ladrões' ? '#b8352a' : '#2e6e76';
-      return `<div class="cg-dot" style="left:${pctDe(dia)}%;bottom:${4+i*13}px;background:${cor};" data-cg='${encodeURIComponent(JSON.stringify(p))}' title="${p.fazenda} — ${p.talhao} (${p.avaliacoes.length} avaliação(ões))"></div>`;
-    }).join('')).join('');
-
-    modalRoot.innerHTML = `
-    <style>
-      .cg-timeline-wrap{overflow-x:auto;padding-bottom:6px;}
-      .cg-timeline{position:relative;height:160px;min-width:900px;margin:30px 10px 0;}
-      .cg-timeline-eixo{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--line);}
-      .cg-mes-label{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:10px;color:var(--ink-soft);font-weight:700;}
-      .cg-hoje-linha{position:absolute;top:0;bottom:0;width:1.5px;background:#e67e22;z-index:1;}
-      .cg-hoje-label{position:absolute;top:-16px;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#e67e22;}
-      .cg-dot{position:absolute;width:9px;height:9px;border-radius:50%;transform:translateX(-50%);cursor:pointer;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15);}
-      .cg-dot:hover{transform:translateX(-50%) scale(1.4);}
-      .cg-detalhe{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12.5px;min-height:20px;margin-top:22px;}
-      .cg-checklist{max-height:110px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;min-width:140px;}
-    </style>
-    <div class="modal-overlay" id="cgOverlay">
-      <div class="modal-panel" style="max-width:96vw;width:1400px;max-height:94vh;display:flex;flex-direction:column;">
-        <h2>📅 Cronograma Geral — Ladrões/Máximas</h2>
-        <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Datas previstas (Plantio + DAP) de todas as avaliações, Set/2026 a Abr/2027.</p>
-
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
-          <div class="fitem">
-            <label>Projeto</label>
-            <div class="cg-checklist" id="cgChkProjeto">
-              ${['Ladrões','Máximas'].map(o=>`<label class="checklist-item"><input type="checkbox" value="${o}" ${state.cgFiltroProjeto.has(o)?'checked':''}> ${o}</label>`).join('')}
-            </div>
-            <div class="ms-actions"><button data-todos="cgChkProjeto">Marcar todos</button><button data-limpar="cgChkProjeto">Limpar</button></div>
-          </div>
-          <div class="fitem">
-            <label>Mês</label>
-            <div class="cg-checklist" id="cgChkMes">
-              ${CG_MESES.map(m=>`<label class="checklist-item"><input type="checkbox" value="${m.key}" ${state.cgFiltroMes.has(m.key)?'checked':''}> ${m.label}</label>`).join('')}
-            </div>
-            <div class="ms-actions"><button data-todos="cgChkMes">Marcar todos</button><button data-limpar="cgChkMes">Limpar</button></div>
-          </div>
-          <div class="fitem">
-            <label>Estado</label>
-            <div class="cg-checklist" id="cgChkEstado">
-              ${estadosDisp.map(uf=>`<label class="checklist-item"><input type="checkbox" value="${uf}" ${state.cgFiltroEstado.has(uf)?'checked':''}> ${uf}</label>`).join('')}
-            </div>
-            <div class="ms-actions"><button data-todos="cgChkEstado">Marcar todos</button><button data-limpar="cgChkEstado">Limpar</button></div>
-          </div>
-        </div>
-
-        <div class="cg-timeline-wrap">
-          <div class="cg-timeline">
-            <div class="cg-timeline-eixo"></div>
-            ${eixoHtml}
-            ${linhaHojeHtml}
-            ${dotsHtml}
-          </div>
-        </div>
-        <div class="cg-detalhe" id="cgDetalhe">Clique numa bolinha pra ver o que é. 🔴 Ladrões · 🔵 Máximas</div>
-        <p class="sub-sm" style="margin-top:6px;">${filtrados.length} avaliação(ões) prevista(s) nesse filtro.</p>
-
-        <div class="modal-actions">
-          <button class="btn ghost" id="cgFecharBtn">Fechar</button>
-        </div>
-      </div>
-    </div>`;
-
-    function ligarChecklist(elId, targetSet){
-      const box = document.getElementById(elId);
-      box.addEventListener('change', ()=>{
-        targetSet.clear();
-        box.querySelectorAll('input:checked').forEach(cb=> targetSet.add(cb.value));
-        render();
-      });
-    }
-    ligarChecklist('cgChkProjeto', state.cgFiltroProjeto);
-    ligarChecklist('cgChkMes', state.cgFiltroMes);
-    ligarChecklist('cgChkEstado', state.cgFiltroEstado);
-    document.querySelectorAll('[data-todos]').forEach(btn=> btn.addEventListener('click', ()=>{
-      const box = document.getElementById(btn.dataset.todos);
-      const sets = { cgChkProjeto: state.cgFiltroProjeto, cgChkMes: state.cgFiltroMes, cgChkEstado: state.cgFiltroEstado };
-      box.querySelectorAll('input').forEach(cb=>{ cb.checked = true; sets[btn.dataset.todos].add(cb.value); });
-      render();
+    document.getElementById('cgLeg').innerHTML = ctx.projetos.length>1
+      ? '<div class="cg-leg">'+ctx.projetos.map(k=>`<span><i style="background:${CG_PROJ[k].cor}"></i>${CG_PROJ[k].label} (${grupos.filter(g=>g.projeto===k).length})</span>`).join('')+'</div>' : '';
+    document.getElementById('cgArea').innerHTML = `<div class="cg-timeline-wrap"><div class="cg-timeline" style="height:${altura}px;"><div class="cg-timeline-eixo"></div>${eixo}${linhaHoje}${dots}</div></div>`;
+    detEl.textContent = 'Clique numa bolinha pra ver o que é.';
+    document.getElementById('cgContagem').textContent = `${filtrados.length} avaliação(ões) prevista(s) · ${grupos.length} bolinha(s) nesse filtro.`;
+    document.querySelectorAll('#cgArea .cg-dot').forEach(dot=> dot.addEventListener('click', ()=>{
+      const g = grupos[Number(dot.dataset.g)];
+      const lista = g.avaliacoes.map(a=>`${a.avaliacao} (${a.estagio})`).join(', ');
+      detEl.innerHTML = `<b>${g.cliente} / ${g.fazenda} / ${g.talhao}</b> (${CG_PROJ[g.projeto].label}, ${g.estado||'—'}${g.consultor?', '+g.consultor:''}) — previstas pra ${new Date(g.dataStr+'T00:00:00').toLocaleDateString('pt-BR')}: <b>${lista}</b>`;
     }));
-    document.querySelectorAll('[data-limpar]').forEach(btn=> btn.addEventListener('click', ()=>{
-      const sets = { cgChkProjeto: state.cgFiltroProjeto, cgChkMes: state.cgFiltroMes, cgChkEstado: state.cgFiltroEstado };
-      sets[btn.dataset.limpar].clear();
-      render();
-    }));
-    document.getElementById('cgFecharBtn').addEventListener('click', ()=>{ modalRoot.innerHTML=''; });
-    document.getElementById('cgOverlay').addEventListener('click', (e)=>{ if(e.target.id==='cgOverlay') modalRoot.innerHTML=''; });
-    document.querySelectorAll('.cg-dot').forEach(dot=>{
-      dot.addEventListener('click', ()=>{
-        const p = JSON.parse(decodeURIComponent(dot.dataset.cg));
-        const det = document.getElementById('cgDetalhe');
-        const lista = p.avaliacoes.map(a=>`${a.avaliacao} (${a.estagio})`).join(', ');
-        det.innerHTML = `<b>${p.cliente} / ${p.fazenda} / ${p.talhao}</b> (${p.projeto}, ${p.estado}) — previstas pra ${new Date(p.dataStr+'T00:00:00').toLocaleDateString('pt-BR')}: <b>${lista}</b>`;
-      });
-    });
   }
-  render();
+  desenharBarra();
+  desenharTimeline();
 }
+window.abrirCronogramaGeral = abrirCronogramaGeral;
+function abrirCronogramaGeralLM(){ abrirCronogramaGeral('lm'); }
 
 function abrirModalLadroesMaximasTalhao(rec){
   const modalRoot = document.getElementById('modalRoot');
@@ -9189,7 +9555,7 @@ function renderLadroesMaximasMapa(){
       </select>
     </div>
     <span style="font-size:10.5px;color:var(--ink-soft);">${selFiltrados.length} de ${selecionados.length} talhão(ões) — controla o mapa, os KPIs, o gráfico e a tabela abaixo</span>
-    <button class="btn" id="lmCronogramaGeralBtn" style="margin-left:auto;">📅 Cronograma Geral</button>
+    <button class="btn btn-preto" id="lmCronogramaGeralBtn" style="margin-left:auto;">📅 Cronograma Geral</button>
   </div>
 
   <div class="lm-proxima-row">
@@ -9259,7 +9625,7 @@ function renderLadroesMaximasMapa(){
         <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
         <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
         <div class="table-scroll">
-          <table>
+          <table data-colfilter="lm-acomp-${String(titulo).replace(/\s+/g,'-')}">
             <thead>
             <tr>
               <th rowspan="4">Cliente</th><th rowspan="4">Fazenda</th><th rowspan="4">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th>
@@ -9293,7 +9659,7 @@ function renderLadroesMaximasMapa(){
                   <td class="mono-td">${fmtNum(r.area,1)}</td>
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
+                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
                   <td style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
@@ -9473,6 +9839,41 @@ function abrirModalVidaNoSoloTalhao(rec){
     vns_doenca_rhizoctonia:'Doença Rhizoctonia', vns_morte_plantas:'Morte de plantas',
   };
   const presentesSim = Object.entries(NEMA_DOENCA_LABELS).filter(([k])=> rec[k]==='Sim').map(([,label])=>label);
+
+  // linha do tempo: cada estádio (R1, Colheita) vira 1 bolinha com as etapas dele — mesmo padrão do modal do Ladrões/Máximas.
+  // vermelha = tem etapa atrasada · verde = tudo feito no prazo · cinza = ainda só previsão
+  const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
+  const hojeTl = new Date(); hojeTl.setHours(0,0,0,0);
+  const VNS_ESTAGIOS = [
+    { estagio:'R1', dap:42, faixa:4, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
+    { estagio:'Colheita', dap:130, faixa:5, etapas:['etapa4_pos_colheita'] },
+  ];
+  const gruposEstagio = VNS_ESTAGIOS.map(est=>{
+    const esperada = dataPlantioObj ? (()=>{ const d = new Date(dataPlantioObj); d.setDate(d.getDate()+est.dap); return d; })() : null;
+    const detalhes = est.etapas.map(key=>{
+      const def = VNS_ETAPAS.find(e=>e.key===key);
+      const feito = rec['vns_'+key]==='Executado';
+      const dReal = rec['vns_'+key+'_data'] ? new Date(rec['vns_'+key+'_data']+'T00:00:00') : null;
+      let status = 'previsto', sub = 'previsto', dataMostrar = esperada;
+      if(feito){
+        if(dReal && esperada){
+          const diff = Math.round((dReal-esperada)/86400000);
+          dataMostrar = dReal;
+          if(Math.abs(diff)<=est.faixa){ status='no_prazo'; sub='no prazo'; }
+          else { status = diff>0 ? 'atrasado' : 'adiantado'; sub = diff>0 ? `${diff}d atrasado` : `${Math.abs(diff)}d adiantado`; }
+        } else { status='executado'; sub='executado (sem data)'; dataMostrar = dReal; }
+      } else if(esperada){
+        const diasPassou = Math.round((hojeTl-esperada)/86400000);
+        if(diasPassou > est.faixa){ status='atrasado'; sub=`pendente — ${diasPassou}d atrasado`; }
+        else sub = 'pendente — previsto';
+      } else { sub = 'pendente'; dataMostrar = null; }
+      return { label: def ? def.label : key, status, sub, data: dataMostrar };
+    });
+    const temAtrasado = detalhes.some(x=>x.status==='atrasado');
+    const todasOk = detalhes.length>0 && detalhes.every(x=>x.status==='no_prazo'||x.status==='adiantado'||x.status==='executado');
+    const cor = temAtrasado ? '#e74c3c' : (todasOk ? '#2ecc71' : '#c7cdbd');
+    return { estagio: est.estagio, cor, data: esperada, dap: est.dap, faixa: est.faixa, detalhes };
+  });
   modalRoot.innerHTML = `
   <div class="modal-overlay" id="vnsTalhaoModalOverlay">
     <div class="modal-panel" style="max-width:1000px;">
@@ -9494,6 +9895,37 @@ function abrirModalVidaNoSoloTalhao(rec){
           <tr><td style="padding:4px 8px;color:var(--ink-soft);">Estado</td><td style="padding:4px 8px;">${rec.estado||'—'}</td><td style="padding:4px 8px;color:var(--ink-soft);">Cidade</td><td style="padding:4px 8px;">${rec.cidade||'—'}</td></tr>
         </tbody>
       </table>
+
+      <style>
+        .vns-tl2{position:relative;display:flex;justify-content:space-between;align-items:flex-start;padding-top:6px;}
+        .vns-tl2-track{position:absolute;left:14px;right:14px;top:16px;height:3px;background:var(--line);border-radius:2px;z-index:0;}
+        .vns-tl2-item{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;}
+        .vns-tl2-clicavel{cursor:pointer;}
+        .vns-tl2-clicavel:hover .vns-tl2-dot{transform:scale(1.2);}
+        .vns-tl2-dot{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);transition:.15s;}
+        .vns-tl2-label{font-size:10.5px;font-weight:700;color:var(--ink);}
+        .vns-tl2-date{font-size:9px;color:var(--ink-soft);}
+        .vns-tl2-detalhe-card{background:var(--bg);border-radius:10px;padding:12px 14px;}
+        .vns-tl2-detalhe-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px;}
+        .vns-tl2-detalhe-item:last-child{border-bottom:none;}
+      </style>
+      <h3 style="font-size:13px;margin:0 0 4px;">Linha do tempo — Plantio e Etapas</h3>
+      <p class="sub" style="margin:0 0 8px;font-size:10.5px;">Clique num estádio pra ver as etapas dele. 🔴 tem algo atrasado · 🟢 tudo em dia · ⚪ ainda só previsão.</p>
+      <div class="vns-tl2">
+        <div class="vns-tl2-track"></div>
+        <div class="vns-tl2-item">
+          <div class="vns-tl2-dot" style="background:#5c7a3f;"></div>
+          <div class="vns-tl2-label">Plantio</div>
+          <div class="vns-tl2-date">${dataPlantioObj ? dataPlantioObj.toLocaleDateString('pt-BR') : '—'}</div>
+        </div>
+        ${gruposEstagio.map((g,i)=>`<div class="vns-tl2-item vns-tl2-clicavel" data-tl-idx="${i}">
+          <div class="vns-tl2-dot" style="background:${g.cor};"></div>
+          <div class="vns-tl2-label">${g.estagio}</div>
+          <div class="vns-tl2-date">${g.data ? g.data.toLocaleDateString('pt-BR') : '—'}</div>
+        </div>`).join('')}
+      </div>
+      <div id="vnsTl2Detalhe" style="margin:14px 0 16px;"></div>
+      ${dataPlantioObj ? '' : '<p class="sub" style="margin:-6px 0 16px;font-size:11px;">Sem Data de plantio na Alimentação — as datas esperadas não podem ser calculadas.</p>'}
 
       <h3 style="font-size:13px;margin:0 0 8px;">Análise de solo (0-20cm e 20-40cm)</h3>
       <div class="table-scroll" style="margin-bottom:16px;">
@@ -9538,6 +9970,27 @@ function abrirModalVidaNoSoloTalhao(rec){
   const fechar = ()=>{ modalRoot.innerHTML = ''; };
   document.getElementById('vnsTalhaoModalFechar').addEventListener('click', fechar);
   document.getElementById('vnsTalhaoModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='vnsTalhaoModalOverlay') fechar(); });
+  const detalheEl = document.getElementById('vnsTl2Detalhe');
+  document.querySelectorAll('.vns-tl2-clicavel').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      const jaAberto = item.classList.contains('aberto');
+      document.querySelectorAll('.vns-tl2-clicavel').forEach(i=>i.classList.remove('aberto'));
+      if(jaAberto){ detalheEl.innerHTML = ''; return; }
+      item.classList.add('aberto');
+      const g = gruposEstagio[Number(item.dataset.tlIdx)];
+      detalheEl.innerHTML = `
+      <div class="vns-tl2-detalhe-card">
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px;">${g.estagio} · esperado ${g.data?g.data.toLocaleDateString('pt-BR'):'—'} (±${g.faixa} dias)</div>
+        ${g.detalhes.map(d=>{
+          const cor = (d.status==='no_prazo'||d.status==='adiantado'||d.status==='executado') ? '#2ecc71' : d.status==='atrasado' ? '#e74c3c' : '#9aa08e';
+          return `<div class="vns-tl2-detalhe-item">
+            <span>${d.label}</span>
+            <span style="color:${cor};font-weight:700;white-space:nowrap;">${d.sub}${d.data?' — '+d.data.toLocaleDateString('pt-BR'):''}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+  });
 }
 function renderVidaNoSolo(){
   const container = document.getElementById('tab-vida-no-solo');
@@ -9780,12 +10233,13 @@ function renderVidaNoSolo(){
     </div>
 
     <div class="vns-card full-card" style="margin-top:12px;">
-      <h3>📋 Talhões do projeto</h3>
+      <h3>🗓️ Acompanhamento</h3>
       <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
-      <div class="table-scroll vns-tabela-limitada">
-        <table>
+      <div class="table-scroll">
+        <table data-colfilter="vns-talhoes">
           <thead><tr>
-            <th rowspan="2">Cliente</th><th rowspan="2">Fazenda</th><th rowspan="2">Talhão</th><th rowspan="2">Área do talhão (ha)</th>
+            <th rowspan="2" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="2" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="2" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="2" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
+            <th rowspan="2">Data de plantio</th><th rowspan="2">Status do Plantio</th>
             <th rowspan="2">Presença de nematoides</th><th rowspan="2">Presença de doenças</th><th rowspan="2">Participação no projeto</th><th rowspan="2">Status de compra</th>
             ${VNS_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
             <th rowspan="2">Salvar</th>
@@ -9799,19 +10253,25 @@ function renderVidaNoSolo(){
               const temDoenca = DOENCA_CAMPOS.some(c=>r[c]==='Sim');
               const participa = r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0;
               return `<tr>
-                <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
-                <td class="mono-td">${fmtNum(r.area,1)}</td>
+                <td class="vns-freeze vns-freeze-1">${r.cliente}</td><td class="vns-freeze vns-freeze-2">${r.fazenda}</td><td class="vns-freeze vns-freeze-3">${r.talhao}</td>
+                <td class="mono-td vns-freeze vns-freeze-4">${fmtNum(r.area,1)}</td>
+                <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                <td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="status_plantio" style="background:${r.vns_status_plantio==='Plantado'?'#c8e6c9':r.vns_status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;">
+                  <option value="" ${!r.vns_status_plantio?'selected':''}>—</option>
+                  <option value="Plantado" ${r.vns_status_plantio==='Plantado'?'selected':''}>Plantado</option>
+                  <option value="Estimativa" ${r.vns_status_plantio==='Estimativa'?'selected':''}>Estimativa</option>
+                </select></td>
                 <td><span style="color:${temNema?'#e74c3c':'var(--ink-soft)'};font-weight:${temNema?'700':'400'};">${temNema?'Sim':'Não'}</span></td>
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
                 <td><span style="color:${r.vns_status_compra==='Comprado'?'#2ecc71':r.vns_status_compra==='Não comprado'?'#e74c3c':r.vns_status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)'};font-weight:700;">${r.vns_status_compra||'—'}</span></td>
-                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" value="${r['vns_'+e.key+'_data']||''}"></td>`).join('')}
+                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" value="${r['vns_'+e.key+'_data']||''}"></td>`).join('')}
                 <td style="white-space:nowrap;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
                 </td>
               </tr>`;
-            }).join('') || `<tr><td colspan="${9+VNS_ETAPAS.length*2}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+            }).join('') || `<tr><td colspan="${11+VNS_ETAPAS.length*2}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -9865,8 +10325,27 @@ function renderVidaNoSolo(){
       renderVidaNoSolo();
     });
   });
+  // botão de olho: oculta/mostra o conteúdo de cada card (exceto o mapa); o estado fica guardado enquanto o app está aberto
+  if(!state.vnsCardsOcultos) state.vnsCardsOcultos = {};
+  container.querySelectorAll('.vns-card:not(.vns-map-card)').forEach(card=>{
+    const h3 = card.querySelector(':scope > h3');
+    if(!h3) return;
+    const nome = h3.textContent.trim();
+    const btnOlho = document.createElement('button');
+    btnOlho.type = 'button'; btnOlho.className = 'vns-olho';
+    const aplicarOlho = ()=>{
+      const oculto = !!state.vnsCardsOcultos[nome];
+      card.classList.toggle('vns-card-oculto', oculto);
+      btnOlho.textContent = oculto ? '🙈' : '👁';
+      btnOlho.title = oculto ? 'Mostrar conteúdo' : 'Ocultar conteúdo';
+    };
+    btnOlho.addEventListener('click', ()=>{ state.vnsCardsOcultos[nome] = !state.vnsCardsOcultos[nome]; aplicarOlho(); });
+    h3.appendChild(btnOlho);
+    aplicarOlho();
+  });
   container.querySelectorAll('.vns-etapa-input').forEach(el=>{
     el.addEventListener('change', ()=>{
+      if(el.dataset.vnsCampo==='status_plantio') el.style.background = el.value==='Plantado' ? '#c8e6c9' : el.value==='Estimativa' ? '#fff3b0' : '#fff';
       salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, el.value || null, el);
     });
   });
@@ -10014,10 +10493,10 @@ function renderVidaNoSolo(){
 const VG_PROJETOS = [
   { key:'cond', label:'Condicionador', cor:'#5c2410', participa: r=> r.cond_area_projeto!=null && Number(r.cond_area_projeto)>0 },
   { key:'op', label:'Otimização de P', cor:'#2c4a7a', participa: r=> r.op_area_projeto!=null && Number(r.op_area_projeto)>0 },
-  { key:'estr', label:'Estruturação', cor:'#6b7a3f', participa: r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0 },
-  { key:'oxc', label:'Óxido de Magnésio', cor:'#a68a2e', participa: r=> r.dose_oxido!=null && Number(r.dose_oxido)>0 },
+  { key:'estr', label:'Estruturação', cor:'#7cb342', participa: r=> r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0 },
+  { key:'oxc', label:'Óxido de Magnésio', cor:'#e6a700', participa: r=> r.dose_oxido!=null && Number(r.dose_oxido)>0 },
   { key:'micro', label:'Micro Solo', cor:'#7a5b8a', participa: r=> r.micro_status==='Aplicado' },
-  { key:'vns', label:'Vida no Solo', cor:'#3f8891', participa: r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 },
+  { key:'vns', label:'Vida no Solo', cor:'#1e88e5', participa: r=> r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0 },
   { key:'ladroes', label:'Ladrões', cor:'#b8352a', participa: r=> r.max_selecao==='Ladrões' },
   { key:'maximas', label:'Máximas', cor:'#2e6e76', participa: r=> r.max_selecao==='Máximas' },
 ];
@@ -10047,7 +10526,8 @@ function renderVisaoGeral(){
 
   container.innerHTML = `
   <style>
-    .vg-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;height:600px;}
+    .vg-layout{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch;}
+    .vg-map-card{height:540px;}
     .vg-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
     .vg-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
     .vg-filtro-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
@@ -10055,7 +10535,7 @@ function renderVisaoGeral(){
     .vg-legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
     .vg-legenda span{display:inline-flex;align-items:center;gap:4px;}
     .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
-    .vg-table-wrap{flex:1;min-height:0;overflow:auto;}
+    .vg-table-wrap{flex:1;min-height:0;overflow:auto;max-height:620px;}
     .vg-table{width:100%;border-collapse:collapse;font-size:11px;}
     .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);z-index:1;}
     .vg-table td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
@@ -10080,7 +10560,7 @@ function renderVisaoGeral(){
     <div class="vg-card">
       <h3 style="margin:0 0 8px;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
       <div class="vg-table-wrap">
-        <table class="vg-table">
+        <table class="vg-table" data-colfilter="vg-talhoes">
           <thead><tr>
             <th>Cliente</th><th>Fazenda</th><th>Talhão</th>
             ${VG_PROJETOS.map(p=>`<th>${p.label}</th>`).join('')}
@@ -10433,6 +10913,7 @@ function montarDadosVnsBase(rec){
     area_projeto_vns: rec.vns_area_projeto ?? null,
     tipo_teste_vns: rec.vns_tipo_teste ?? null,
     status_compra: rec.vns_status_compra ?? null,
+    status_plantio: rec.vns_status_plantio ?? null,
     nematoide_lesoes_radiculares: rec.vns_nema_lesoes ?? null,
     nematoide_galhas: rec.vns_nema_galhas ?? null,
     nematoide_cisto: rec.vns_nema_cisto ?? null,
@@ -10501,6 +10982,7 @@ async function salvarVnsEntradaCompleta(talhaoId, entry, user){
   if(!rec || !projetosIds['vida-no-solo']) return { error: 'talhão ou projeto não encontrado' };
   const dados = montarDadosVnsBase(rec);
   dados.status_compra = entry.status_compra || null;
+  dados.status_plantio = entry.status_plantio || null;
   VNS_ETAPAS.forEach(e=>{
     dados[e.key] = entry[e.key] ?? null;
     dados[e.key+'_data'] = entry[e.key+'_data'] ?? null;
@@ -10511,6 +10993,7 @@ async function salvarVnsEntradaCompleta(talhaoId, entry, user){
   }, { onConflict: 'talhao_id,projeto_id' });
   if(!error){
     rec.vns_status_compra = entry.status_compra || null;
+    rec.vns_status_plantio = entry.status_plantio || null;
     VNS_ETAPAS.forEach(e=>{
       rec['vns_'+e.key] = entry[e.key] ?? null;
       rec['vns_'+e.key+'_data'] = entry[e.key+'_data'] ?? null;
@@ -10921,7 +11404,7 @@ function renderRegenera(){
             <td>${r.nematoides||''}</td><td>${r.descricao_nematoides||''}</td>
             <td>${r.doencas_solo||''}</td><td>${r.descricao_doencas||''}</td>
             <td>${r.nematicida_biologico||''}</td><td>${r.fungicida_biologico||''}</td><td>${r.fungicida_quimico||''}</td><td>${r.nematicida_quimico||''}</td>
-            ${REGENERA_ETAPAS.map(e=>`<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}">${REGENERA_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${etapasEntry[e.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}_data" value="${etapasEntry[e.key+'_data']||regeneraDataPrevista(r.data_plantio,e.dap)}"></td>`).join('')}
+            ${REGENERA_ETAPAS.map(e=>`<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${e.faixa}">${REGENERA_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${etapasEntry[e.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}_data" data-cor-data="${e.key}" value="${etapasEntry[e.key+'_data']||regeneraDataPrevista(r.data_plantio,e.dap)}"></td>`).join('')}
             <td style="white-space:nowrap;">
               <button class="row-save regenera-etapa-save-btn" data-reg-id="${r.id}">💾 Salvar</button>
               <span class="regenera-etapa-msg" data-reg-msg-id="${r.id}"></span>
@@ -11041,7 +11524,7 @@ function abrirPainelRegenera(rec){
       <div class="form-msg" id="regeneraMsg"></div>
       <div class="modal-actions">
         <button class="btn ghost" id="regeneraCancelBtn">Fechar</button>
-        <button class="btn" id="regeneraSalvarBtn" style="font-size:15px;padding:12px 20px;">💾 ${editando?'Salvar alterações':'Salvar talhão'}</button>
+        <button class="btn btn-preto" id="regeneraSalvarBtn" style="font-size:15px;padding:12px 20px;">💾 ${editando?'Salvar alterações':'Salvar talhão'}</button>
       </div>
     </div>
   </div>`;
