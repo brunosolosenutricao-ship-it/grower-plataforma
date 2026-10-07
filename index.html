@@ -198,6 +198,24 @@
   .vns-card-oculto > *:not(h3){display:none !important;}
   input.dt-br{min-width:118px;padding-right:26px !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");background-repeat:no-repeat;background-position:right 6px center;background-size:15px;}
   input.dt-br.dt-invalida{outline:2px solid var(--red);}
+  .lm-freeze{position:sticky !important;background:var(--paper);z-index:2;box-shadow:2px 0 4px rgba(0,0,0,.08);}
+  thead .lm-freeze{z-index:4;white-space:normal !important;}
+  tbody .lm-freeze{background:#fff;}
+  .lm-freeze-1{left:0px;width:150px;min-width:150px;max-width:150px;}
+  .lm-freeze-2{left:150px;width:150px;min-width:150px;max-width:150px;}
+  .lm-freeze-3{left:300px;width:110px;min-width:110px;max-width:110px;box-shadow:2px 0 6px rgba(0,0,0,.12);}
+  .lm-freeze-right{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:150px;min-width:150px;max-width:150px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+  thead .lm-freeze-right{z-index:4;}
+  tbody .lm-freeze-right{background:#fff;}
+  .lm-freeze-right > span{display:block;font-size:10px;white-space:normal;}
+  .lm-freeze-span{position:sticky !important;left:0px;background:var(--paper);z-index:4;}
+  .reg-freeze-r1{position:sticky !important;right:96px;background:var(--paper);z-index:2;width:140px;min-width:140px;max-width:140px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+  .reg-freeze-r2{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:96px;min-width:96px;max-width:96px;}
+  thead .reg-freeze-r1, thead .reg-freeze-r2{z-index:4;}
+  tbody .reg-freeze-r1, tbody .reg-freeze-r2{background:#fff;}
+  .reg-freeze-r1 > span{display:block;font-size:10px;white-space:normal;}
+  .ts-topo{overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:2px;}
+  .ts-inner{height:1px;}
   .cf-btn{border:1px solid var(--line);background:#fff;border-radius:5px;font-size:9px;line-height:1;padding:2px 4px;margin-left:4px;cursor:pointer;color:var(--ink-soft);vertical-align:middle;font-family:inherit;text-transform:none;letter-spacing:0;}
   .cf-btn:hover{background:var(--bg);}
   .cf-btn.active{background:#111;color:#fff;border-color:#111;font-weight:700;}
@@ -3113,6 +3131,28 @@ document.addEventListener('change', e=>{
   }
   t.dataset.dtUltimo = bruto;
 }, true);
+/* ===== BARRA DE ROLAGEM EM CIMA DA TABELA — qualquer <div class="table-scroll" data-topscroll> ganha uma barra superior sincronizada com a de baixo ===== */
+function tsEnhance(wrap){
+  if(wrap.dataset.tsOk) return;
+  wrap.dataset.tsOk = '1';
+  const topo = document.createElement('div'); topo.className = 'ts-topo';
+  const inner = document.createElement('div'); inner.className = 'ts-inner';
+  topo.appendChild(inner);
+  wrap.parentNode.insertBefore(topo, wrap);
+  const ajustar = ()=>{
+    inner.style.width = wrap.scrollWidth+'px';
+    topo.style.display = wrap.scrollWidth > wrap.clientWidth+1 ? 'block' : 'none';
+  };
+  topo.addEventListener('scroll', ()=>{ if(wrap.scrollLeft!==topo.scrollLeft) wrap.scrollLeft = topo.scrollLeft; });
+  wrap.addEventListener('scroll', ()=>{ if(topo.scrollLeft!==wrap.scrollLeft) topo.scrollLeft = wrap.scrollLeft; });
+  if(window.ResizeObserver){
+    const ro = new ResizeObserver(ajustar);
+    ro.observe(wrap);
+    const t = wrap.querySelector('table'); if(t) ro.observe(t);
+  }
+  ajustar();
+}
+function tsVarrer(){ document.querySelectorAll('.table-scroll[data-topscroll]:not([data-ts-ok])').forEach(tsEnhance); }
 function corVarrer(){
   document.querySelectorAll('select[data-cor-status]:not([data-cor-ok])').forEach(s=>{ s.dataset.corOk = '1'; recolorirStatusData(s); });
 }
@@ -3122,7 +3162,7 @@ document.addEventListener('change', e=>{
 });
 (function(){
   let raf = null;
-  const agendar = ()=>{ if(raf) return; raf = requestAnimationFrame(()=>{ raf = null; dtVarrer(); cfVarrer(); corVarrer(); }); };
+  const agendar = ()=>{ if(raf) return; raf = requestAnimationFrame(()=>{ raf = null; dtVarrer(); cfVarrer(); corVarrer(); tsVarrer(); }); };
   const iniciar = ()=>{ new MutationObserver(agendar).observe(document.body, { childList:true, subtree:true }); agendar(); };
   if(document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
   document.addEventListener('mousedown', e=>{ if(cfPop && !cfPop.contains(e.target) && !e.target.closest('.cf-btn')) cfFecharPop(); });
@@ -3218,24 +3258,24 @@ const ESTR_ETAPAS = [
   { key:'altura_v4', label:'Altura V4', bloco:'V4' },
   { key:'foto_v4', label:'Foto V4', bloco:'V4' },
   { key:'ground_cover_v4', label:'Ground Cover V4', bloco:'V4' },
-  { key:'vagens_planta', label:'Número de vagens p/ planta', bloco:'R5/R6' },
-  { key:'hastes_planta', label:'N de hastes p/ planta', bloco:'R5/R6' },
-  { key:'nos_hastes', label:'N de nós (haste prin. e lateral)', bloco:'R5/R6' },
-  { key:'nos_produtivos_haste', label:'Número de nós produtivos na haste principal', bloco:'R5/R6' },
-  { key:'fotos', label:'Fotos', bloco:'R5/R6' },
-  { key:'ground_cover_r5r6', label:'Ground Cover R5/R6', bloco:'R5/R6' },
+  { key:'vagens_planta', label:'Número de vagens p/ planta', bloco:'R6/R7' },
+  { key:'hastes_planta', label:'N de hastes p/ planta', bloco:'R6/R7' },
+  { key:'nos_hastes', label:'N de nós (haste prin. e lateral)', bloco:'R6/R7' },
+  { key:'nos_produtivos_haste', label:'Número de nós produtivos na haste principal', bloco:'R6/R7' },
+  { key:'fotos', label:'Fotos', bloco:'R6/R7' },
+  { key:'ground_cover_r5r6', label:'Ground Cover R6/R7', bloco:'R6/R7' },
 ];
-const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R5/R6':'#6b7a3f' };
+const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R6/R7':'#6b7a3f' };
 const ESTR_BLOCO_DAP = {
   'V4': { dap:25, faixa:3 },
-  'R5/R6': { dap:80, faixa:5 },
+  'R6/R7': { dap:105, faixa:5 },
 };
 const ESTR_TIPO_MATERIAL_OPTIONS = ['Precoce','Médio','Tardio'];
 const ESTR_STATUS_PLANTIO_OPTIONS = ['Plantado','Estimativa'];
 
-// Coleta Foliar 2026.27 — R1 (coleta) = 42 DAP; Msg 1 = 7 dias antes (35 DAP); Msg 2 = 45 DAP; coleta prevista = 45 DAP
-const CF_DAP_COLETA = 42;
-const CF_DAP_MSG1 = 35;
+// Coleta Foliar 2026.27 — coleta foliar (R1) padronizada em 45 DAP; Msg 1 = 7 dias antes (38 DAP); Msg 2 = 45 DAP; coleta prevista = 45 DAP
+const CF_DAP_COLETA = 45;
+const CF_DAP_MSG1 = CF_DAP_COLETA - 7;
 const CF_DAP_MSG2 = 45;
 const CF_DAP_COLETA_PREVISTA = 45;
 const CF_MSG_OPTIONS = ['Pendente','Enviado'];
@@ -3319,6 +3359,17 @@ const VNS_ETAPAS = [
   { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita' },
 ];
 const VNS_ETAPA_STATUS_OPTIONS = ['Pendente','Executado'];
+// prazo previsto de cada etapa: DAP (dias após o plantio) e janela de tolerância (± dias) — R1 padronizado em 45 DAP
+const VNS_ETAPA_PRAZO = {
+  etapa21_coleta_solo:{ dap:45, faixa:4 }, etapa22_aval_aerea:{ dap:45, faixa:4 },
+  etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
+  etapa4_pos_colheita:{ dap:130, faixa:5 },
+};
+function vnsDataPrevista(dataPlantio, dap){
+  if(!dataPlantio) return '';
+  const d = new Date(dataPlantio+'T00:00:00'); d.setDate(d.getDate()+dap);
+  return d.toISOString().slice(0,10);
+}
 function getVnsEtapaEntry(key){
   const defaults = { status_compra: '' };
   VNS_ETAPAS.forEach(e=>{ defaults[e.key] = 'Pendente'; defaults[e.key+'_data'] = null; });
@@ -3328,18 +3379,23 @@ function getVnsEtapaEntry(key){
 
 const LM_ESTAGIO_DAP = {
   'V4': { dap:25, faixa:3 },
-  'R1': { dap:42, faixa:4 },
+  'R1': { dap:45, faixa:4 },
   'R4': { dap:70, faixa:5 },
   'R5.4': { dap:93, faixa:4 },
-  'R7/R8': { dap:120, faixa:5 },
+  'R8': { dap:120, faixa:5 },
   'Colheita': { dap:130, faixa:5 },
 };
-function lmEstagioKey(estagio){ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R7/R8'->'r7r8', 'R5.4'->'r54'
+function lmEstagioKey(estagio){ if(estagio==='R8') return 'r7r8'; /* chave legada: o R7/R8 virou R8 só no nome — os dados já salvos continuam em *_r7r8 */ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R5.4'->'r54'
+// cor de cada bloco do Máximas/Ladrões — faixa sólida no cabeçalho, tom suave nas células e linha vertical onde o bloco começa
+const LM_BLOCO_COR = { 1:'#2c4a7a', 2:'#8a5a4a', 3:'#6b7a3f', 4:'#7a5b8a' };
+function lmHexRgba(hex, a){ const n = parseInt(hex.slice(1),16); return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')'; }
+function lmBlocoInicio(ocs, oi){ return oi===0 || ocs[oi-1].blocoNum!==ocs[oi].blocoNum; }
+function lmEstCelula(ocs, oi, alfa){ const cor = LM_BLOCO_COR[ocs[oi].blocoNum]; return 'background:'+lmHexRgba(cor,alfa)+';'+(lmBlocoInicio(ocs,oi) ? 'border-left:3px solid '+cor+';' : ''); }
 
 // 4 blocos — cada avaliação lista em quais estádios ela ocorre (algumas ocorrem em vários)
 const LM_BLOCOS = [
   { num:1, label:'Nutrição e amostragem', itens:[
-    { key:'marcha_absorcao', label:'Marcha de absorção', estagios:['V4','R1','R4','R5.4','R7/R8'] },
+    { key:'marcha_absorcao', label:'Marcha de absorção', estagios:['V4','R1','R4','R5.4','R8'] },
     { key:'massa_fresca', label:'Análise de massa fresca', estagios:['V4'] },
     { key:'analise_foliar', label:'Análise foliar', estagios:['R1'] },
   ]},
@@ -3347,17 +3403,17 @@ const LM_BLOCOS = [
     { key:'nodulacao', label:'Avaliações de nodulação', estagios:['V4','R4'] },
   ]},
   { num:3, label:'Estande e monitoramento visual', itens:[
-    { key:'estande', label:'Estande', estagios:['V4','R7/R8'] },
-    { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1','R7/R8'] },
-    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1','R4','R5.4','R7/R8'] },
+    { key:'estande', label:'Estande', estagios:['V4','R8'] },
+    { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1','R8'] },
+    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1','R4','R5.4','R8'] },
     { key:'ground_cover', label:'Ground cover', estagios:['V4','R1','R4'] },
   ]},
   { num:4, label:'Componentes produtivos', itens:[
-    { key:'altura_final', label:'Altura final das plantas', estagios:['R7/R8'] },
-    { key:'nos_haste_principal', label:'Nº de nós na haste principal', estagios:['R7/R8'] },
-    { key:'ramos_laterais', label:'Nº de ramos laterais', estagios:['R7/R8'] },
-    { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos', estagios:['R7/R8'] },
-    { key:'graos_falhados', label:'Grãos falhados por nós', estagios:['R7/R8'] },
+    { key:'altura_final', label:'Altura final das plantas', estagios:['R8'] },
+    { key:'nos_haste_principal', label:'Nº de nós na haste principal', estagios:['R8'] },
+    { key:'ramos_laterais', label:'Nº de ramos laterais', estagios:['R8'] },
+    { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos', estagios:['R8'] },
+    { key:'graos_falhados', label:'Grãos falhados por nós', estagios:['R8'] },
     { key:'produtividade', label:'Produtividade', estagios:['Colheita'] },
     { key:'pmg', label:'PMG', estagios:['Colheita'] },
   ]},
@@ -6844,6 +6900,43 @@ function adicionarBotoesZoomGraficos(container){
     if(wrapper) wrapper.appendChild(btn);
   });
 }
+// fator de ampliação das fontes no gráfico da lupa (+25%)
+const ZOOM_FONTE = 1.25;
+// devolve uma cópia das opções do gráfico com todas as fontes multiplicadas por "fator" — o gráfico original não é alterado.
+// Cobre eixos, legenda, tooltips, títulos e rótulos de dados (inclusive fontes calculadas por função). Onde não há tamanho definido,
+// parte do padrão do Chart.js.
+function ampliarFontesChart(opcoes, fator){
+  const base = (window.Chart && Chart.defaults && Chart.defaults.font && Number(Chart.defaults.font.size)) || 12;
+  const arred = n => Math.round(n*100)/100;
+  const plano = v => v && typeof v==='object' && Object.getPrototypeOf(v)===Object.prototype;
+  const escalarFonte = f=>{
+    if(typeof f==='function') return ctx=>{ const r = f(ctx); return (r && typeof r==='object') ? {...r, size: arred((Number(r.size)||base)*fator)} : r; };
+    if(plano(f)) return {...f, size: arred((Number(f.size)||base)*fator)};
+    return f;
+  };
+  const clonar = v=>{
+    if(Array.isArray(v)) return v.map(clonar);
+    if(!plano(v)) return v;
+    const out = {};
+    Object.keys(v).forEach(k=>{ out[k] = /font$/i.test(k) ? escalarFonte(v[k]) : clonar(v[k]); });
+    return out;
+  };
+  const op = clonar(opcoes);
+  // eixos / legenda / datalabels sem fonte definida: usam o padrão, então defino explicitamente já ampliado
+  if(op.scales && plano(op.scales)) Object.keys(op.scales).forEach(k=>{
+    const ax = op.scales[k]; if(!plano(ax)) return;
+    ax.ticks = plano(ax.ticks) ? ax.ticks : {};
+    if(!ax.ticks.font) ax.ticks.font = { size: arred(base*fator) };
+  });
+  if(op.plugins && plano(op.plugins)){
+    const lg = op.plugins.legend;
+    if(plano(lg) && lg.display!==false){ lg.labels = plano(lg.labels) ? lg.labels : {}; if(!lg.labels.font) lg.labels.font = { size: arred(base*fator) }; }
+    const dl = op.plugins.datalabels;
+    if(plano(dl) && !dl.font) dl.font = { size: arred(base*fator) };
+  }
+  return op;
+}
+
 function abrirModalZoomChart(chart){
   const modalRoot = document.getElementById('modalRoot');
   modalRoot.innerHTML = `
@@ -6863,7 +6956,7 @@ function abrirModalZoomChart(chart){
   new Chart(bigCanvas.getContext('2d'), {
     type: cfg.type,
     data: cfg.data,
-    options: {...cfg.options, responsive:true, maintainAspectRatio:false},
+    options: ampliarFontesChart({...cfg.options, responsive:true, maintainAspectRatio:false}, ZOOM_FONTE),
   });
   const fechar = ()=>{ modalRoot.innerHTML = ''; };
   document.getElementById('zoomChartFechar').addEventListener('click', fechar);
@@ -7838,10 +7931,10 @@ function renderEstruturacao(){
   <div class="estr-card full-card" style="margin-top:12px;animation-delay:.34s;">
     <h3>🗓️ Acompanhamento</h3>
     <p class="sub-sm">Talhões com Área do projeto (Estruturação) &gt; 0 · ${acompRowsEstr.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
-    <div class="table-scroll">
+    <div class="table-scroll" data-topscroll="1">
       <table data-colfilter="estr-acomp">
         <thead><tr>
-          <th colspan="8"></th>
+          <th colspan="3" class="lm-freeze-span"></th><th colspan="5"></th>
           ${(()=>{
             // agrupa etapas consecutivas do mesmo bloco numa única célula colspan; sem bloco = célula vazia por etapa
             const grupos = [];
@@ -7852,17 +7945,17 @@ function renderEstruturacao(){
             });
             return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:${ESTR_BLOCO_COR[g.bloco]||'#6b7a3f'};color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
           })()}
-          <th></th>
+          <th class="lm-freeze-right"></th>
         </tr></thead>
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Cultivar</th><th>Data de Plantio</th><th>Status do Plantio</th><th>Ciclo</th><th>Tipo de material</th>
+          <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Cultivar</th><th>Data de Plantio</th><th>Status do Plantio</th><th>Ciclo</th><th>Tipo de material</th>
           ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-          <th>Salvar</th>
+          <th class="lm-freeze-right">Salvar</th>
         </tr></thead>
         <thead><tr>
-          <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+          <th class="lm-freeze lm-freeze-1"></th><th class="lm-freeze lm-freeze-2"></th><th class="lm-freeze lm-freeze-3"></th><th></th><th></th><th></th><th></th><th></th>
           ${ESTR_ETAPAS.map(()=>`<th>Data</th><th>Execução</th>`).join('')}
-          <th></th>
+          <th class="lm-freeze-right"></th>
         </tr></thead>
         <tbody>
           ${acompRowsEstr.map(r=>{
@@ -7876,7 +7969,7 @@ function renderEstruturacao(){
               return d.toISOString().slice(0,10);
             }
             return `<tr>
-              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="lm-freeze lm-freeze-1">${r.cliente}</td><td class="lm-freeze lm-freeze-2">${r.fazenda}</td><td class="lm-freeze lm-freeze-3">${r.talhao}</td>
               <td>${r.cultivar||'—'}</td>
               <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
               <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="status_plantio" style="background:${entry.status_plantio==='Plantado'?'#c8e6c9':entry.status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;">
@@ -7890,7 +7983,7 @@ function renderEstruturacao(){
                 <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" value="${entry[e.key+'_mes']||dataPrevistaEstrStr(e.bloco)}"></td>
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${e.key}" data-cor-faixa="${(ESTR_BLOCO_DAP[e.bloco]||{}).faixa||0}">${EXECUCAO_OPTIONS.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
               `).join('')}
-              <td style="white-space:nowrap;">
+              <td class="lm-freeze-right" style="white-space:nowrap;">
                 <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button>
                 <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
               </td>
@@ -8347,12 +8440,12 @@ function renderOxidoConsumo(){
         ${clientesDisponiveis.map(c=>`<option value="${encodeURIComponent(c)}" ${state.oxidoConsumoFiltroCliente===c?'selected':''}>${c}</option>`).join('')}
       </select>
     </div>
-    <div class="table-scroll">
+    <div class="table-scroll" data-topscroll="1">
       <table data-colfilter="oxc-acomp">
         <thead><tr>
-          <th>Cliente</th><th>Fazenda</th><th>Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
+          <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
           ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
-          <th>Salvar</th>
+          <th class="lm-freeze-right">Salvar</th>
         </tr></thead>
         <tbody>
           ${paginaAtual.map(r=>{
@@ -8361,7 +8454,7 @@ function renderOxidoConsumo(){
             const dataPlantio = r.data_plantio ? new Date(r.data_plantio+'T00:00:00') : null;
             const dataColeta = calcularDataColeta(r.data_plantio);
             return `<tr>
-              <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+              <td class="lm-freeze lm-freeze-1">${r.cliente}</td><td class="lm-freeze lm-freeze-2">${r.fazenda}</td><td class="lm-freeze lm-freeze-3">${r.talhao}</td>
               <td class="mono-td">${fmtNum(Number(r.dose_oxido),1)}</td>
               <td>${r.status||'—'}</td>
               <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao" style="background:${oxcCorFundo('participacao',entry.participacao)};font-weight:700;">${OXC_PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
@@ -8371,7 +8464,7 @@ function renderOxidoConsumo(){
                 ? `<td style="background:${oxcCorFundo('etapa2', r.status)};font-weight:700;text-align:center;">${r.status||'—'}</td>`
                 : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`
               ).join('')}
-              <td style="white-space:nowrap;">
+              <td class="lm-freeze-right" style="white-space:nowrap;">
                 <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
               </td>
@@ -9065,15 +9158,15 @@ function cgColetarPontos(projetos, ini, fim){
     if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio));
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
-      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',42,rot(k),'R1'));
-      add(r,'vns',130,rot('etapa4_pos_colheita'),'Colheita');
+      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1'));
+      add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita');
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
       ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info) add(r,'estr',info.dap,e.label,e.bloco); });
     }
     if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',45,'Coleta foliar prevista (Etapa 3)','45 DAP');
     if(projetos.includes('cf') && r.cultura==='Soja'){
-      add(r,'cf',CF_DAP_MSG1,'Mensagem de lembrete 1','35 DAP');
+      add(r,'cf',CF_DAP_MSG1,'Mensagem de lembrete 1',CF_DAP_MSG1+' DAP');
       add(r,'cf',CF_DAP_MSG2,'Mensagem de lembrete 2','45 DAP');
       add(r,'cf',CF_DAP_COLETA_PREVISTA,'Coleta foliar','45 DAP');
     }
@@ -9084,6 +9177,11 @@ function cgColetarPontos(projetos, ini, fim){
 let cgPop = null, cgListeners = false;
 function cgFecharPop(){ if(cgPop){ cgPop.remove(); cgPop = null; } }
 function cgAbrirPop(btn, chave, titulo, getOpcoes, sel, aoMudar){
+  if(!cgListeners){
+    cgListeners = true;
+    document.addEventListener('mousedown', e=>{ if(cgPop && !cgPop.contains(e.target) && !e.target.closest('.cg-fbtn')) cgFecharPop(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') cgFecharPop(); });
+  }
   cgFecharPop();
   const pop = document.createElement('div');
   pop.className = 'cf-pop'; pop.style.zIndex = '6000'; pop.dataset.f = chave;
@@ -9300,10 +9398,10 @@ function abrirModalLadroesMaximasTalhao(rec){
   ];
   const corSinaleiro = (()=>{ const n = Number(rec.max_sinaleiro); if(isNaN(n)) return '#d9d9d4'; if(n<=1) return '#2ecc71'; if(n===2) return '#f1c40f'; return '#e74c3c'; })();
 
-  // agrupa as 30 ocorrências por estádio — cada estádio vira 1 "bolinha" (Plantio + V4 + R1 + R4 + R5.4 + R7/R8 + Colheita)
+  // agrupa as 30 ocorrências por estádio — cada estádio vira 1 "bolinha" (Plantio + V4 + R1 + R4 + R5.4 + R8 + Colheita)
   // a bolinha fica vermelha se tiver algo atrasado ali dentro, verde se tudo realizado no prazo, cinza se só previsão ainda
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
-  const ESTAGIOS_ORDEM = ['V4','R1','R4','R5.4','R7/R8','Colheita'];
+  const ESTAGIOS_ORDEM = ['V4','R1','R4','R5.4','R8','Colheita'];
   const gruposEstagio = ESTAGIOS_ORDEM.map(estagio=>{
     const ocorrenciasDoEstagio = LM_OCORRENCIAS_MAXIMAS.filter(oc=>oc.estagio===estagio);
     const detalhes = ocorrenciasDoEstagio.map(oc=>{
@@ -9658,22 +9756,22 @@ function renderLadroesMaximasMapa(){
       <div class="lm-card full-card" style="margin-top:12px;">
         <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
         <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
-        <div class="table-scroll">
+        <div class="table-scroll" data-topscroll="1">
           <table data-colfilter="lm-acomp-${String(titulo).replace(/\s+/g,'-')}">
             <thead>
             <tr>
-              <th rowspan="4">Cliente</th><th rowspan="4">Fazenda</th><th rowspan="4">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th>
-              ${blocos.map(b=>`<th colspan="${b.itens.reduce((s,it)=>s+it.estagios.length,0)*2}">Bloco ${b.num} — ${b.label}</th>`).join('')}
-              <th rowspan="4">Salvar</th>
+              <th rowspan="4" class="lm-freeze lm-freeze-1">Cliente</th><th rowspan="4" class="lm-freeze lm-freeze-2">Fazenda</th><th rowspan="4" class="lm-freeze lm-freeze-3">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th>
+              ${blocos.map(b=>`<th colspan="${b.itens.reduce((s,it)=>s+it.estagios.length,0)*2}" style="background:${LM_BLOCO_COR[b.num]};color:#fff;border-left:3px solid #fff;">Bloco ${b.num} — ${b.label}</th>`).join('')}
+              <th rowspan="4" class="lm-freeze-right">Salvar</th>
             </tr>
             <tr>
-              ${blocos.flatMap(b=>b.itens.map(it=>`<th colspan="${it.estagios.length*2}">${it.label}</th>`)).join('')}
+              ${blocos.flatMap(b=>b.itens.map((it,ii)=>`<th colspan="${it.estagios.length*2}" style="background:${lmHexRgba(LM_BLOCO_COR[b.num],.16)};${ii===0?`border-left:3px solid ${LM_BLOCO_COR[b.num]};`:''}">${it.label}</th>`)).join('')}
             </tr>
             <tr>
-              ${ocorrencias.map(oc=>`<th colspan="2">${oc.estagio}<br><span style="font-weight:400;font-size:8.5px;opacity:.8;">${oc.dap} DAP ±${oc.faixa}</span></th>`).join('')}
+              ${ocorrencias.map((oc,oi)=>`<th colspan="2" style="${lmEstCelula(ocorrencias,oi,.16)}">${oc.estagio}<br><span style="font-weight:400;font-size:8.5px;opacity:.8;">${oc.dap} DAP ±${oc.faixa}</span></th>`).join('')}
             </tr>
             <tr>
-              ${ocorrencias.map(()=>`<th>Status</th><th>Data</th>`).join('')}
+              ${ocorrencias.map((oc,oi)=>`<th style="${lmEstCelula(ocorrencias,oi,.16)}">Status</th><th style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.16)};">Data</th>`).join('')}
             </tr>
             </thead>
             <tbody>
@@ -9687,14 +9785,14 @@ function renderLadroesMaximasMapa(){
                   return d.toISOString().slice(0,10); // YYYY-MM-DD, formato aceito pelo <input type="date">
                 }
                 return `<tr>
-                  <td>${r.cliente}</td><td>${r.fazenda}</td><td>${r.talhao}</td>
+                  <td class="lm-freeze lm-freeze-1">${r.cliente}</td><td class="lm-freeze lm-freeze-2">${r.fazenda}</td><td class="lm-freeze lm-freeze-3">${r.talhao}</td>
                   <td>${r.cultivar||'—'}</td>
                   <td><input type="text" inputmode="numeric" class="cell-input lm-ciclo-input" data-lm-talhao-id="${r.id}" value="${r.max_ciclo!=null?r.max_ciclo:''}" placeholder="—" style="width:50px;"></td>
                   <td class="mono-td">${fmtNum(r.area,1)}</td>
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                  ${ocorrencias.map(oc=>`<td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
-                  <td style="white-space:nowrap;">
+                  ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
+                  <td class="lm-freeze-right" style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
                   </td>
@@ -9879,8 +9977,8 @@ function abrirModalVidaNoSoloTalhao(rec){
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
   const hojeTl = new Date(); hojeTl.setHours(0,0,0,0);
   const VNS_ESTAGIOS = [
-    { estagio:'R1', dap:42, faixa:4, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
-    { estagio:'Colheita', dap:130, faixa:5, etapas:['etapa4_pos_colheita'] },
+    { estagio:'R1', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
+    { estagio:'Colheita', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, faixa:VNS_ETAPA_PRAZO.etapa4_pos_colheita.faixa, etapas:['etapa4_pos_colheita'] },
   ];
   const gruposEstagio = VNS_ESTAGIOS.map(est=>{
     const esperada = dataPlantioObj ? (()=>{ const d = new Date(dataPlantioObj); d.setDate(d.getDate()+est.dap); return d; })() : null;
@@ -10269,14 +10367,14 @@ function renderVidaNoSolo(){
     <div class="vns-card full-card" style="margin-top:12px;">
       <h3>🗓️ Acompanhamento</h3>
       <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
-      <div class="table-scroll">
+      <div class="table-scroll" data-topscroll="1">
         <table data-colfilter="vns-talhoes">
           <thead><tr>
             <th rowspan="2" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="2" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="2" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="2" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
             <th rowspan="2">Data de plantio</th><th rowspan="2">Status do Plantio</th>
             <th rowspan="2">Presença de nematoides</th><th rowspan="2">Presença de doenças</th><th rowspan="2">Participação no projeto</th><th rowspan="2">Status de compra</th>
             ${VNS_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-            <th rowspan="2">Salvar</th>
+            <th rowspan="2" class="lm-freeze-right">Salvar</th>
           </tr>
           <tr>
             ${VNS_ETAPAS.map(()=>`<th>Status</th><th>Data</th>`).join('')}
@@ -10299,8 +10397,8 @@ function renderVidaNoSolo(){
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
                 <td><span style="color:${r.vns_status_compra==='Comprado'?'#2ecc71':r.vns_status_compra==='Não comprado'?'#e74c3c':r.vns_status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)'};font-weight:700;">${r.vns_status_compra||'—'}</span></td>
-                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" value="${r['vns_'+e.key+'_data']||''}"></td>`).join('')}
-                <td style="white-space:nowrap;">
+                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${VNS_ETAPA_PRAZO[e.key].faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" data-cor-data="${e.key}" value="${r['vns_'+e.key+'_data']||vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap)}"></td>`).join('')}
+                <td class="lm-freeze-right" style="white-space:nowrap;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
                 </td>
@@ -10555,7 +10653,23 @@ function renderVisaoGeral(){
   }
 
   const filtroAtivo = state.visaoGeralFiltro || 'Todos';
-  const linhasFiltradas = filtroAtivo==='Todos' ? linhas : linhas.filter(l=> l.projetos.includes(filtroAtivo));
+  const linhasProj = filtroAtivo==='Todos' ? linhas : linhas.filter(l=> l.projetos.includes(filtroAtivo));
+  // filtros multi-seleção (valem pro mapa e pra tabela, junto com o pill de projeto)
+  if(!state.vgF) state.vgF = { estado:new Set(), consultor:new Set(), cliente:new Set() };
+  const VGF = [
+    { k:'estado', label:'Estado', val:l=> (l.rec.estado||'').toUpperCase() },
+    { k:'consultor', label:'Consultor', val:l=> l.rec.consultor||'' },
+    { k:'cliente', label:'Cliente', val:l=> l.rec.cliente||'' },
+  ];
+  const passaVg = (l, ign)=> VGF.every(f=> f.k===ign || state.vgF[f.k].size===0 || state.vgF[f.k].has(f.val(l)));
+  const linhasFiltradas = linhasProj.filter(l=>passaVg(l,null));
+  const opcoesVg = k=>{
+    const f = VGF.find(x=>x.k===k), set = new Set();
+    linhasProj.forEach(l=>{ if(passaVg(l,k)){ const v = f.val(l); if(v) set.add(v); } });
+    state.vgF[k].forEach(v=>set.add(v));
+    return [...set].sort((a,b)=> a.localeCompare(b,'pt-BR',{numeric:true})).map(v=>({ v, l:v }));
+  };
+  const textoVg = f=>{ const s = state.vgF[f.k]; return s.size===0 ? f.label+': Todos' : s.size===1 ? f.label+': '+[...s][0] : f.label+': '+s.size+' selec.'; };
   const comPonto = linhasFiltradas.filter(l=> l.rec.max_latitude!=null && l.rec.max_longitude!=null && !isNaN(Number(l.rec.max_latitude)) && !isNaN(Number(l.rec.max_longitude)));
 
   container.innerHTML = `
@@ -10566,6 +10680,10 @@ function renderVisaoGeral(){
     .vg-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
     .vg-filtro-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
     .vg-filtro-pill.active{color:#fff;}
+    .vg-fbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
+    .vg-fbtn:hover{background:var(--bg);}
+    .vg-fbtn.ativo{background:#111;color:#fff;border-color:#111;}
+    .vg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
     .vg-legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
     .vg-legenda span{display:inline-flex;align-items:center;gap:4px;}
     .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
@@ -10581,6 +10699,11 @@ function renderVisaoGeral(){
   <div class="vg-filtros">
     <button class="vg-filtro-pill ${filtroAtivo==='Todos'?'active':''}" style="${filtroAtivo==='Todos'?'background:var(--green-deep);border-color:var(--green-deep);':''}" data-filtro="Todos">Todos</button>
     ${VG_PROJETOS.map(p=>`<button class="vg-filtro-pill ${filtroAtivo===p.key?'active':''}" style="${filtroAtivo===p.key?`background:${p.cor};border-color:${p.cor};`:''}" data-filtro="${p.key}">${p.label}</button>`).join('')}
+  </div>
+
+  <div class="vg-filtros" style="align-items:center;">
+    ${VGF.map(f=>`<button type="button" class="vg-fbtn cg-fbtn ${state.vgF[f.k].size?'ativo':''}" data-vgf="${f.k}">${textoVg(f)} ▾</button>`).join('')}
+    ${VGF.some(f=>state.vgF[f.k].size) ? '<button type="button" class="vg-limpar" id="vgLimparFiltros">Limpar filtros</button>' : ''}
   </div>
 
   <div class="vg-layout">
@@ -10617,6 +10740,13 @@ function renderVisaoGeral(){
       renderVisaoGeral();
     });
   });
+  container.querySelectorAll('.vg-fbtn').forEach(btn=> btn.addEventListener('click', ()=>{
+    const f = VGF.find(x=>x.k===btn.dataset.vgf);
+    if(cgPop && cgPop.dataset.f==='vg-'+f.k){ cgFecharPop(); return; }
+    cgAbrirPop(btn, 'vg-'+f.k, f.label, ()=>opcoesVg(f.k), state.vgF[f.k], ()=>renderVisaoGeral());
+  }));
+  const vgLimpar = container.querySelector('#vgLimparFiltros');
+  if(vgLimpar) vgLimpar.addEventListener('click', ()=>{ VGF.forEach(f=>state.vgF[f.k].clear()); cgFecharPop(); renderVisaoGeral(); });
 
   // monta um ponto por (talhão, projeto) — um talhão em vários projetos gera vários pontos levemente espalhados
   const pontosVg = [];
@@ -11166,15 +11296,15 @@ function renderColetaFoliar(){
   <div class="cf-card full-card">
     <h3 style="margin:0 0 4px;">🗓️ Acompanhamento</h3>
     <p class="sub-sm" style="margin:0 0 8px;">Soja com Data de Plantio informada · ${lista.length} talhão(ões). "Dias até coleta" = Plantio + ${CF_DAP_COLETA} DAP − hoje.</p>
-    <div class="table-scroll">
-      <table>
+    <div class="table-scroll" data-topscroll="1">
+      <table data-colfilter="cf-acomp">
         <thead><tr>
-          <th>Talhão</th><th>Fazenda</th><th>Consultor</th><th>Data Plantio</th><th>Cultivar</th><th>Área</th>
+          <th class="lm-freeze lm-freeze-1">Talhão</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Consultor</th><th>Data Plantio</th><th>Cultivar</th><th>Área</th>
           <th>Dias até coleta</th>
           <th>Msg 1 (Status)</th><th>Msg 1 (Data)</th>
           <th>Msg 2 (Status)</th><th>Msg 2 (Data)</th>
           <th>Data da coleta</th><th>Status da coleta</th>
-          <th>Salvar</th>
+          <th class="lm-freeze-right">Salvar</th>
         </tr></thead>
         <tbody>
           ${lista.map(r=>{
@@ -11182,7 +11312,7 @@ function renderColetaFoliar(){
             const entry = getCfEntry(key);
             const dias = diasAteColeta(r.data_plantio);
             return `<tr>
-              <td>${r.talhao}</td><td>${r.fazenda}</td><td>${r.consultor}</td>
+              <td class="lm-freeze lm-freeze-1">${r.talhao}</td><td class="lm-freeze lm-freeze-2">${r.fazenda}</td><td class="lm-freeze lm-freeze-3">${r.consultor}</td>
               <td class="mono-td">${new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR')}</td>
               <td>${r.cultivar||'—'}</td>
               <td class="mono-td">${fmtNum(r.area,1)}</td>
@@ -11193,7 +11323,7 @@ function renderColetaFoliar(){
               <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg2_data" value="${entry.msg2_data||dataPrevistaCf(r.data_plantio,CF_DAP_MSG2)}"></td>
               <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="coleta_data" value="${entry.coleta_data||dataPrevistaCf(r.data_plantio,CF_DAP_COLETA_PREVISTA)}"></td>
               <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="coleta_status">${CF_COLETA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${entry.coleta_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
-              <td style="white-space:nowrap;">
+              <td class="lm-freeze-right" style="white-space:nowrap;">
                 <button class="row-save cf-save-btn" data-cf-id="${r.id}">💾 Salvar</button>
                 <span class="cf-msg" data-cf-msg-id="${r.id}"></span>
               </td>
@@ -11240,10 +11370,10 @@ const REGENERA_SIM_NAO = ['Sim','Não'];
 const REGENERA_ETAPA_STATUS_OPTIONS = ['Pendente','Executado'];
 const REGENERA_ETAPAS = [
   { key:'etapa1_plantio', label:'Etapa 1 – Plantio/Aplicação', dap:0, faixa:3 },
-  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1)', dap:42, faixa:4 },
-  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1)', dap:42, faixa:4 },
-  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1)', dap:42, faixa:4 },
-  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1)', dap:42, faixa:4 },
+  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1)', dap:45, faixa:4 },
+  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1)', dap:45, faixa:4 },
+  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1)', dap:45, faixa:4 },
+  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1)', dap:45, faixa:4 },
   { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita', dap:130, faixa:5 },
 ];
 function getRegeneraEtapasEntry(rec){
@@ -11411,19 +11541,19 @@ function renderRegenera(){
 
   <div class="regenera-card full-card">
     <h3 style="margin:0 0 8px;">📋 Talhões (${filtrados.length})</h3>
-    <div class="table-scroll">
+    <div class="table-scroll" data-topscroll="1">
       <table>
         <thead><tr>
           <th class="reg-freeze reg-freeze-1">Cliente</th><th class="reg-freeze reg-freeze-2">Fazenda</th><th class="reg-freeze reg-freeze-3">Estado</th><th class="reg-freeze reg-freeze-4">Cidade</th><th class="reg-freeze reg-freeze-5">Talhão</th><th>Latitude</th><th>Longitude</th><th>Área</th><th>Cultura</th><th>Data de Plantio</th><th>Variedade</th>
           <th>Nematoides</th><th>Descrição Nematoides</th><th>Doenças de solo</th><th>Descrição Doenças</th>
           <th>Nematicida biológico</th><th>Fungicida biológico</th><th>Fungicida químico</th><th>Nematicida químico</th>
           ${REGENERA_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-          <th>Salvar</th><th>Ações</th>
+          <th class="reg-freeze-r1">Salvar</th><th class="reg-freeze-r2">Ações</th>
         </tr>
         <tr>
           <th colspan="19"></th>
           ${REGENERA_ETAPAS.map(()=>`<th>Status</th><th>Data</th>`).join('')}
-          <th></th><th></th>
+          <th class="reg-freeze-r1"></th><th class="reg-freeze-r2"></th>
         </tr></thead>
         <tbody>
           ${filtrados.map(r=>{
@@ -11439,11 +11569,11 @@ function renderRegenera(){
             <td>${r.doencas_solo||''}</td><td>${r.descricao_doencas||''}</td>
             <td>${r.nematicida_biologico||''}</td><td>${r.fungicida_biologico||''}</td><td>${r.fungicida_quimico||''}</td><td>${r.nematicida_quimico||''}</td>
             ${REGENERA_ETAPAS.map(e=>`<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${e.faixa}">${REGENERA_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${etapasEntry[e.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}_data" data-cor-data="${e.key}" value="${etapasEntry[e.key+'_data']||regeneraDataPrevista(r.data_plantio,e.dap)}"></td>`).join('')}
-            <td style="white-space:nowrap;">
+            <td class="reg-freeze-r1" style="white-space:nowrap;">
               <button class="row-save regenera-etapa-save-btn" data-reg-id="${r.id}">💾 Salvar</button>
               <span class="regenera-etapa-msg" data-reg-msg-id="${r.id}"></span>
             </td>
-            <td style="white-space:nowrap;">
+            <td class="reg-freeze-r2" style="white-space:nowrap;">
               <button class="row-edit-btn regenera-edit-btn" data-id="${r.id}" title="Editar">✏️</button>
               <button class="row-edit-btn regenera-del-btn" data-id="${r.id}" title="Excluir">🗑️</button>
             </td>
