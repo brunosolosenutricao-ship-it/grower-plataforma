@@ -9026,19 +9026,19 @@ function abrirModalLadroesMaximasLista(uf, projeto, lista){
   document.getElementById('lmListaModalFechar').addEventListener('click', fechar);
   document.getElementById('lmListaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='lmListaModalOverlay') fechar(); });
 }
-/* ===== CRONOGRAMA — linha do tempo das avaliações previstas (Plantio + DAP). Um modal só, usado por
+/* ===== CRONOGRAMA — calendário mensal das avaliações previstas (Plantio + DAP). Um modal só, usado por
    Vida no Solo, Estruturação, Óxido, Coleta Foliar, Ladrões/Máximas e Visão Geral ===== */
 const CG_MESES = [
   {key:'2026-09', label:'Set/26'}, {key:'2026-10', label:'Out/26'}, {key:'2026-11', label:'Nov/26'}, {key:'2026-12', label:'Dez/26'},
   {key:'2027-01', label:'Jan/27'}, {key:'2027-02', label:'Fev/27'}, {key:'2027-03', label:'Mar/27'}, {key:'2027-04', label:'Abr/27'},
 ];
 const CG_PROJ = {
-  ladroes: { label:'Ladrões', cor:'#b8352a' },
-  maximas: { label:'Máximas', cor:'#2e6e76' },
-  vns:     { label:'Vida no Solo', cor:'#1e88e5' },
-  estr:    { label:'Estruturação', cor:'#7cb342' },
-  oxc:     { label:'Óxido de Magnésio', cor:'#e6a700' },
-  cf:      { label:'Coleta Foliar', cor:'#8e44ad' },
+  ladroes: { label:'Ladrões', s:'Lad', cor:'#b8352a', txt:'#fff' },
+  maximas: { label:'Máximas', s:'Máx', cor:'#2e6e76', txt:'#fff' },
+  vns:     { label:'Vida no Solo', s:'VNS', cor:'#1e88e5', txt:'#fff' },
+  estr:    { label:'Estruturação', s:'Est', cor:'#7cb342', txt:'#173404' },
+  oxc:     { label:'Óxido de Magnésio', s:'Óxi', cor:'#e6a700', txt:'#412402' },
+  cf:      { label:'Coleta Foliar', s:'CF', cor:'#8e44ad', txt:'#fff' },
 };
 const CG_CONTEXTOS = {
   lm:    { titulo:'Cronograma Geral — Ladrões/Máximas', projetos:['ladroes','maximas'] },
@@ -9114,21 +9114,24 @@ function cgAbrirPop(btn, chave, titulo, getOpcoes, sel, aoMudar){
   busca.focus();
 }
 
+const CG_NOMES_MES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function abrirCronogramaGeral(ctxKey){
   const ctx = CG_CONTEXTOS[ctxKey]; if(!ctx) return;
-  state.cgF = state.cgF || {};
+  state.cgF = state.cgF || {}; state.cgMes = state.cgMes || {};
   const F = state.cgF[ctxKey] = state.cgF[ctxKey] || {};
   const FILTROS = [
     ...(ctx.projetos.length>1 ? [{k:'projeto', label:'Projeto'}] : []),
-    {k:'mes', label:'Mês'}, {k:'estado', label:'Estado'}, {k:'consultor', label:'Consultor'},
+    {k:'estado', label:'Estado'}, {k:'consultor', label:'Consultor'},
     {k:'cliente', label:'Cliente'}, {k:'fazenda', label:'Fazenda'}, {k:'talhao', label:'Talhão'},
   ];
   FILTROS.forEach(f=>{ if(!F[f.k]) F[f.k] = new Set(); });
   const inicioRange = new Date(2026,8,1), fimRange = new Date(2027,4,0);
   const pontos = cgColetarPontos(ctx.projetos, inicioRange, fimRange);
+  const mesHoje = (()=>{ const h = new Date(); const k = h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); return CG_MESES.some(m=>m.key===k) ? k : CG_MESES[0].key; })();
+  if(!state.cgMes[ctxKey]) state.cgMes[ctxKey] = mesHoje;
 
-  const valorDe = (p,k)=> k==='projeto' ? p.projeto : k==='mes' ? p.mesStr : p[k];
-  const rotuloDe = (k,v)=> k==='projeto' ? CG_PROJ[v].label : k==='mes' ? ((CG_MESES.find(m=>m.key===v)||{}).label||v) : v;
+  const valorDe = (p,k)=> k==='projeto' ? p.projeto : p[k];
+  const rotuloDe = (k,v)=> k==='projeto' ? CG_PROJ[v].label : v;
   const passa = (p, ignorar)=> FILTROS.every(f=> f.k===ignorar || F[f.k].size===0 || F[f.k].has(valorDe(p,f.k)));
   const opcoesDe = k=>{
     const set = new Set(); pontos.forEach(p=>{ if(passa(p,k)) set.add(valorDe(p,k)); });
@@ -9145,32 +9148,49 @@ function abrirCronogramaGeral(ctxKey){
   const modalRoot = document.getElementById('modalRoot');
   modalRoot.innerHTML = `
   <style>
-    .cg-timeline-wrap{overflow-x:auto;padding-bottom:6px;}
-    .cg-timeline{position:relative;min-width:900px;margin:30px 10px 0;}
-    .cg-timeline-eixo{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--line);}
-    .cg-mes-label{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:10px;color:var(--ink-soft);font-weight:700;}
-    .cg-hoje-linha{position:absolute;top:0;bottom:0;width:1.5px;background:#e67e22;z-index:1;}
-    .cg-hoje-label{position:absolute;top:-16px;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#e67e22;}
-    .cg-dot{position:absolute;width:9px;height:9px;border-radius:50%;transform:translateX(-50%);cursor:pointer;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2);z-index:2;}
-    .cg-dot:hover{transform:translateX(-50%) scale(1.5);}
-    .cg-detalhe{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12.5px;min-height:20px;margin-top:26px;}
+    .cg-nav{display:flex;align-items:center;gap:10px;margin:0 0 10px;}
+    .cg-nav button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 12px;font-family:inherit;font-size:13px;cursor:pointer;}
+    .cg-nav button:hover{background:var(--bg);}
+    .cg-nav button:disabled{opacity:.35;cursor:default;}
+    .cg-nav .tit{font-size:16px;font-weight:700;color:var(--ink);min-width:190px;text-align:center;text-transform:capitalize;}
+    .cg-nav .tot{font-size:12px;color:var(--ink-soft);margin-left:6px;}
+    .cg-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+    .cg-dow{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding:2px 0;text-transform:uppercase;letter-spacing:.04em;}
+    .cg-cel{background:var(--paper);border:1px solid var(--line);border-radius:8px;min-height:104px;padding:4px 5px;overflow:hidden;min-width:0;}
+    .cg-cel.tem{cursor:pointer;}
+    .cg-cel.tem:hover{border-color:var(--ink-soft);}
+    .cg-cel.hoje{border:2px solid #e67e22;padding:3px 4px;}
+    .cg-cel .n{font-size:11px;color:var(--ink-soft);}
+    .cg-cel.hoje .n{color:#e67e22;font-weight:700;}
+    .cg-pill{display:block;width:100%;margin-top:3px;padding:2px 6px;border:none;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;text-align:left;line-height:1.4;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .cg-pill:hover{filter:brightness(.92);}
+    .cg-pill.mais{background:var(--bg);color:var(--ink);border:1px solid var(--line);}
+    .cg-detalhe{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12.5px;min-height:20px;margin-top:12px;}
+    .cg-det-it{display:flex;gap:8px;align-items:flex-start;padding:4px 0;}
+    .cg-det-it i{flex:none;width:10px;height:10px;border-radius:50%;margin-top:4px;}
     .cg-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;}
     .cg-fbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
     .cg-fbtn:hover{background:var(--bg);}
     .cg-fbtn.ativo{background:#111;color:#fff;border-color:#111;}
     .cg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
-    .cg-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
+    .cg-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;}
     .cg-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
   </style>
   <div class="modal-overlay" id="cgOverlay">
     <div class="modal-panel" style="max-width:96vw;width:1400px;max-height:94vh;display:flex;flex-direction:column;">
       <h2>📅 ${ctx.titulo}</h2>
-      <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Datas previstas (Plantio + DAP) das avaliações, Set/2026 a Abr/2027.</p>
+      <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Datas previstas (Plantio + DAP) das avaliações, Set/2026 a Abr/2027. Clique numa pílula pra ver o talhão, ou no dia pra ver tudo dele.</p>
       <div class="cg-filtros" id="cgBarra"></div>
+      <div class="cg-nav">
+        <button type="button" id="cgPrev" aria-label="Mês anterior">◀</button>
+        <span class="tit" id="cgTitMes"></span>
+        <button type="button" id="cgNext" aria-label="Próximo mês">▶</button>
+        <button type="button" id="cgHojeBtn">Hoje</button>
+        <span class="tot" id="cgTot"></span>
+      </div>
       <div id="cgLeg"></div>
       <div id="cgArea"></div>
       <div class="cg-detalhe" id="cgDetalhe"></div>
-      <p class="sub-sm" id="cgContagem" style="margin-top:6px;"></p>
       <div class="modal-actions"><button class="btn ghost" id="cgFecharBtn">Fechar</button></div>
     </div>
   </div>`;
@@ -9183,6 +9203,14 @@ function abrirCronogramaGeral(ctxKey){
     document.addEventListener('mousedown', e=>{ if(cgPop && !cgPop.contains(e.target) && !e.target.closest('.cg-fbtn')) cgFecharPop(); });
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') cgFecharPop(); });
   }
+  const irMes = delta=>{
+    const i = CG_MESES.findIndex(m=>m.key===state.cgMes[ctxKey]) + delta;
+    if(i<0 || i>=CG_MESES.length) return;
+    state.cgMes[ctxKey] = CG_MESES[i].key; desenharCalendario();
+  };
+  document.getElementById('cgPrev').addEventListener('click', ()=>irMes(-1));
+  document.getElementById('cgNext').addEventListener('click', ()=>irMes(1));
+  document.getElementById('cgHojeBtn').addEventListener('click', ()=>{ state.cgMes[ctxKey] = mesHoje; desenharCalendario(); });
 
   function desenharBarra(){
     const barra = document.getElementById('cgBarra');
@@ -9191,14 +9219,19 @@ function abrirCronogramaGeral(ctxKey){
     barra.querySelectorAll('.cg-fbtn').forEach(btn=> btn.addEventListener('click', ()=>{
       const f = FILTROS.find(x=>x.k===btn.dataset.f);
       if(cgPop && cgPop.dataset.f===f.k){ cgFecharPop(); return; }
-      cgAbrirPop(btn, f.k, f.label, ()=>opcoesDe(f.k), F[f.k], ()=>{ desenharBarra(); desenharTimeline(); });
+      cgAbrirPop(btn, f.k, f.label, ()=>opcoesDe(f.k), F[f.k], ()=>{ desenharBarra(); desenharCalendario(); });
     }));
     const lt = document.getElementById('cgLimparTudo');
-    if(lt) lt.addEventListener('click', ()=>{ FILTROS.forEach(f=>F[f.k].clear()); cgFecharPop(); desenharBarra(); desenharTimeline(); });
+    if(lt) lt.addEventListener('click', ()=>{ FILTROS.forEach(f=>F[f.k].clear()); cgFecharPop(); desenharBarra(); desenharCalendario(); });
   }
 
-  function desenharTimeline(){
-    const filtrados = pontos.filter(p=>passa(p,null));
+  const dataBr = s=> new Date(s+'T00:00:00').toLocaleDateString('pt-BR');
+  const itemGrupo = g=>`<div class="cg-det-it"><i style="background:${CG_PROJ[g.projeto].cor}"></i><div><b>${CG_PROJ[g.projeto].label} · ${g.cliente} / ${g.fazenda} / ${g.talhao}</b> (${g.estado||'—'}${g.consultor?', '+g.consultor:''})<br><span style="color:var(--ink-soft)">${g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ')}</span></div></div>`;
+
+  function desenharCalendario(){
+    const mesKey = state.cgMes[ctxKey];
+    const [ano, mes] = mesKey.split('-').map(Number);
+    const filtrados = pontos.filter(p=> passa(p,null) && p.mesStr===mesKey);
     const mapa = new Map();
     filtrados.forEach(p=>{
       const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
@@ -9206,51 +9239,52 @@ function abrirCronogramaGeral(ctxKey){
       mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
     });
     const grupos = [...mapa.values()];
+    const porDia = {};
+    grupos.forEach((g,idx)=>{ g.idx = idx; (porDia[g.dataStr] = porDia[g.dataStr] || []).push(g); });
 
-    let rangeInicio = inicioRange, rangeFim = fimRange, zoomMes = null;
-    if(F.mes.size===1){
-      zoomMes = [...F.mes][0];
-      const [ano, mes] = zoomMes.split('-').map(Number);
-      rangeInicio = new Date(ano, mes-1, 1); rangeFim = new Date(ano, mes, 0);
-    }
-    const totalMs = rangeFim - rangeInicio;
-    const pctDe = d=> ((new Date(d+'T00:00:00') - rangeInicio) / totalMs) * 100;
-
-    const pilha = {};
-    grupos.forEach(g=>{ g.i = pilha[g.dataStr] || 0; pilha[g.dataStr] = g.i + 1; });
-    const maxPilha = Math.max(0, ...Object.values(pilha));
-    const passo = maxPilha>0 ? Math.max(5, Math.min(13, Math.floor(380/maxPilha))) : 13;
-    const altura = Math.max(160, 34 + maxPilha*passo);
-
-    const dots = grupos.map((g,idx)=>`<div class="cg-dot" style="left:${pctDe(g.dataStr)}%;bottom:${4+g.i*passo}px;background:${CG_PROJ[g.projeto].cor};" data-g="${idx}" title="${g.fazenda} — ${g.talhao} (${CG_PROJ[g.projeto].label})"></div>`).join('');
-
-    let eixo = '';
-    if(zoomMes){
-      const dias = rangeFim.getDate();
-      for(let d=1; d<=dias; d+=(dias>20?2:1)){
-        const dt = new Date(rangeInicio.getFullYear(), rangeInicio.getMonth(), d);
-        eixo += `<div class="cg-mes-label" style="left:${((dt-rangeInicio)/totalMs)*100}%;">${d}</div>`;
-      }
-    } else {
-      eixo = CG_MESES.map(m=>`<div class="cg-mes-label" style="left:${pctDe(m.key+'-01')}%;">${m.label}</div>`).join('');
-    }
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const linhaHoje = (hoje>=rangeInicio && hoje<=rangeFim)
-      ? `<div class="cg-hoje-linha" style="left:${((hoje-rangeInicio)/totalMs)*100}%;"></div><div class="cg-hoje-label" style="left:${((hoje-rangeInicio)/totalMs)*100}%;">Hoje</div>` : '';
-
+    const idxMes = CG_MESES.findIndex(m=>m.key===mesKey);
+    document.getElementById('cgTitMes').textContent = CG_NOMES_MES[mes-1]+' de '+ano;
+    document.getElementById('cgPrev').disabled = idxMes<=0;
+    document.getElementById('cgNext').disabled = idxMes>=CG_MESES.length-1;
+    document.getElementById('cgTot').textContent = `${filtrados.length} avaliação(ões) · ${grupos.length} talhão(ões)-dia neste mês`;
     document.getElementById('cgLeg').innerHTML = ctx.projetos.length>1
       ? '<div class="cg-leg">'+ctx.projetos.map(k=>`<span><i style="background:${CG_PROJ[k].cor}"></i>${CG_PROJ[k].label} (${grupos.filter(g=>g.projeto===k).length})</span>`).join('')+'</div>' : '';
-    document.getElementById('cgArea').innerHTML = `<div class="cg-timeline-wrap"><div class="cg-timeline" style="height:${altura}px;"><div class="cg-timeline-eixo"></div>${eixo}${linhaHoje}${dots}</div></div>`;
-    detEl.textContent = 'Clique numa bolinha pra ver o que é.';
-    document.getElementById('cgContagem').textContent = `${filtrados.length} avaliação(ões) prevista(s) · ${grupos.length} bolinha(s) nesse filtro.`;
-    document.querySelectorAll('#cgArea .cg-dot').forEach(dot=> dot.addEventListener('click', ()=>{
-      const g = grupos[Number(dot.dataset.g)];
-      const lista = g.avaliacoes.map(a=>`${a.avaliacao} (${a.estagio})`).join(', ');
-      detEl.innerHTML = `<b>${g.cliente} / ${g.fazenda} / ${g.talhao}</b> (${CG_PROJ[g.projeto].label}, ${g.estado||'—'}${g.consultor?', '+g.consultor:''}) — previstas pra ${new Date(g.dataStr+'T00:00:00').toLocaleDateString('pt-BR')}: <b>${lista}</b>`;
+
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const hojeStr = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+    const offset = new Date(ano, mes-1, 1).getDay(), dias = new Date(ano, mes, 0).getDate();
+    const multi = ctx.projetos.length>1;
+    let h = '<div class="cg-cal">' + ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(n=>`<div class="cg-dow">${n}</div>`).join('');
+    for(let i=0;i<offset;i++) h += '<div></div>';
+    for(let d=1; d<=dias; d++){
+      const ds = ano+'-'+String(mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const lista = porDia[ds] || [];
+      const visiveis = lista.length>3 ? 2 : lista.length;
+      h += `<div class="cg-cel ${lista.length?'tem':''} ${ds===hojeStr?'hoje':''}" ${lista.length?`data-dia="${ds}"`:''}><div class="n">${d}</div>`;
+      lista.slice(0,visiveis).forEach(g=>{
+        const p = CG_PROJ[g.projeto];
+        const txt = (multi ? p.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
+        h += `<button type="button" class="cg-pill" data-g="${g.idx}" style="background:${p.cor};color:${p.txt};" title="${p.label} — ${g.fazenda} ${g.talhao}">${txt}</button>`;
+      });
+      if(lista.length>visiveis) h += `<button type="button" class="cg-pill mais" data-dia="${ds}">+${lista.length-visiveis} mais</button>`;
+      h += '</div>';
+    }
+    document.getElementById('cgArea').innerHTML = h + '</div>';
+    detEl.textContent = 'Clique numa pílula pra ver o talhão, ou no dia pra ver todos os eventos dele.';
+    const mostrarDia = ds=>{
+      const l = porDia[ds] || [];
+      detEl.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">${dataBr(ds)} · ${l.length} talhão(ões)</div>` + l.map(itemGrupo).join('');
+    };
+    document.querySelectorAll('#cgArea .cg-pill[data-g]').forEach(btn=> btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const g = grupos[Number(btn.dataset.g)];
+      detEl.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">${dataBr(g.dataStr)}</div>` + itemGrupo(g);
     }));
+    document.querySelectorAll('#cgArea .cg-pill.mais').forEach(btn=> btn.addEventListener('click', e=>{ e.stopPropagation(); mostrarDia(btn.dataset.dia); }));
+    document.querySelectorAll('#cgArea .cg-cel.tem').forEach(cel=> cel.addEventListener('click', ()=> mostrarDia(cel.dataset.dia)));
   }
   desenharBarra();
-  desenharTimeline();
+  desenharCalendario();
 }
 window.abrirCronogramaGeral = abrirCronogramaGeral;
 function abrirCronogramaGeralLM(){ abrirCronogramaGeral('lm'); }
