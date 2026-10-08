@@ -3216,7 +3216,7 @@ function tsEnhance(wrap){
   }
   ajustar();
 }
-function tsVarrer(){ document.querySelectorAll('.table-scroll[data-topscroll]:not([data-ts-ok])').forEach(tsEnhance); }
+function tsVarrer(){ document.querySelectorAll('.table-scroll[data-topscroll]:not([data-ts-ok]), .vg-table-wrap[data-topscroll]:not([data-ts-ok])').forEach(tsEnhance); }
 function corVarrer(){
   document.querySelectorAll('select[data-cor-status]:not([data-cor-ok])').forEach(s=>{ s.dataset.corOk = '1'; recolorirStatusData(s); });
 }
@@ -3322,16 +3322,20 @@ const ESTR_ETAPAS = [
   { key:'altura_v4', label:'Altura V4', bloco:'V4' },
   { key:'foto_v4', label:'Foto V4', bloco:'V4' },
   { key:'ground_cover_v4', label:'Ground Cover V4', bloco:'V4' },
+  { key:'altura_r1r2', label:'Altura R1/R2', bloco:'R1/R2' },
+  { key:'foto_r1r2', label:'Fotos R1/R2', bloco:'R1/R2' },
+  { key:'ground_cover_r1r2', label:'Ground Cover R1/R2', bloco:'R1/R2' },
   { key:'vagens_planta', label:'Número de vagens p/ planta', bloco:'R6/R7' },
   { key:'hastes_planta', label:'N de hastes p/ planta', bloco:'R6/R7' },
   { key:'nos_hastes', label:'N de nós (haste prin. e lateral)', bloco:'R6/R7' },
   { key:'nos_produtivos_haste', label:'Número de nós produtivos na haste principal', bloco:'R6/R7' },
-  { key:'fotos', label:'Fotos', bloco:'R6/R7' },
-  { key:'ground_cover_r5r6', label:'Ground Cover R6/R7', bloco:'R6/R7' },
+  { key:'produtividade_planta', label:'Produtividade por planta', bloco:'R6/R7' },
+  { key:'pmg_planta', label:'PMG por planta', bloco:'R6/R7' },
 ];
-const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R6/R7':'#6b7a3f' };
+const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R1/R2':'#8a4f7d', 'R6/R7':'#6b7a3f' };
 const ESTR_BLOCO_DAP = {
   'V4': { dap:25, faixa:3 },
+  'R1/R2': { dap:45, faixa:4 },
   'R6/R7': { dap:105, faixa:5 },
 };
 const ESTR_TIPO_MATERIAL_OPTIONS = ['Precoce','Médio','Tardio'];
@@ -3416,10 +3420,10 @@ function getMicroAcompEntry(key){
 
 // Estádios fenológicos da soja (ciclo ~125 dias) — DAP (dias após plantio) + janela de tolerância
 const VNS_ETAPAS = [
-  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1)' },
-  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1)' },
-  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1)' },
-  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1)' },
+  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1/R2)' },
+  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)' },
+  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)' },
+  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1/R2)' },
   { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita' },
 ];
 const VNS_ETAPA_STATUS_OPTIONS = ['Pendente','Executado'];
@@ -3443,13 +3447,14 @@ function getVnsEtapaEntry(key){
 
 const LM_ESTAGIO_DAP = {
   'V4': { dap:25, faixa:3 },
-  'R1': { dap:45, faixa:4 },
+  'R1/R2': { dap:45, faixa:4 },
   'R4': { dap:70, faixa:5 },
   'R5.4': { dap:93, faixa:4 },
+  'R6/R7': { dap:105, faixa:5 },
   'R8': { dap:120, faixa:5 },
   'Colheita': { dap:130, faixa:5 },
 };
-function lmEstagioKey(estagio){ if(estagio==='R8') return 'r7r8'; /* chave legada: o R7/R8 virou R8 só no nome — os dados já salvos continuam em *_r7r8 */ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R5.4'->'r54'
+function lmEstagioKey(estagio){ if(estagio==='R8') return 'r7r8'; if(estagio==='R1/R2') return 'r1'; /* chaves legadas: R7/R8 virou R8 e R1 virou R1/R2 só no nome — os dados já salvos continuam em *_r7r8 e *_r1 */ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R5.4'->'r54'
 // cor de cada bloco do Máximas/Ladrões — faixa sólida no cabeçalho, tom suave nas células e linha vertical onde o bloco começa
 const LM_BLOCO_COR = { 1:'#2c4a7a', 2:'#8a5a4a', 3:'#6b7a3f', 4:'#7a5b8a' };
 function lmHexRgba(hex, a){ const n = parseInt(hex.slice(1),16); return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')'; }
@@ -3459,25 +3464,25 @@ function lmEstCelula(ocs, oi, alfa){ const cor = LM_BLOCO_COR[ocs[oi].blocoNum];
 // 4 blocos — cada avaliação lista em quais estádios ela ocorre (algumas ocorrem em vários)
 const LM_BLOCOS = [
   { num:1, label:'Nutrição e amostragem', itens:[
-    { key:'marcha_absorcao', label:'Marcha de absorção', estagios:['V4','R1','R4','R5.4','R8'] },
-    { key:'massa_fresca', label:'Análise de massa fresca', estagios:['V4'] },
-    { key:'analise_foliar', label:'Análise foliar', estagios:['R1'] },
+    { key:'marcha_absorcao', label:'Marcha de absorção', estagios:['V4','R1/R2','R4','R5.4','R8'] },
+    { key:'massa_fresca', label:'Massa Fresca Raiz', estagios:['V4'] },
+    { key:'analise_foliar', label:'Análise foliar', estagios:['R1/R2'] },
   ]},
   { num:2, label:'Nodulação', itens:[
     { key:'nodulacao', label:'Avaliações de nodulação', estagios:['V4','R4'] },
   ]},
   { num:3, label:'Estande e monitoramento visual', itens:[
     { key:'estande', label:'Estande', estagios:['V4','R8'] },
-    { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1','R8'] },
-    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1','R4','R5.4','R8'] },
-    { key:'ground_cover', label:'Ground cover', estagios:['V4','R1','R4'] },
+    { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1/R2','R8'] },
+    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1/R2','R4','R5.4','R8'] },
+    { key:'ground_cover', label:'Ground cover', estagios:['V4','R1/R2','R4'] },
   ]},
   { num:4, label:'Componentes produtivos', itens:[
-    { key:'altura_final', label:'Altura final das plantas', estagios:['R8'] },
-    { key:'nos_haste_principal', label:'Nº de nós na haste principal', estagios:['R8'] },
-    { key:'ramos_laterais', label:'Nº de ramos laterais', estagios:['R8'] },
-    { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos', estagios:['R8'] },
-    { key:'graos_falhados', label:'Grãos falhados por nós', estagios:['R8'] },
+    { key:'altura_final', label:'Altura final das plantas', estagios:['R6/R7'], estagioLegado:'R8' },
+    { key:'nos_haste_principal', label:'Nº de nós na haste principal', estagios:['R6/R7'], estagioLegado:'R8' },
+    { key:'ramos_laterais', label:'Nº de ramos laterais', estagios:['R6/R7'], estagioLegado:'R8' },
+    { key:'vagens_graos', label:'Vagens com 1, 2, 3 e 4 grãos', estagios:['R6/R7'], estagioLegado:'R8' },
+    { key:'graos_falhados', label:'Grãos falhados por nós', estagios:['R6/R7'], estagioLegado:'R8' },
     { key:'produtividade', label:'Produtividade', estagios:['Colheita'] },
     { key:'pmg', label:'PMG', estagios:['Colheita'] },
   ]},
@@ -3491,7 +3496,7 @@ function lmOcorrencias(blocos){
         out.push({
           blocoNum:b.num, blocoLabel:b.label,
           avaliacaoKey:it.key, avaliacaoLabel:it.label,
-          estagio, campoKey: it.key+'_'+lmEstagioKey(estagio),
+          estagio, campoKey: it.key+'_'+lmEstagioKey(it.estagioLegado || estagio),
           dap: LM_ESTAGIO_DAP[estagio].dap, faixa: LM_ESTAGIO_DAP[estagio].faixa,
         });
       });
@@ -9314,7 +9319,7 @@ function cgColetarPontos(projetos, ini, fim){
     if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio));
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
-      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1'));
+      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2'));
       add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita');
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
@@ -9557,7 +9562,7 @@ function abrirModalLadroesMaximasTalhao(rec){
   // agrupa as 30 ocorrências por estádio — cada estádio vira 1 "bolinha" (Plantio + V4 + R1 + R4 + R5.4 + R8 + Colheita)
   // a bolinha fica vermelha se tiver algo atrasado ali dentro, verde se tudo realizado no prazo, cinza se só previsão ainda
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
-  const ESTAGIOS_ORDEM = ['V4','R1','R4','R5.4','R8','Colheita'];
+  const ESTAGIOS_ORDEM = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
   const gruposEstagio = ESTAGIOS_ORDEM.map(estagio=>{
     const ocorrenciasDoEstagio = LM_OCORRENCIAS_MAXIMAS.filter(oc=>oc.estagio===estagio);
     const detalhes = ocorrenciasDoEstagio.map(oc=>{
@@ -10133,7 +10138,7 @@ function abrirModalVidaNoSoloTalhao(rec){
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
   const hojeTl = new Date(); hojeTl.setHours(0,0,0,0);
   const VNS_ESTAGIOS = [
-    { estagio:'R1', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
+    { estagio:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
     { estagio:'Colheita', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, faixa:VNS_ETAPA_PRAZO.etapa4_pos_colheita.faixa, etapas:['etapa4_pos_colheita'] },
   ];
   const gruposEstagio = VNS_ESTAGIOS.map(est=>{
@@ -10817,10 +10822,10 @@ const RF_OXC_DAP = 45;
 const RF_OXC_FEITO = ['Coletado','No laboratório','Laudo recebido'];
 const RF_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const RF_PRINC = {
-  maximas:[['Marcha de absorção','V4 a R8','planta inteira pra análise de nutrientes ao longo do ciclo'],['Análise foliar','R1','folha diagnóstico pra teor de nutrientes'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos'],['+ estande, nodulação, fotos e componentes produtivos','','']],
-  ladroes:[['Componentes produtivos','R8','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
-  estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, fotos e ground cover']],
-  vns:[['Coleta de solo, fotos e análise foliar','R1','etapas 2.1, 2.2, 2.3 e 3'],['Análises pós colheita','Colheita','etapa 4 do acompanhamento']],
+  maximas:[['Marcha de absorção','V4 a R8','planta inteira pra análise de nutrientes ao longo do ciclo'],['Análise foliar','R1/R2','folha diagnóstico pra teor de nutrientes'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos'],['+ estande, nodulação, fotos e componentes produtivos','','']],
+  ladroes:[['Componentes produtivos','R6/R7','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
+  estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Altura, fotos e ground cover','R1/R2','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, produtividade e PMG por planta']],
+  vns:[['Coleta de solo, fotos e análise foliar','R1/R2','etapas 2.1, 2.2, 2.3 e 3'],['Análises pós colheita','Colheita','etapa 4 do acompanhamento']],
   oxc:[['Coleta foliar','45 DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
 };
 function rfHexRgb(h){ let x = String(h).replace('#',''); if(x.length===3) x = x.split('').map(c=>c+c).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; }
@@ -10842,19 +10847,19 @@ function rfLinkMapa(r){
 function rfMarcos(r,k){
   if(k==='maximas' || k==='ladroes'){
     const ocs = k==='maximas' ? LM_OCORRENCIAS_MAXIMAS : LM_OCORRENCIAS_LADROES;
-    return ['V4','R1','R4','R5.4','R8','Colheita'].map(est=>{
+    return ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'].map(est=>{
       const l = ocs.filter(oc=>oc.estagio===est); if(!l.length) return null;
       return { rot: est==='Colheita' ? 'Colh.' : est, dap: LM_ESTAGIO_DAP[est].dap, total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
     }).filter(Boolean);
   }
-  if(k==='estr') return ['V4','R6/R7'].map(b=>{
+  if(k==='estr') return ['V4','R1/R2','R6/R7'].map(b=>{
     const l = ESTR_ETAPAS.filter(e=>e.bloco===b);
     return { rot:b, dap:ESTR_BLOCO_DAP[b].dap, total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
   });
   if(k==='vns'){
     const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'];
     return [
-      { rot:'R1', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length },
+      { rot:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length },
       { rot:'Colh.', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
     ];
   }
@@ -11183,8 +11188,22 @@ function renderVisaoGeral(){
     .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
     .vg-table-wrap{flex:1;min-height:0;overflow:auto;max-height:620px;}
     .vg-table{width:100%;border-collapse:collapse;font-size:11px;}
-    .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);z-index:1;}
+    .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);z-index:3;height:28px;box-sizing:border-box;white-space:nowrap;}
+    .vg-table thead tr:nth-child(2) th{top:28px;}
     .vg-table td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+    .vg-table td.vg-fz, .vg-table td.vg-fzr{position:sticky;z-index:2;background:#fff;overflow:hidden;text-overflow:ellipsis;}
+    .vg-table th.vg-fz, .vg-table th.vg-fzr{position:sticky;z-index:5;overflow:hidden;text-overflow:ellipsis;}
+    .vg-fz0{left:0;width:32px;min-width:32px;max-width:32px;}
+    .vg-fz1{left:32px;width:130px;min-width:130px;max-width:130px;}
+    .vg-fz2{left:162px;width:130px;min-width:130px;max-width:130px;}
+    .vg-fz3{left:292px;width:70px;min-width:70px;max-width:70px;}
+    .vg-fz4{left:362px;width:58px;min-width:58px;max-width:58px;}
+    .vg-fz5{left:420px;width:142px;min-width:142px;max-width:142px;box-shadow:2px 0 4px rgba(0,0,0,.10);}
+    .vg-fzr{right:0;width:112px;min-width:112px;max-width:112px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+    .vg-proj-grp{background:#f1efe8 !important;text-align:center !important;}
+    .vg-proj-oculto .vg-proj{display:none;}
+    .vg-proj-ph{display:none;text-align:center;color:var(--ink-soft);}
+    .vg-proj-oculto .vg-proj-ph{display:table-cell;}
     .vg-cell-on{background:var(--lime-soft);text-align:center;}
     .vg-cell-off{text-align:center;color:var(--line);}
     @media (max-width:1100px){ .vg-layout{grid-template-columns:1fr;height:auto;} .vg-map-card{height:440px;} .vg-table-wrap{max-height:440px;} }
@@ -11223,23 +11242,27 @@ function renderVisaoGeral(){
         <span id="vgLoteMsg" style="color:var(--ink-soft);flex:1;min-width:120px;"></span>
         <button type="button" class="btn btn-preto" id="vgSalvarLote" style="padding:6px 12px;font-size:12px;display:none;">💾 Salvar alterações (0)</button>
       </div>
-      <div class="vg-table-wrap">
-        <table class="vg-table" data-colfilter="vg-talhoes">
-          <thead><tr>
-            <th><input type="checkbox" class="vg-chk" id="vgChkTodos" title="Selecionar todos os talhões que estão na tela"></th>
-            <th>Cliente</th><th>Fazenda</th><th>Talhão</th>
-            <th data-cf-skip>Estado<button type="button" class="cf-btn cg-fbtn vg-estado-btn ${state.vgF.estado.size?'active':''}" title="Filtrar: Estado (é o mesmo filtro do topo)">▾</button></th>
-            <th>Responsabilidade/Parceiro</th>
-            ${VG_VISIVEIS.map(p=>`<th>${p.label}</th>`).join('')}
-            <th>Salvar</th>
-          </tr></thead>
+      <div class="vg-table-wrap" data-topscroll="1">
+        <table class="vg-table ${state.vgProjOculto?'vg-proj-oculto':''}" data-colfilter="vg-talhoes">
+          <thead>
+            <tr>
+              <th class="vg-fz vg-fz0" rowspan="2"><input type="checkbox" class="vg-chk" id="vgChkTodos" title="Selecionar todos os talhões que estão na tela"></th>
+              <th class="vg-fz vg-fz1" rowspan="2">Cliente</th><th class="vg-fz vg-fz2" rowspan="2">Fazenda</th><th class="vg-fz vg-fz3" rowspan="2">Talhão</th>
+              <th class="vg-fz vg-fz4" rowspan="2" data-cf-skip>Estado<button type="button" class="cf-btn cg-fbtn vg-estado-btn ${state.vgF.estado.size?'active':''}" title="Filtrar: Estado (é o mesmo filtro do topo)">▾</button></th>
+              <th class="vg-fz vg-fz5" rowspan="2">Responsabilidade/Parceiro</th>
+              <th class="vg-proj-grp" id="vgProjGrp" colspan="${VG_VISIVEIS.length}"><span>Por projeto</span><button type="button" class="cf-btn vg-proj-toggle" title="Ocultar ou mostrar o bloco por projeto">▾</button></th>
+              <th class="vg-fzr" rowspan="2">Salvar</th>
+            </tr>
+            <tr>${VG_VISIVEIS.map(p=>`<th class="vg-proj">${p.label}</th>`).join('')}</tr>
+          </thead>
           <tbody>
             ${linhasFiltradas.map(l=>`<tr>
-              <td><input type="checkbox" class="vg-chk vg-chk-linha" data-id="${l.rec.id}"></td>
-              <td>${l.rec.cliente||''}</td><td>${l.rec.fazenda||''}</td><td>${l.rec.talhao||''}</td>
-              <td>${(l.rec.estado||'').toUpperCase()}</td><td>${parcSelectHtml(l.rec)}</td>
-              ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on">✓</td>` : `<td class="vg-cell-off">—</td>`).join('')}
-              <td><button type="button" class="vg-salvar ${parcAlterado(l.rec)?'alterado':''}" data-id="${l.rec.id}">💾 Salvar</button></td>
+              <td class="vg-fz vg-fz0"><input type="checkbox" class="vg-chk vg-chk-linha" data-id="${l.rec.id}"></td>
+              <td class="vg-fz vg-fz1" title="${String(l.rec.cliente||'').replace(/"/g,'&quot;')}">${l.rec.cliente||''}</td><td class="vg-fz vg-fz2" title="${String(l.rec.fazenda||'').replace(/"/g,'&quot;')}">${l.rec.fazenda||''}</td><td class="vg-fz vg-fz3">${l.rec.talhao||''}</td>
+              <td class="vg-fz vg-fz4">${(l.rec.estado||'').toUpperCase()}</td><td class="vg-fz vg-fz5">${parcSelectHtml(l.rec)}</td>
+              ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on vg-proj">✓</td>` : `<td class="vg-cell-off vg-proj">—</td>`).join('')}
+              <td class="vg-proj-ph">···</td>
+              <td class="vg-fzr"><button type="button" class="vg-salvar ${parcAlterado(l.rec)?'alterado':''}" data-id="${l.rec.id}">💾 Salvar</button></td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -11259,6 +11282,16 @@ function renderVisaoGeral(){
     if(cgPop && cgPop.dataset.f==='vg-'+f.k){ cgFecharPop(); return; }
     cgAbrirPop(btn, 'vg-'+f.k, f.label, ()=>opcoesVg(f.k), state.vgF[f.k], ()=>renderVisaoGeral());
   }));
+  const tabelaVg = container.querySelector('.vg-table'), grpVg = container.querySelector('#vgProjGrp');
+  const aplicarProjOculto = ()=>{
+    const oc = !!state.vgProjOculto;
+    tabelaVg.classList.toggle('vg-proj-oculto', oc);
+    grpVg.colSpan = oc ? 1 : VG_VISIVEIS.length; grpVg.rowSpan = oc ? 2 : 1;
+    grpVg.querySelector('button').textContent = oc ? '▶' : '▾';
+    grpVg.querySelector('span').textContent = oc ? 'Projetos' : 'Por projeto';
+  };
+  grpVg.querySelector('button').addEventListener('click', ()=>{ state.vgProjOculto = !state.vgProjOculto; aplicarProjOculto(); });
+  aplicarProjOculto();
   // Estado na tabela = o mesmo filtro do topo (mesma chave e mesmo conjunto): mexer em um muda o outro, e o mapa acompanha
   const btnEstadoTab = container.querySelector('.vg-estado-btn');
   if(btnEstadoTab) btnEstadoTab.addEventListener('click', e=>{
@@ -12028,10 +12061,10 @@ const REGENERA_SIM_NAO = ['Sim','Não'];
 const REGENERA_ETAPA_STATUS_OPTIONS = ['Pendente','Executado'];
 const REGENERA_ETAPAS = [
   { key:'etapa1_plantio', label:'Etapa 1 – Plantio/Aplicação', dap:0, faixa:3 },
-  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1)', dap:45, faixa:4 },
-  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1)', dap:45, faixa:4 },
-  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1)', dap:45, faixa:4 },
-  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1)', dap:45, faixa:4 },
+  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1/R2)', dap:45, faixa:4 },
+  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)', dap:45, faixa:4 },
+  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)', dap:45, faixa:4 },
+  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1/R2)', dap:45, faixa:4 },
   { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita', dap:130, faixa:5 },
 ];
 function getRegeneraEtapasEntry(rec){
