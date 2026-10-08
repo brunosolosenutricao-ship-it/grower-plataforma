@@ -6807,6 +6807,92 @@ function criarMapaCoropleticoLeaflet(containerId, porEstado, opts){
 }
 
 // Mapa de pontos — plota lat/long reais, cada ponto colorido conforme a função corPonto(item)
+// ---- mapa da Visão Geral: bolinha do talhão cresce com o zoom (3,5 px com o Brasil inteiro até 18 px bem perto) ----
+function raioMarcadorPorZoom(z){ return Math.min(18, 3.5 + Math.max(0, z-5)*1.2); }
+function pesoMarcadorPorZoom(z){ return z>=14 ? 2 : z>=10 ? 1.5 : 1; }
+
+// ---- mapa da Visão Geral: busca de cidade. Primeiro as cidades que já têm talhão na base (instantâneo); no fim da lista,
+//      "Buscar no mapa" consulta o OpenStreetMap (qualquer cidade do Brasil). Só dispara a consulta externa por clique/Enter. ----
+function adicionarBuscaCidade(map, cfg){
+  cfg = cfg || {};
+  const base = cfg.cidadesBase || [];
+  const norm = s=> String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const TIPOS = ['city','town','village','municipality','hamlet','suburb','city_district','county','state'];
+  const Ctl = L.Control.extend({
+    options:{ position:'topright' },
+    onAdd(){
+      const div = L.DomUtil.create('div','mapa-busca');
+      div.innerHTML = '<div class="mapa-busca-caixa"><input type="text" placeholder="Buscar cidade…" autocomplete="off" aria-label="Buscar cidade"><button type="button" class="mapa-busca-x" title="Limpar busca" style="display:none">×</button></div><div class="mapa-busca-lista" style="display:none"></div>';
+      L.DomEvent.disableClickPropagation(div); L.DomEvent.disableScrollPropagation(div);
+      const inp = div.querySelector('input'), x = div.querySelector('.mapa-busca-x'), lista = div.querySelector('.mapa-busca-lista');
+      ['keydown','keypress','keyup','dblclick'].forEach(ev=> L.DomEvent.on(inp, ev, L.DomEvent.stopPropagation)); // as setas não movem o mapa enquanto digita
+      let pin = null, ultima = 0, tmr = null; const cache = {};
+      const linha = (titulo, sub, aoClicar)=>{
+        const d = document.createElement('div'); d.className = 'mapa-busca-item';
+        const t = document.createElement('span'); t.textContent = titulo; d.appendChild(t);
+        if(sub){ const s = document.createElement('small'); s.textContent = sub; d.appendChild(s); }
+        d.addEventListener('click', aoClicar); return d;
+      };
+      const msg = txt=>{ const d = document.createElement('div'); d.className = 'mapa-busca-msg'; d.textContent = txt; return d; };
+      const mostrar = nodes=>{ lista.innerHTML = ''; nodes.forEach(n=> lista.appendChild(n)); lista.style.display = nodes.length ? 'block' : 'none'; };
+      const irPara = (bounds, rotulo, comPin)=>{
+        if(pin){ map.removeLayer(pin); pin = null; }
+        try{ map.fitBounds(bounds, { padding:[40,40], maxZoom:12 }); }catch(e){}
+        if(comPin) pin = L.marker(bounds.getCenter(), { icon:L.divIcon({ className:'mapa-busca-pin', html:'📍', iconSize:[24,24], iconAnchor:[12,22] }), keyboard:false, interactive:false }).addTo(map);
+        inp.value = rotulo; x.style.display = 'block'; mostrar([]);
+      };
+      const limpar = ()=>{ if(pin){ map.removeLayer(pin); pin = null; } inp.value = ''; x.style.display = 'none'; mostrar([]); };
+      const buscarOSM = async q=>{
+        mostrar([msg('Buscando “'+q+'”…')]);
+        try{
+          const espera = 1100-(Date.now()-ultima); if(espera>0) await new Promise(r=> setTimeout(r,espera)); // respeita o limite de ~1 consulta por segundo
+          ultima = Date.now();
+          let res = cache[norm(q)];
+          if(!res){
+            const resp = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=br&addressdetails=1&accept-language=pt-BR&limit=10&q='+encodeURIComponent(q), { headers:{ 'Accept':'application/json' } });
+            if(!resp.ok) throw new Error('HTTP '+resp.status);
+            res = await resp.json(); cache[norm(q)] = res;
+          }
+          let lugares = res.filter(r=> TIPOS.includes(r.addresstype)); if(!lugares.length) lugares = res;
+          lugares = lugares.slice(0,6);
+          if(!lugares.length){ mostrar([msg('Nenhum lugar encontrado pra “'+q+'”.')]); return; }
+          mostrar(lugares.map(r=>{
+            const nome = r.name || String(r.display_name||'').split(',')[0];
+            const uf = r.address && r.address.state ? ' · '+r.address.state : '';
+            const bb = (r.boundingbox||[]).map(Number);
+            const bounds = bb.length===4 ? L.latLngBounds([bb[0],bb[2]],[bb[1],bb[3]]) : L.latLngBounds([[Number(r.lat),Number(r.lon)],[Number(r.lat),Number(r.lon)]]);
+            return linha(nome+uf, r.display_name, ()=> irPara(bounds, nome+uf, true));
+          }));
+        }catch(e){ console.error(e); mostrar([msg('Não foi possível buscar agora (sem internet ou limite do serviço). Tente de novo em alguns segundos.')]); }
+      };
+      const achar = q=>{
+        const nq = norm(q);
+        return base.filter(c=> norm(c.cidade).includes(nq)).sort((a,b)=>{
+          const sa = norm(a.cidade).startsWith(nq) ? 0 : 1, sb = norm(b.cidade).startsWith(nq) ? 0 : 1;
+          return sa-sb || a.cidade.localeCompare(b.cidade,'pt-BR');
+        }).slice(0,5);
+      };
+      const opcoes = ()=>{
+        const q = inp.value.trim(); if(q.length<2){ mostrar([]); return; }
+        const nodes = achar(q).map(c=> linha(c.cidade+(c.estado?' · '+c.estado:''), c.talhoes+' talhão(ões) na base', ()=> irPara(L.latLngBounds(c.pts), c.cidade+(c.estado?' · '+c.estado:''), false)));
+        nodes.push(linha('🌎 Buscar “'+q+'” no mapa', 'qualquer cidade do Brasil · OpenStreetMap', ()=> buscarOSM(q)));
+        mostrar(nodes);
+      };
+      inp.addEventListener('input', ()=>{ x.style.display = inp.value ? 'block' : 'none'; clearTimeout(tmr); tmr = setTimeout(opcoes,120); });
+      inp.addEventListener('focus', ()=>{ if(inp.value.trim().length>=2) opcoes(); });
+      inp.addEventListener('keydown', e=>{
+        if(e.key==='Escape'){ mostrar([]); inp.blur(); }
+        if(e.key==='Enter'){ e.preventDefault(); const q = inp.value.trim(); if(q.length<2) return; const a = achar(q); if(a.length) irPara(L.latLngBounds(a[0].pts), a[0].cidade+(a[0].estado?' · '+a[0].estado:''), false); else buscarOSM(q); }
+      });
+      x.addEventListener('click', limpar);
+      const fora = e=>{ if(!div.contains(e.target)) mostrar([]); };
+      document.addEventListener('mousedown', fora); map.on('unload', ()=> document.removeEventListener('mousedown', fora));
+      return div;
+    }
+  });
+  new Ctl().addTo(map);
+}
+
 function criarMapaPontosLeaflet(containerId, pontos, opts){
   opts = opts || {};
   const el = document.getElementById(containerId);
@@ -6842,6 +6928,11 @@ function criarMapaPontosLeaflet(containerId, pontos, opts){
     const grupo = L.featureGroup(marcadores);
     try{ map.fitBounds(grupo.getBounds(), { padding:[24,24], maxZoom:7 }); }catch(e){}
   }
+  if(opts.raioZoom && marcadores.length){      // a bolinha acompanha o zoom (só nos mapas que pedem)
+    const aplicarRaio = ()=>{ const z = map.getZoom(), r = raioMarcadorPorZoom(z), w = pesoMarcadorPorZoom(z); marcadores.forEach(m=>{ m.setRadius(r); m.setStyle({ weight:w }); }); };
+    map.on('zoomend', aplicarRaio); aplicarRaio();
+  }
+  if(opts.buscaCidade) adicionarBuscaCidade(map, opts.buscaCidade);
   const invalidateSeguro = ()=>{ try{ map.invalidateSize(); }catch(e){ /* mapa já foi substituído — ignora */ } };
   setTimeout(invalidateSeguro, 60);
   setTimeout(invalidateSeguro, 300);
@@ -10976,6 +11067,16 @@ function renderVisaoGeral(){
     .vg-fbtn:hover{background:var(--bg);}
     .vg-fbtn.ativo{background:#111;color:#fff;border-color:#111;}
     .vg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
+    .mapa-busca{width:270px;font-family:inherit;}
+    .mapa-busca-caixa{display:flex;align-items:center;background:#fff;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.25);overflow:hidden;}
+    .mapa-busca-caixa input{flex:1;border:none;outline:none;padding:9px 11px;font-size:13px;font-family:inherit;min-width:0;background:transparent;}
+    .mapa-busca-x{border:none;background:none;font-size:18px;line-height:1;padding:0 10px;cursor:pointer;color:var(--ink-soft);}
+    .mapa-busca-lista{margin-top:4px;background:#fff;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.25);max-height:260px;overflow-y:auto;}
+    .mapa-busca-item{padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #eee;color:#1a2019;}
+    .mapa-busca-item:hover{background:#f1efe8;}
+    .mapa-busca-item small{display:block;color:#888780;font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mapa-busca-msg{padding:9px 11px;font-size:12px;color:#5f5e5a;}
+    .mapa-busca-pin{font-size:22px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.4);}
     .vg-legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
     .vg-legenda span{display:inline-flex;align-items:center;gap:4px;}
     .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
@@ -11054,8 +11155,18 @@ function renderVisaoGeral(){
       });
     });
   });
+  // cidades que têm talhão com coordenada (não dependem dos filtros) — alimentam a busca rápida do mapa
+  const cidadesMapa = {};
+  linhas.forEach(l=>{
+    const r = l.rec, lat = Number(r.max_latitude), lon = Number(r.max_longitude);
+    if(!r.cidade || r.max_latitude==null || r.max_longitude==null || isNaN(lat) || isNaN(lon)) return;
+    const k = r.cidade+'|'+(r.estado||''); const o = cidadesMapa[k] || (cidadesMapa[k] = { cidade:r.cidade, estado:r.estado||'', pts:[], talhoes:0 });
+    o.pts.push([lat,lon]); o.talhoes++;
+  });
   criarMapaPontosLeaflet('vgLeafletMap', pontosVg, {
     corPonto: (p)=> p.cor,
+    raioZoom: true,
+    buscaCidade: { cidadesBase: Object.values(cidadesMapa) },
   });
 }
 
