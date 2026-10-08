@@ -10793,12 +10793,8 @@ function rfGerarPdf(cliente, fazenda){
         const ds = dm(dd)+parcial; T(xm-tw(ds,10*K,false)/2,ly+33*K,ds,10*K,false,'#5f5e5a');
       });
     });
-    if(d0<=hoje && hoje<=fim){
-      const hx = tx+Math.round((hoje-d0)/86400000)*PXD; LN(hx,yt+14*K,hx,yl+n*LH,'#e67e22',2);
-      T(hx-tw('Hoje',10.5*K,true)/2,yl+n*LH,'Hoje',10.5*K,true,'#e67e22');
-    }
     // principais avaliações — uma coluna por projeto
-    const yp0 = yl+n*LH+18*K; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
+    const yp0 = yl+n*LH+12*K; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
     const colw = (RW-20)/n; let baseDir = yp0;
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], xc = RX+i*colw; let yp = yp0+2;
