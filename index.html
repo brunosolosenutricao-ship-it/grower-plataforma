@@ -947,7 +947,7 @@
           <h2>🌍 Visão Geral de Projetos</h2>
           <p class="sub">Mapa de pontos (Latitude/Longitude) de todos os 7 projetos, cada um com sua cor, e tabela de participação por talhão.</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('geral')">📅 Cronograma Geral</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('geral')">📅 Cronograma Geral</button><button class="btn btn-preto" onclick="window.abrirResumoFazenda()">📄 Resumo da fazenda</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="visaoGeralLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -10632,6 +10632,302 @@ const VG_PROJETOS = [
   { key:'ladroes', label:'Ladrões', cor:'#b8352a', participa: r=> r.max_selecao==='Ladrões' },
   { key:'maximas', label:'Máximas', cor:'#2e6e76', participa: r=> r.max_selecao==='Máximas' },
 ];
+/* ===== RESUMO DA FAZENDA (PDF) — um cartão por talhão, com linha do tempo por projeto, faixa de ±7 dias e link do Google Maps =====
+   Projetos: Máximas, Ladrões, Estruturação, Vida no Solo e Óxido. Participação = critério de cada projeto (o mesmo da Visão Geral);
+   pílula cheia = todas as avaliações do estádio com status concluído na tabela de acompanhamento do projeto. */
+const RF_PROJ_ORDEM = ['maximas','ladroes','estr','vns','oxc'];
+const RF_SAFRA = '2026/27';
+const RF_JANELA = 7;
+const RF_OXC_DAP = 45;
+const RF_OXC_FEITO = ['Coletado','No laboratório','Laudo recebido'];
+const RF_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const RF_PRINC = {
+  maximas:[['Marcha de absorção','V4 a R8','planta inteira pra análise de nutrientes ao longo do ciclo'],['Análise foliar','R1','folha diagnóstico pra teor de nutrientes'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos'],['+ estande, nodulação, fotos e componentes produtivos','','']],
+  ladroes:[['Componentes produtivos','R8','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
+  estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, fotos e ground cover']],
+  vns:[['Coleta de solo, fotos e análise foliar','R1','etapas 2.1, 2.2, 2.3 e 3'],['Análises pós colheita','Colheita','etapa 4 do acompanhamento']],
+  oxc:[['Coleta foliar','45 DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
+};
+function rfHexRgb(h){ let x = String(h).replace('#',''); if(x.length===3) x = x.split('').map(c=>c+c).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; }
+function rfMistura(cor,a){ const [r,g,b] = rfHexRgb(cor); return [Math.round(255+(r-255)*a), Math.round(255+(g-255)*a), Math.round(255+(b-255)*a)]; }
+function rfParticipa(r,k){ const p = VG_PROJETOS.find(x=>x.key===k); return !!(p && p.participa(r)); }
+function rfTalhoesDaFazenda(cliente, fazenda){
+  return RECORDS.filter(r=> r.cliente===cliente && r.fazenda===fazenda)
+    .map(r=>({ rec:r, projs: RF_PROJ_ORDEM.filter(k=>rfParticipa(r,k)) }))
+    .filter(t=>t.projs.length)
+    .sort((a,b)=> String(a.rec.talhao).localeCompare(String(b.rec.talhao),'pt-BR',{numeric:true}));
+}
+// ponto no Google Maps a partir de latitude e longitude; sem coordenada válida devolve null (o botão fica em branco)
+function rfLinkMapa(r){
+  const lat = parseFloat(String(r.max_latitude).replace(',','.')), lon = parseFloat(String(r.max_longitude).replace(',','.'));
+  if(!isFinite(lat) || !isFinite(lon)) return null;
+  if(lat<-35 || lat>6 || lon<-75 || lon>-33) return null; // fora do Brasil: provável latitude/longitude trocadas
+  return { url:`https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`, txt:`${lat.toFixed(5)}, ${lon.toFixed(5)}` };
+}
+function rfMarcos(r,k){
+  if(k==='maximas' || k==='ladroes'){
+    const ocs = k==='maximas' ? LM_OCORRENCIAS_MAXIMAS : LM_OCORRENCIAS_LADROES;
+    return ['V4','R1','R4','R5.4','R8','Colheita'].map(est=>{
+      const l = ocs.filter(oc=>oc.estagio===est); if(!l.length) return null;
+      return { rot: est==='Colheita' ? 'Colh.' : est, dap: LM_ESTAGIO_DAP[est].dap, total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
+    }).filter(Boolean);
+  }
+  if(k==='estr') return ['V4','R6/R7'].map(b=>{
+    const l = ESTR_ETAPAS.filter(e=>e.bloco===b);
+    return { rot:b, dap:ESTR_BLOCO_DAP[b].dap, total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
+  });
+  if(k==='vns'){
+    const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'];
+    return [
+      { rot:'R1', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length },
+      { rot:'Colh.', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
+    ];
+  }
+  if(k==='oxc') return [{ rot:'Coleta', dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
+  return [];
+}
+
+function rfGerarPdf(cliente, fazenda){
+  const { jsPDF } = window.jspdf;
+  const W=1400, H=990, M=28, K=1.1, LEFT=244, LAB=128, HORIZ=140;
+  const CW=W-2*M, RX=M+LEFT+12, RW=CW-LEFT-28, TLW=RW-LAB-18, PXD=TLW/HORIZ;
+  const novo = ()=> new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+  const doc = novo(); const sc = doc.internal.pageSize.getWidth()/W;
+  let D = doc, REAL = false;
+  const cor = c => Array.isArray(c) ? c : rfHexRgb(c);
+  const setF = (px,b)=>{ D.setFont('helvetica', b?'bold':'normal'); D.setFontSize(px*sc); };
+  const tw = (t,px,b)=>{ setF(px,b); return D.getTextWidth(String(t))/sc; };
+  const T = (x,y,t,px,b,c)=>{ setF(px,b); D.setTextColor(...cor(c||'#1a2019')); D.text(String(t), x*sc, y*sc, { baseline:'top' }); };
+  const RR = (x0,y0,x1,y1,r,fill,line,lw)=>{
+    const rr = Math.min(r,(x1-x0)/2,(y1-y0)/2);
+    if(fill) D.setFillColor(...cor(fill)); if(line){ D.setDrawColor(...cor(line)); D.setLineWidth((lw||1)*sc); }
+    D.roundedRect(x0*sc,y0*sc,(x1-x0)*sc,(y1-y0)*sc,rr*sc,rr*sc, fill&&line?'FD':fill?'F':'S');
+  };
+  const LN = (x0,y0,x1,y1,c,lw)=>{ D.setDrawColor(...cor(c)); D.setLineWidth((lw||1)*sc); D.line(x0*sc,y0*sc,x1*sc,y1*sc); };
+  const CI = (cx,cy,r,c)=>{ D.setFillColor(...cor(c)); D.circle(cx*sc,cy*sc,r*sc,'F'); };
+  const PIN = (cx,cy,c,furo,r)=>{ D.setFillColor(...cor(c)); D.triangle((cx-r*.85)*sc,(cy+r*.45)*sc,(cx+r*.85)*sc,(cy+r*.45)*sc,cx*sc,(cy+r*2.1)*sc,'F'); CI(cx,cy,r,c); CI(cx,cy,r*.4,furo); };
+  const LINK = (x0,y0,x1,y1,url)=>{ if(REAL && url) D.link(x0*sc,y0*sc,(x1-x0)*sc,(y1-y0)*sc,{ url }); };
+  const dm = d=> String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+  const dmy = d=> dm(d)+'/'+d.getFullYear();
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const somaDias = (d,n)=>{ const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+
+  // ---------- dados ----------
+  const todos = rfTalhoesDaFazenda(cliente,fazenda);
+  const comPlantio = todos.filter(t=> t.rec.data_plantio);
+  const semPlantio = todos.filter(t=> !t.rec.data_plantio);
+  const recs = todos.map(t=>t.rec);
+  const areaTotal = recs.reduce((a,r)=> a+(Number(r.area)||0),0);
+  const cidade = (recs.find(r=>r.cidade)||{}).cidade || '', uf = (recs.find(r=>r.estado)||{}).estado || '';
+  const consultores = [...new Set(recs.map(r=>r.consultor).filter(Boolean))].join(', ');
+  const fmt1 = n=> Number(n).toLocaleString('pt-BR',{ maximumFractionDigits:1 });
+
+  // ---------- cartão do talhão ----------
+  // junta palavras seguidas de mesmo estilo numa linha só (o PDF fica com texto corrido: dá pra copiar e buscar)
+  const runs = lin=>{ const o=[]; lin.forEach(([pal,px,b,c,xo])=>{ const u=o[o.length-1]; if(u && u.px===px && u.b===b && u.c===c) u.txt += ' '+pal; else o.push({ txt:pal, px, b, c, xo }); }); return o; };
+  function wrapTk(tk,maxw){
+    const lin=[]; let cur=[], w=0;
+    tk.forEach(([pal,px,b,c])=>{
+      const ww = tw(pal,px,b), sp = tw(' ',px,b);
+      if(cur.length && w+sp+ww>maxw){ lin.push(cur); cur=[]; w=0; }
+      if(cur.length) w += sp;
+      cur.push([pal,px,b,c,w]); w += ww;
+    });
+    lin.push(cur); return lin;
+  }
+  function tokens(n,e,ds,c){
+    if(!e && !ds) return n.split(' ').map(w=>[w,11*K,false,'#888780']);
+    const tk = n.split(' ').map(w=>[w,12.5*K,true,'#1a2019']);
+    if(e) tk.push(['['+e+']',11.5*K,true,c]);
+    if(ds){ tk.push(['—',11.5*K,false,'#888780']); ds.split(' ').forEach(w=>tk.push([w,11.5*K,false,'#5f5e5a'])); }
+    return tk;
+  }
+  function cartao(t,y0,h){
+    const r = t.rec; RR(M,y0,W-M,y0+h,12,'#ffffff','#c9c7bd',1.3);
+    const x = M+16;
+    const tit = 'Talhão '+r.talhao; T(x,y0+12,tit,26*K,true);
+    const info2 = `${fmt1(r.area||0)} ha · ${r.cultura||'—'}`; T(x+tw(tit,26*K,true)+10,y0+12+12*K,info2,12.5*K,true,'#888780');
+    let cx = x, cy = y0+12+36*K;
+    t.projs.forEach(k=>{
+      const p = CG_PROJ[k], w = tw(p.label,11*K,true)+20;
+      if(cx+w > M+LEFT-8){ cx = x; cy += 26*K; }
+      RR(cx,cy,cx+w,cy+22*K,11*K,p.cor); T(cx+10,cy+4*K,p.label,11*K,true,p.txt); cx += w+6;
+    });
+    cy += 32*K;
+    const material = [r.cultivar, r.estr_acomp_tipo_material ? String(r.estr_acomp_tipo_material).toLowerCase() : ''].filter(Boolean).join(' · ') || '—';
+    [['PLANTIO', dmy(new Date(r.data_plantio+'T00:00:00'))],['MATERIAL', material]].forEach(([k,v])=>{
+      T(x,cy,k,9.5*K,true,'#888780'); T(x,cy+13*K,v,14.5*K,true); cy += 33*K;
+    });
+    let baseEsq = cy;
+    const mapa = rfLinkMapa(r);
+    if(mapa){                                       // sem latitude/longitude válidas, esse bloco fica em branco
+      const bw = LEFT-26, by = cy+4*K;
+      RR(x,by,x+bw,by+30*K,15*K,'#1a73e8'); PIN(x+19,by+13*K,'#ffffff','#1a73e8',6); T(x+36,by+7*K,'Abrir no Google Maps',12.5*K,true,'#ffffff');
+      T(x,by+30*K+4,mapa.txt,9.5*K,false,'#1a73e8');
+      LINK(x,by,x+bw,by+30*K,mapa.url); LINK(x,by+30*K+2,x+tw(mapa.txt,9.5*K,false),by+30*K+17,mapa.url);
+      baseEsq = by+30*K+4+14;
+    }
+    // linha do tempo
+    const tx = RX+LAB+4, yt = y0+10, d0 = new Date(r.data_plantio+'T00:00:00'), fim = somaDias(d0,HORIZ), n = t.projs.length, yl = yt+22*K, LH = 44*K;
+    LN(tx,yt+18*K,tx+TLW,yt+18*K,'#d3d1c7',1);
+    let mm = new Date(d0.getFullYear(),d0.getMonth(),1);
+    while(mm<=fim){
+      if(mm>=d0){ const xm = tx+Math.round((mm-d0)/86400000)*PXD; LN(xm,yt+18*K,xm,yl+n*LH,'#ececE6',1); T(xm+3,yt+2,RF_MESES[mm.getMonth()],11*K,true,'#888780'); }
+      mm = new Date(mm.getFullYear(),mm.getMonth()+1,1);
+    }
+    t.projs.forEach((k,i)=>{
+      const p = CG_PROJ[k], marcos = rfMarcos(r,k), ly = yl+i*LH;
+      RR(RX,ly+8*K,RX+LAB-8,ly+32*K,12*K,p.cor); let fl = 12*K; while(tw(p.label,fl,true) > LAB-8-18 && fl>8) fl -= 0.4; T(RX+10,ly+13*K+(12*K-fl)/2,p.label,fl,true,p.txt);
+      LN(tx,ly+20*K,tx+TLW,ly+20*K,'#e6e4dc',1);
+      marcos.forEach(m=>{
+        const dd = somaDias(d0,m.dap), xm = tx+m.dap*PXD, passou = (m.total>0 && m.feitas===m.total);
+        const xa = xm-RF_JANELA*PXD, xb = xm+RF_JANELA*PXD;
+        RR(xa,ly+15*K,xb,ly+25*K,5,rfMistura(p.cor, passou?0.16:0.34));
+        [xa,xb].forEach(xc=> LN(xc,ly+10*K,xc,ly+30*K,p.cor,2));
+      });
+      marcos.forEach(m=>{
+        const dd = somaDias(d0,m.dap), xm = tx+m.dap*PXD, feito = (m.total>0 && m.feitas===m.total), w = tw(m.rot,11.5*K,true)+16;
+        if(feito){ RR(xm-w/2,ly+9*K,xm+w/2,ly+31*K,11*K,p.cor); T(xm-tw(m.rot,11.5*K,true)/2,ly+13*K,m.rot,11.5*K,true,p.txt); }
+        else { RR(xm-w/2,ly+9*K,xm+w/2,ly+31*K,11*K,'#ffffff',p.cor,1.8); T(xm-tw(m.rot,11.5*K,true)/2,ly+13*K,m.rot,11.5*K,true,'#1a2019'); }
+        const parcial = (!feito && m.feitas>0 && m.total>1) ? ` · ${m.feitas}/${m.total}` : '';
+        const ds = dm(dd)+parcial; T(xm-tw(ds,10*K,false)/2,ly+33*K,ds,10*K,false,'#5f5e5a');
+      });
+    });
+    if(d0<=hoje && hoje<=fim){
+      const hx = tx+Math.round((hoje-d0)/86400000)*PXD; LN(hx,yt+14*K,hx,yl+n*LH,'#e67e22',2);
+      T(hx-tw('Hoje',10.5*K,true)/2,yl+n*LH,'Hoje',10.5*K,true,'#e67e22');
+    }
+    // principais avaliações — uma coluna por projeto
+    const yp0 = yl+n*LH+18*K; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
+    const colw = (RW-20)/n; let baseDir = yp0;
+    t.projs.forEach((k,i)=>{
+      const p = CG_PROJ[k], xc = RX+i*colw; let yp = yp0+2;
+      CI(xc+5.5,yp+8.5,5.5,p.cor); T(xc+17,yp,p.label,13*K,true); yp += 22*K;
+      RF_PRINC[k].forEach(([nm,e,ds])=>{
+        wrapTk(tokens(nm,e,ds,p.cor),colw-30).forEach(lin=>{ runs(lin).forEach(u=> T(xc+17+u.xo,yp,u.txt,u.px,u.b,u.c)); yp += 15*K; });
+        yp += 4*K;
+      });
+      baseDir = Math.max(baseDir,yp);
+    });
+    if(h>0) LN(M+LEFT,y0+12,M+LEFT,y0+h-12,'#ececE6',1);
+    return Math.max(baseEsq,baseDir)+12-y0;
+  }
+  const medir = t=>{ const g=D, g2=REAL; D = novo(); REAL=false; const h = cartao(t,0,0); D=g; REAL=g2; return h; };
+
+  // ---------- páginas ----------
+  const LIM = H-52, GAP = 12, Y_P1 = 154, Y_PN = 46;
+  const paginas = [[]]; let y = Y_P1;
+  comPlantio.forEach(t=>{
+    const h = medir(t);
+    if(y+h > LIM && paginas[paginas.length-1].length){ paginas.push([]); y = Y_PN; }
+    paginas[paginas.length-1].push({ t, h, y }); y += h+GAP;
+  });
+  const fimUltima = y;
+  let notaSemPlantio = null;
+  if(semPlantio.length){
+    notaSemPlantio = 'Sem data de plantio (fora da linha do tempo): ' + semPlantio.map(t=> `${t.rec.talhao} (${t.projs.map(k=>CG_PROJ[k].label).join(', ')})`).join('; ') + '. Preencha a Data de plantio na Alimentação.';
+    if(fimUltima+36 > LIM){ paginas.push([]); }
+  }
+  const nPag = paginas.length;
+
+  function cabecalhoPagina1(){
+    D.setFillColor(45,74,31); D.rect(0,0,W*sc,84*sc,'F');
+    T(M,10,'GROWER  ·  Consultoria Agronômica',11,true,'#9fb08f'); T(M,26,fazenda,30,true,'#ffffff');
+    T(M,63,`Cliente: ${cliente}${cidade?'   ·   '+cidade+(uf?' · '+uf:''):''}${consultores?'   ·   Consultor: '+consultores:''}   ·   Safra ${RF_SAFRA}`,12.5,false,'#e3ead9');
+    const dir = 'Resumo de avaliações por fazenda  ·  emitido em '+dmy(hoje); T(W-M-tw(dir,11.5,false),30,dir,11.5,false,'#c9d3be');
+    const yb = 94, tt = `${todos.length} talhão${todos.length===1?'':'es'}  ·  ${fmt1(areaTotal)} ha`;
+    T(M,yb+3,tt,16,true); let cx = M+tw(tt,16,true)+22;
+    RF_PROJ_ORDEM.forEach(k=>{
+      const n = todos.filter(t=>t.projs.includes(k)).length; if(!n) return;
+      const lab = `${CG_PROJ[k].label} · ${n} talhão${n===1?'':'es'}`, w = tw(lab,11.5,true)+22;
+      RR(cx,yb,cx+w,yb+26,13,CG_PROJ[k].cor); T(cx+11,yb+5,lab,11.5,true,CG_PROJ[k].txt); cx += w+8;
+    });
+    const ly = 126; let lx = M;
+    RR(lx,ly+3,lx+28,ly+17,7,'#5f5e5a'); T(lx+34,ly+2,'todas as avaliações do estádio feitas',11.5,false,'#5f5e5a'); lx += 34+tw('todas as avaliações do estádio feitas',11.5,false)+22;
+    RR(lx,ly+3,lx+28,ly+17,7,'#ffffff','#5f5e5a',1.6); T(lx+34,ly+2,'a fazer ou em andamento (n/total)',11.5,false,'#5f5e5a'); lx += 34+tw('a fazer ou em andamento (n/total)',11.5,false)+22;
+    RR(lx,ly+6,lx+70,ly+14,4,rfMistura('#2e6e76',0.34)); [lx,lx+70].forEach(xc=> LN(xc,ly+1,xc,ly+19,'#2e6e76',2)); RR(lx+25,ly+3,lx+45,ly+17,7,'#ffffff','#2e6e76',1.6);
+    T(lx+80,ly+2,'faixa = pode ser feita até 7 dias antes ou 7 dias depois',11.5,true,'#2e6e76');
+  }
+  function cabecalhoPaginaN(){
+    D.setFillColor(45,74,31); D.rect(0,0,W*sc,34*sc,'F');
+    T(M,9,`${fazenda}  ·  ${cliente}`,15,true,'#ffffff');
+    const dir = 'Resumo de avaliações  ·  '+dmy(hoje); T(W-M-tw(dir,11,false),12,dir,11,false,'#c9d3be');
+  }
+  function rodape(p){
+    const fy = H-44; LN(M,fy,W-M,fy,'#d3d1c7',1); PIN(M+7,fy+14,'#1a73e8','#ffffff',5);
+    T(M+20,fy+7,'No PDF, o botão "Abrir no Google Maps" é um link: um toque abre o ponto do talhão direto no app de mapas do celular.',10.5,false,'#5f5e5a');
+    T(M,fy+24,'Datas previstas = data de plantio + DAP (dias após o plantio) de cada estádio; cada avaliação pode ser feita até 7 dias antes ou 7 dias depois (faixa clara).',10.5,false,'#888780');
+    const pg = `Página ${p} de ${nPag}`; T(W-M-tw(pg,10.5,true),fy+7,pg,10.5,true,'#5f5e5a');
+  }
+  REAL = true;
+  paginas.forEach((pg,i)=>{
+    if(i>0) D.addPage();
+    if(i===0) cabecalhoPagina1(); else cabecalhoPaginaN();
+    pg.forEach(c=> cartao(c.t,c.y,c.h));
+    if(notaSemPlantio && i===nPag-1){
+      const yy = pg.length ? pg[pg.length-1].y+pg[pg.length-1].h+GAP : (i===0?Y_P1:Y_PN);
+      wrapTk(notaSemPlantio.split(' ').map(w=>[w,11,false,'#5f5e5a']),CW).forEach((lin,j)=> runs(lin).forEach(u=> T(M+u.xo,yy+j*15,u.txt,u.px,u.b,u.c)));
+    }
+    rodape(i+1);
+  });
+  doc.setProperties({ title:`Resumo de avaliações — ${fazenda}`, author:'Grower Consultoria Agronômica', subject:`Cliente ${cliente}` });
+  const nomeArq = `Resumo_${fazenda}_${hoje.toISOString().slice(0,10)}`.replace(/[^\w\-]+/g,'_')+'.pdf';
+  return { doc, nomeArq, nTalhoes:todos.length, nSemPlantio:semPlantio.length, nSemCoord: comPlantio.filter(t=>!rfLinkMapa(t.rec)).length, nPag };
+}
+
+function abrirResumoFazenda(){
+  if(!(window.jspdf && window.jspdf.jsPDF)){ alert('A biblioteca de PDF ainda não carregou. Recarregue a página e tente de novo.'); return; }
+  const modalRoot = document.getElementById('modalRoot');
+  const comProjeto = RECORDS.filter(r=> RF_PROJ_ORDEM.some(k=>rfParticipa(r,k)));
+  const clientes = [...new Set(comProjeto.map(r=>r.cliente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  modalRoot.innerHTML = `
+  <div class="modal-overlay" id="rfOverlay">
+    <div class="modal-panel" style="max-width:520px;">
+      <h2>📄 Resumo da fazenda (PDF)</h2>
+      <p class="sub" style="margin-top:-8px;color:var(--ink-soft);font-size:13px;">Escolha o cliente e a fazenda. O PDF traz os talhões que participam de Máximas, Ladrões, Estruturação, Vida no Solo ou Óxido, com a linha do tempo de cada projeto.</p>
+      <div class="form-grid">
+        <div><label>Cliente</label><select id="rfCliente"><option value="">Escolha…</option>${clientes.map(c=>`<option value="${encodeURIComponent(c)}">${c}</option>`).join('')}</select></div>
+        <div><label>Fazenda</label><select id="rfFazenda" disabled><option value="">Escolha o cliente primeiro</option></select></div>
+      </div>
+      <div id="rfInfo" style="font-size:12.5px;color:var(--ink-soft);margin-top:12px;min-height:18px;"></div>
+      <div class="form-msg" id="rfMsg"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="rfFechar">Fechar</button>
+        <button class="btn btn-preto" id="rfEmitir" disabled>📄 Emitir PDF</button>
+      </div>
+    </div>
+  </div>`;
+  const selC = document.getElementById('rfCliente'), selF = document.getElementById('rfFazenda'), info = document.getElementById('rfInfo'), msg = document.getElementById('rfMsg'), btn = document.getElementById('rfEmitir');
+  const fechar = ()=>{ modalRoot.innerHTML=''; };
+  document.getElementById('rfFechar').addEventListener('click', fechar);
+  document.getElementById('rfOverlay').addEventListener('click', e=>{ if(e.target.id==='rfOverlay') fechar(); });
+  const atualizarInfo = ()=>{
+    const c = selC.value ? decodeURIComponent(selC.value) : '', f = selF.value ? decodeURIComponent(selF.value) : '';
+    btn.disabled = !(c && f); info.textContent = ''; msg.className = 'form-msg'; msg.textContent = '';
+    if(!(c && f)) return;
+    const t = rfTalhoesDaFazenda(c,f), semP = t.filter(x=>!x.rec.data_plantio).length, semC = t.filter(x=>x.rec.data_plantio && !rfLinkMapa(x.rec)).length;
+    info.textContent = `${t.length} talhão(ões) participando de projeto.` + (semP?` ${semP} sem data de plantio (listado(s) no fim, sem linha do tempo).`:'') + (semC?` ${semC} sem latitude/longitude válida (botão do mapa em branco).`:'');
+  };
+  selC.addEventListener('change', ()=>{
+    const c = selC.value ? decodeURIComponent(selC.value) : '';
+    const fz = [...new Set(comProjeto.filter(r=>r.cliente===c).map(r=>r.fazenda).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    selF.innerHTML = c ? `<option value="">Escolha…</option>${fz.map(f=>`<option value="${encodeURIComponent(f)}">${f}</option>`).join('')}` : '<option value="">Escolha o cliente primeiro</option>';
+    selF.disabled = !c; atualizarInfo();
+  });
+  selF.addEventListener('change', atualizarInfo);
+  btn.addEventListener('click', ()=>{
+    const c = decodeURIComponent(selC.value), f = decodeURIComponent(selF.value);
+    const txt = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Gerando…';
+    setTimeout(()=>{   // deixa o navegador pintar o "Gerando…" antes do trabalho pesado
+      try{
+        const r = rfGerarPdf(c,f); r.doc.save(r.nomeArq);
+        msg.className = 'form-msg ok'; msg.textContent = `✅ PDF gerado: ${r.nTalhoes} talhão(ões) em ${r.nPag} página(s).` + (r.nSemCoord?` ${r.nSemCoord} sem coordenada (botão do mapa em branco).`:'');
+      }catch(err){ console.error(err); msg.className = 'form-msg erro'; msg.textContent = 'Erro ao gerar o PDF: '+err.message; }
+      btn.textContent = txt; btn.disabled = false;
+    },60);
+  });
+}
+window.abrirResumoFazenda = abrirResumoFazenda;
 function renderVisaoGeral(){
   const container = document.getElementById('tab-visao-geral');
   if(!container) return;
