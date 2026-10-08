@@ -198,6 +198,9 @@
   .vns-card-oculto > *:not(h3){display:none !important;}
   input.dt-br{min-width:118px;padding-right:26px !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");background-repeat:no-repeat;background-position:right 6px center;background-size:15px;}
   input.dt-br.dt-invalida{outline:2px solid var(--red);}
+  .alim-fbtn{border:none;background:transparent;color:inherit;opacity:.55;cursor:pointer;font-size:10px;line-height:1;padding:2px 4px;margin-left:3px;border-radius:4px;vertical-align:middle;}
+  .alim-fbtn:hover{opacity:1;background:rgba(0,0,0,.10);}
+  .alim-fbtn.ativo{opacity:1;background:#111;color:#fff;}
   .lm-freeze{position:sticky !important;background:var(--paper);z-index:2;box-shadow:2px 0 4px rgba(0,0,0,.08);}
   thead .lm-freeze{z-index:4;white-space:normal !important;}
   tbody .lm-freeze{background:#fff;}
@@ -661,7 +664,7 @@
 
       <div class="toolbar">
         <input type="text" id="searchInput" placeholder="Buscar por cliente, fazenda ou talhão…">
-        <button class="btn ghost" id="toggleFiltersBtn">🔍 Filtros</button>
+        <button class="btn ghost" id="toggleFiltersBtn" style="display:none;">✕ Limpar filtros</button>
         <span class="count-line" id="countLine"></span>
         <span style="flex:1;"></span>
         <button class="btn btn-preto" id="addTalhaoBtn">+ Adicionar talhão</button>
@@ -1259,6 +1262,43 @@ let alimentacaoFilters = defaultAlimentacaoFilters();
 let alimentacaoOpenFilter = null;
 let alimentacaoFiltersVisible = false;
 
+// Filtros ▾ no cabeçalho de TODAS as colunas da Alimentação (chave da coluna -> Set de valores marcados). Valem pra base inteira, não só pra página.
+let alimColFiltros = {};
+const ALIM_VAZIO = '__vazio__';
+const ALIM_SLUG_VG = { 'oxido-magnesio':'oxc', 'maximas-produtividades':'maximas', 'condicionador-de-solo':'cond', 'projeto-estruturacao':'estr',
+                       'projeto-micro-solo':'micro', 'otimizacao-de-p':'op', 'vida-no-solo':'vns' };
+function alimColunasTodas(){
+  return [ {key:'cliente',label:'Cliente'}, {key:'fazenda',label:'Fazenda'}, {key:'talhao',label:'Talhão'}, {key:'area_ha',label:'Área (ha)'},
+           {key:'estado',label:'Estado'}, {key:'cidade',label:'Cidade'}, {key:'cultura',label:'Cultura'},
+           ...GERAL_CAMPOS, ...PROJETOS_CONFIG.flatMap(p=>p.campos) ];
+}
+function alimColPorKey(key){ return alimColunasTodas().find(c=>c.key===key); }
+function alimValorFiltro(t, col){
+  const v = (col.type==='mirror' || col.type==='mirror-sinaleiro') ? t[col.mirrorFrom] : t[col.key];
+  if(v==null || v==='') return ALIM_VAZIO;
+  if(typeof v==='number') return String(Math.round(v*100)/100).replace('.',',');
+  return String(v);
+}
+function alimPassaColFiltros(t, ign){
+  for(const key in alimColFiltros){
+    const s = alimColFiltros[key]; if(!s || !s.size || key===ign) continue;
+    const col = alimColPorKey(key); if(!col) continue;
+    if(!s.has(alimValorFiltro(t,col))) return false;
+  }
+  return true;
+}
+// cor oficial de cada projeto (a mesma da Visão Geral e do Cronograma) e as variações usadas na tabela
+function alimProjEstilo(p){
+  const ponte = window.__alimBridge, o = ponte && ponte.vgProjetos.find(x=>x.key===ALIM_SLUG_VG[p.slug]), cor = o ? o.cor : '#5f5e5a';
+  const n = parseInt(cor.slice(1),16), r = n>>16&255, g = n>>8&255, b = n&255;
+  const txt = (0.299*r+0.587*g+0.114*b)/255 > 0.55 ? '#1a2019' : '#ffffff';
+  const mist = a=> '#'+[r,g,b].map(v=> Math.round(255+(v-255)*a).toString(16).padStart(2,'0')).join('');
+  return { cor,
+    grupo:`background:${cor};color:${txt};border-left:3px solid #fff;`,
+    cab:`background:${mist(.2)};`, cabIni:`background:${mist(.2)};border-left:3px solid ${cor};`,
+    cel:`background:${mist(.07)};`, celIni:`background:${mist(.07)};border-left:3px solid ${cor};` };
+}
+
 function showError(msg){ errBox.textContent = msg; errBox.style.display = 'block'; }
 function clearError(){ errBox.style.display = 'none'; }
 function normalize(s){ return (s??'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
@@ -1415,7 +1455,7 @@ document.getElementById('searchInput').addEventListener('input', (e)=>{
 document.getElementById('prevPageBtn').addEventListener('click', ()=>{ if(currentPage>0){ currentPage--; renderAlimentacaoTable(); } });
 document.getElementById('nextPageBtn').addEventListener('click', ()=>{ currentPage++; renderAlimentacaoTable(); });
 document.getElementById('toggleFiltersBtn').addEventListener('click', ()=>{
-  alimentacaoFiltersVisible = !alimentacaoFiltersVisible;
+  alimColFiltros = {}; currentPage = 0;
   renderAlimentacaoTable();
 });
 
@@ -1499,7 +1539,9 @@ function renderAlimentacaoTable(){
   }
 
   const termo = normalize(searchTerm);
+  const passaBusca = t=> !termo || normalize(t.cliente).includes(termo) || normalize(t.fazenda).includes(termo) || normalize(t.talhao).includes(termo);
   const filtered = todosTalhoesConsultor.filter(t=>{
+    if(!alimPassaColFiltros(t)) return false;
     if(termo){
       const bate = normalize(t.cliente).includes(termo) || normalize(t.fazenda).includes(termo) || normalize(t.talhao).includes(termo);
       if(!bate) return false;
@@ -1572,6 +1614,18 @@ function renderAlimentacaoTable(){
       </div>
     </div>`;
 
+  const nFiltrosAtivos = Object.values(alimColFiltros).filter(s=> s && s.size).length;
+  const btnLimpar = document.getElementById('toggleFiltersBtn');
+  if(btnLimpar){ btnLimpar.style.display = nFiltrosAtivos ? '' : 'none'; btnLimpar.textContent = '✕ Limpar filtros ('+nFiltrosAtivos+')'; }
+  const opcoesAlim = key=>{
+    const col = alimColPorKey(key), cont = new Map();
+    todosTalhoesConsultor.forEach(t=>{ if(!passaBusca(t) || !alimPassaColFiltros(t,key)) return; const v = alimValorFiltro(t,col); cont.set(v,(cont.get(v)||0)+1); });
+    (alimColFiltros[key]||new Set()).forEach(v=>{ if(!cont.has(v)) cont.set(v,0); });
+    const ord = [...cont.keys()].filter(v=>v!==ALIM_VAZIO).sort((a,b)=>{ const na = parseNum(a), nb = parseNum(b); return (na!=null && nb!=null) ? na-nb : a.localeCompare(b,'pt-BR',{numeric:true}); });
+    if(cont.has(ALIM_VAZIO)) ord.push(ALIM_VAZIO);
+    return ord.map(v=>({ v, l:(v===ALIM_VAZIO ? '(vazio)' : v)+' ('+cont.get(v)+')' }));
+  };
+  const fb = key=> `<button type="button" class="alim-fbtn cg-fbtn ${(alimColFiltros[key] && alimColFiltros[key].size) ? 'ativo' : ''}" data-alim-f="${key}" title="Filtrar esta coluna">▾</button>`;
   const todosCampos = PROJETOS_CONFIG.flatMap(p=>p.campos);
   const totalColCount = 4 + 3 + GERAL_CAMPOS.length + todosCampos.length + 1;
 
@@ -1680,8 +1734,8 @@ function renderAlimentacaoTable(){
             <th colspan="${3+geralCamposVisiveis.length}" class="group-head group-geral">Geral</th>
             ${PROJETOS_CONFIG.map((p,i)=>{
               const oculto = state.colunasOcultas.has(p.slug);
-              return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%7}">
-                <button class="proj-toggle-btn" data-proj-toggle="${p.slug}" title="${oculto?'Mostrar colunas':'Ocultar colunas'}">${oculto?'▶':'▾'}</button>
+              return `<th colspan="${oculto?1:p.campos.length}" class="group-head group-projeto proj-color-${i%7}" style="${alimProjEstilo(p).grupo}">
+                <button class="proj-toggle-btn" style="color:inherit;" data-proj-toggle="${p.slug}" title="${oculto?'Mostrar colunas':'Ocultar colunas'}">${oculto?'▶':'▾'}</button>
                 ${oculto ? p.badge.replace(/^\S+\s/,'') : p.badge}
               </th>`;
             }).join('')}
@@ -1691,14 +1745,14 @@ function renderAlimentacaoTable(){
             <th class="freeze-col freeze-1"></th><th class="freeze-col freeze-2"></th><th class="freeze-col freeze-3"></th><th class="freeze-col freeze-4"></th>
             <th class="freeze-col freeze-5"></th><th class="freeze-col freeze-6"></th><th class="freeze-col freeze-7"></th>
             ${subgrupoCellsHtml(geralCamposVisiveis)}
-            ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : `<th colspan="${p.campos.length}"></th>`).join('')}
+            ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? `<th style="${alimProjEstilo(p).cabIni}"></th>` : `<th colspan="${p.campos.length}" style="${alimProjEstilo(p).cabIni}"></th>`).join('')}
             <th class="freeze-right"></th>
           </tr>
           <tr>
-            <th class="freeze-col freeze-1">Cliente</th><th class="freeze-col freeze-2">Fazenda</th><th class="freeze-col freeze-3">Talhão</th><th class="freeze-col freeze-4">Área (ha)</th>
-            <th class="freeze-col freeze-5">Estado</th><th class="freeze-col freeze-6">Cidade</th><th class="freeze-col freeze-7">Cultura</th>
-            ${geralCamposVisiveis.map(c=>`<th>${c.label}</th>`).join('')}
-            ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<th></th>' : p.campos.map(c=>`<th>${c.label}</th>`).join('')).join('')}
+            <th class="freeze-col freeze-1">Cliente${fb('cliente')}</th><th class="freeze-col freeze-2">Fazenda${fb('fazenda')}</th><th class="freeze-col freeze-3">Talhão${fb('talhao')}</th><th class="freeze-col freeze-4">Área (ha)${fb('area_ha')}</th>
+            <th class="freeze-col freeze-5">Estado${fb('estado')}</th><th class="freeze-col freeze-6">Cidade${fb('cidade')}</th><th class="freeze-col freeze-7">Cultura${fb('cultura')}</th>
+            ${geralCamposVisiveis.map(c=>`<th>${c.label}${c.__placeholder ? '' : fb(c.key)}</th>`).join('')}
+            ${PROJETOS_CONFIG.map(p=>{ const e = alimProjEstilo(p); return state.colunasOcultas.has(p.slug) ? `<th style="${e.cabIni}"></th>` : p.campos.map((c,ci)=>`<th style="${ci===0?e.cabIni:e.cab}">${c.label}${fb(c.key)}</th>`).join(''); }).join('')}
             <th class="freeze-right"></th>
           </tr>
         </thead>
@@ -1712,13 +1766,23 @@ function renderAlimentacaoTable(){
                 ${CULTURA_OPTIONS.map(c=>`<option value="${c}" ${t.cultura===c?'selected':''}>${c}</option>`).join('')}
               </select></td>
               ${geralCamposVisiveis.map(c=> c.__placeholder ? `<td class="col-oculta">···</td>` : `<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')}
-              ${PROJETOS_CONFIG.map(p=> state.colunasOcultas.has(p.slug) ? '<td class="col-oculta">···</td>' : p.campos.map(c=>`<td>${campoInputHtml(c, t[c.key], t)}</td>`).join('')).join('')}
+              ${PROJETOS_CONFIG.map(p=>{ const e = alimProjEstilo(p); return state.colunasOcultas.has(p.slug) ? `<td class="col-oculta" style="${e.celIni}">···</td>` : p.campos.map((c,ci)=>`<td style="${ci===0?e.celIni:e.cel}">${campoInputHtml(c, t[c.key], t)}</td>`).join(''); }).join('')}
               <td class="freeze-right"><button class="row-save">Salvar</button> <button class="row-edit-btn" data-talhao-id="${t.id}" title="Editar todos os campos deste talhão">✏️</button> <button class="row-edit-btn row-del-btn" data-talhao-id="${t.id}" title="Excluir este talhão">🗑️</button></td>
             </tr>`).join('') || `<tr><td colspan="${totalColCount}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
     </div>`;
 
+  area.querySelectorAll('[data-alim-f]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const ponte = window.__alimBridge; if(!ponte) return;
+      const key = btn.dataset.alimF, col = alimColPorKey(key);
+      if(ponte.chaveAberta()==='alim-'+key){ ponte.fecharPop(); return; }
+      if(!alimColFiltros[key]) alimColFiltros[key] = new Set();
+      ponte.abrirPop(btn, 'alim-'+key, col.label, ()=>opcoesAlim(key), alimColFiltros[key], ()=>{ currentPage = 0; renderAlimentacaoTable(); });
+    });
+  });
   area.querySelectorAll('.proj-toggle-btn[data-proj-toggle]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const slug = btn.dataset.projToggle;
@@ -10723,6 +10787,10 @@ const VG_PROJETOS = [
   { key:'ladroes', label:'Ladrões', cor:'#b8352a', participa: r=> r.max_selecao==='Ladrões' },
   { key:'maximas', label:'Máximas', cor:'#2e6e76', participa: r=> r.max_selecao==='Máximas' },
 ];
+// projetos com cadeado (Condicionador, Otimização de P e Micro Solo): não aparecem na Visão Geral (tabela, filtros, legenda e mapa).
+// VG_PROJETOS continua inteira porque a Alimentação usa as cores dela.
+const VG_BLOQUEADOS = ['cond','op','micro'];
+const VG_VISIVEIS = VG_PROJETOS.filter(p=> !VG_BLOQUEADOS.includes(p.key));
 /* ===== RESUMO DA FAZENDA (PDF) — um cartão por talhão, com linha do tempo por projeto, faixa de ±7 dias e link do Google Maps =====
    Projetos: Máximas, Ladrões, Estruturação, Vida no Solo e Óxido. Participação = critério de cada projeto (o mesmo da Visão Geral);
    pílula cheia = todas as avaliações do estádio com status concluído na tabela de acompanhamento do projeto. */
@@ -11015,13 +11083,14 @@ function abrirResumoFazenda(){
   });
 }
 window.abrirResumoFazenda = abrirResumoFazenda;
+window.__alimBridge = { abrirPop: cgAbrirPop, fecharPop: cgFecharPop, chaveAberta: ()=> cgPop ? cgPop.dataset.f : null, vgProjetos: VG_PROJETOS };
 function renderVisaoGeral(){
   const container = document.getElementById('tab-visao-geral');
   if(!container) return;
 
   const base = byPais(RECORDS);
   const linhas = base.map(r=>{
-    const projetos = VG_PROJETOS.filter(p=>p.participa(r)).map(p=>p.key);
+    const projetos = VG_VISIVEIS.filter(p=>p.participa(r)).map(p=>p.key);
     return { rec:r, projetos };
   }).filter(l=> l.projetos.length>0);
 
@@ -11030,11 +11099,12 @@ function renderVisaoGeral(){
     <div class="card full-card">
       <div class="eyebrow">Card · Visão Geral de Projetos</div>
       <h2>Nenhum talhão participando de projeto ainda</h2>
-      <p class="sub">Assim que algum talhão entrar em qualquer um dos 7 projetos, ele aparece aqui.</p>
+      <p class="sub">Assim que algum talhão entrar em qualquer um dos 5 projetos, ele aparece aqui.</p>
     </div>`;
     return;
   }
 
+  if(state.visaoGeralFiltro && state.visaoGeralFiltro!=='Todos' && !VG_VISIVEIS.some(p=>p.key===state.visaoGeralFiltro)) state.visaoGeralFiltro = 'Todos';
   const filtroAtivo = state.visaoGeralFiltro || 'Todos';
   const linhasProj = filtroAtivo==='Todos' ? linhas : linhas.filter(l=> l.projetos.includes(filtroAtivo));
   // filtros multi-seleção (valem pro mapa e pra tabela, junto com o pill de projeto)
@@ -11091,7 +11161,7 @@ function renderVisaoGeral(){
 
   <div class="vg-filtros">
     <button class="vg-filtro-pill ${filtroAtivo==='Todos'?'active':''}" style="${filtroAtivo==='Todos'?'background:var(--green-deep);border-color:var(--green-deep);':''}" data-filtro="Todos">Todos</button>
-    ${VG_PROJETOS.map(p=>`<button class="vg-filtro-pill ${filtroAtivo===p.key?'active':''}" style="${filtroAtivo===p.key?`background:${p.cor};border-color:${p.cor};`:''}" data-filtro="${p.key}">${p.label}</button>`).join('')}
+    ${VG_VISIVEIS.map(p=>`<button class="vg-filtro-pill ${filtroAtivo===p.key?'active':''}" style="${filtroAtivo===p.key?`background:${p.cor};border-color:${p.cor};`:''}" data-filtro="${p.key}">${p.label}</button>`).join('')}
   </div>
 
   <div class="vg-filtros" style="align-items:center;">
@@ -11104,21 +11174,24 @@ function renderVisaoGeral(){
       <h3 style="margin:0 0 8px;font-size:13px;">🗺️ Mapa de pontos</h3>
       <div id="vgLeafletMap" style="flex:1;min-height:0;border-radius:8px;"></div>
       <div class="vg-legenda">
-        ${VG_PROJETOS.map(p=>`<span><span class="vg-dot" style="background:${p.cor};"></span>${p.label}</span>`).join('')}
+        ${VG_VISIVEIS.map(p=>`<span><span class="vg-dot" style="background:${p.cor};"></span>${p.label}</span>`).join('')}
       </div>
     </div>
     <div class="vg-card">
-      <h3 style="margin:0 0 8px;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;">
+        <h3 style="margin:0;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
+        <button type="button" class="btn btn-preto" id="vgExportarExcel" style="padding:6px 12px;font-size:12px;">⬇️ Exportar Excel</button>
+      </div>
       <div class="vg-table-wrap">
         <table class="vg-table" data-colfilter="vg-talhoes">
           <thead><tr>
             <th>Cliente</th><th>Fazenda</th><th>Talhão</th>
-            ${VG_PROJETOS.map(p=>`<th>${p.label}</th>`).join('')}
+            ${VG_VISIVEIS.map(p=>`<th>${p.label}</th>`).join('')}
           </tr></thead>
           <tbody>
             ${linhasFiltradas.map(l=>`<tr>
               <td>${l.rec.cliente||''}</td><td>${l.rec.fazenda||''}</td><td>${l.rec.talhao||''}</td>
-              ${VG_PROJETOS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on">✓</td>` : `<td class="vg-cell-off">—</td>`).join('')}
+              ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on">✓</td>` : `<td class="vg-cell-off">—</td>`).join('')}
             </tr>`).join('')}
           </tbody>
         </table>
@@ -11138,6 +11211,19 @@ function renderVisaoGeral(){
     if(cgPop && cgPop.dataset.f==='vg-'+f.k){ cgFecharPop(); return; }
     cgAbrirPop(btn, 'vg-'+f.k, f.label, ()=>opcoesVg(f.k), state.vgF[f.k], ()=>renderVisaoGeral());
   }));
+  // exporta exatamente o que está na tabela agora (pill de projeto, filtros do topo e filtros de coluna ▾ já aplicados)
+  const vgExp = container.querySelector('#vgExportarExcel');
+  if(vgExp) vgExp.addEventListener('click', ()=>{
+    if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
+    const tabela = container.querySelector('.vg-table'); if(!tabela) return;
+    const cab = ['Cliente','Fazenda','Talhão', ...VG_VISIVEIS.map(p=>p.label)];
+    const dados = [...tabela.querySelectorAll('tbody tr')].filter(tr=> tr.style.display!=='none')
+      .map(tr=> [...tr.children].map(td=> td.textContent.trim()));
+    const ws = XLSX.utils.aoa_to_sheet([cab, ...dados]);
+    ws['!cols'] = [{wch:26},{wch:28},{wch:14}, ...VG_VISIVEIS.map(()=>({wch:16}))];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Talhões por Projeto');
+    XLSX.writeFile(wb, 'Visao_Geral_Talhoes_por_Projeto_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  });
   const vgLimpar = container.querySelector('#vgLimparFiltros');
   if(vgLimpar) vgLimpar.addEventListener('click', ()=>{ VGF.forEach(f=>state.vgF[f.k].clear()); cgFecharPop(); renderVisaoGeral(); });
 
@@ -11146,7 +11232,7 @@ function renderVisaoGeral(){
   comPonto.forEach(l=>{
     const projetosPlotar = filtroAtivo==='Todos' ? l.projetos : [filtroAtivo];
     projetosPlotar.forEach((pk,i)=>{
-      const proj = VG_PROJETOS.find(p=>p.key===pk);
+      const proj = VG_VISIVEIS.find(p=>p.key===pk);
       const jitter = i * 0.01; // graus, espalha pontos sobrepostos do mesmo talhão
       pontosVg.push({
         lat: Number(l.rec.max_latitude) + jitter, lon: Number(l.rec.max_longitude) + jitter,
