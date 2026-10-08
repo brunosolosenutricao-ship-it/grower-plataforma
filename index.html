@@ -2963,6 +2963,18 @@ function cfValorCelula(td){
   return (v==='' || v==='—') ? '(vazio)' : v;
 }
 function cfMapearColunas(table){
+  // tabelas que marcam cada coluna com data-cf-col (número da célula na linha) e data-cf-label: não dependem dos colspan do cabeçalho
+  const marcadas = [...table.querySelectorAll('thead th[data-cf-col]')];
+  if(marcadas.length){
+    const n = Math.max(...marcadas.map(th=> Number(th.dataset.cfCol))) + 1, cols = [];
+    for(let i=0; i<n; i++) cols.push({ idx:i, th:null, label:'', skip:true, btn:null });
+    marcadas.forEach(th=>{
+      const i = Number(th.dataset.cfCol), txt = cfTextoTh(th);
+      cols[i] = { idx:i, th, label: th.dataset.cfLabel || txt, btn:null,
+                  skip: (!txt && !th.dataset.cfLabel) || th.hasAttribute('data-cf-skip') || /^(salvar|ações|acoes)$/i.test(txt) };
+    });
+    return cols;
+  }
   const rows = [...table.querySelectorAll('thead tr')];
   const ocupado = [], cobre = [];
   rows.forEach((tr,r)=>{
@@ -3205,7 +3217,7 @@ function tsEnhance(wrap){
   wrap.parentNode.insertBefore(topo, wrap);
   const ajustar = ()=>{
     inner.style.width = wrap.scrollWidth+'px';
-    topo.style.display = wrap.scrollWidth > wrap.clientWidth+1 ? 'block' : 'none';
+    topo.style.display = (wrap.dataset.topscroll==='sempre' || wrap.scrollWidth > wrap.clientWidth+1) ? 'block' : 'none';
   };
   topo.addEventListener('scroll', ()=>{ if(wrap.scrollLeft!==topo.scrollLeft) wrap.scrollLeft = topo.scrollLeft; });
   wrap.addEventListener('scroll', ()=>{ if(topo.scrollLeft!==wrap.scrollLeft) topo.scrollLeft = wrap.scrollLeft; });
@@ -11153,11 +11165,46 @@ function renderVisaoGeral(){
     const atual = parcAtual(r), nome = atual || 'Em aberto';
     return `<select class="vg-parceiro" data-id="${r.id}" style="background:${vgParceiroCor(atual)};">${VG_PARCEIROS.map(p=>`<option value="${p.v==='Em aberto'?'':p.v}" style="background:${p.cor};color:#fff;" ${p.v===nome?'selected':''}>${p.v}</option>`).join('')}</select>`;
   };
+  // ---- mapa de avaliações: o que cada projeto avalia, por estádio. A célula fica verde pro talhão que participa do projeto ----
+  if(!state.vgOcultos) state.vgOcultos = { pp:false, vns:false, estr:false, max:false, lad:false };
+  const MAPA_ESTAGIOS = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
+  const agrupaOcs = ocs=> MAPA_ESTAGIOS.map(e=> [e, ocs.filter(o=>o.estagio===e).map(o=>o.avaliacaoLabel)]).filter(g=>g[1].length);
+  const estrPorBloco = []; ESTR_ETAPAS.forEach(e=>{ let g = estrPorBloco.find(x=>x[0]===e.bloco); if(!g){ g = [e.bloco, []]; estrPorBloco.push(g); } g[1].push(e.label); });
+  const dapR1 = VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap;
+  const textoSobre = hex=>{ const n = parseInt(hex.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255 > 0.55 ? '#1a2019' : '#ffffff'; };
+  const esc = s=> String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  // tom de cada estádio dentro da cor do projeto (só no cabeçalho; as células continuam verdes): 2 ou 3 estádios vão do claro pro escuro;
+  // com mais estádios alterna claro/escuro e a Colheita (último) fica no tom mais escuro. r>0 clareia (mistura com branco), r<0 escurece (mistura com preto)
+  const razaoTom = (i, n)=> n===2 ? (i===0 ? 0.5 : -0.15) : n===3 ? [0.55, 0.12, -0.2][i] : (i===n-1 ? -0.25 : (i%2===0 ? 0.5 : 0));
+  const canaisTom = (hex, r)=>{ const m = parseInt(hex.slice(1),16), alvo = r>=0 ? 255 : 0, a = Math.abs(r); return [m>>16&255, m>>8&255, m&255].map(x=> Math.round(x+(alvo-x)*a)); };
+  const estiloTom = (hex, i, n)=>{ const ch = canaisTom(hex, razaoTom(i,n)); return `background:rgb(${ch.join(',')});color:${(0.299*ch[0]+0.587*ch[1]+0.114*ch[2])/255 > 0.58 ? '#1a2019' : '#ffffff'};border-left:2px solid #fff;`; };
+  const VG_MAPA = [
+    { k:'vns',  pk:'vns',     nome:'Vida no Solo', g:[ ['R1/R2', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.label)], ['Colheita', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.label)] ] },
+    { k:'estr', pk:'estr',    nome:'Estruturação', g:estrPorBloco },
+    { k:'max',  pk:'maximas', nome:'Máximas',      g:agrupaOcs(LM_OCORRENCIAS_MAXIMAS) },
+    { k:'lad',  pk:'ladroes', nome:'Ladrões',      g:agrupaOcs(LM_OCORRENCIAS_LADROES) },
+  ].map(p=>{ const cor = VG_PROJETOS.find(x=>x.key===p.pk).cor; return { ...p, cor, txt:textoSobre(cor), n:p.g.reduce((s,g)=>s+g[1].length,0) }; });
+  const nMapaVis = VG_MAPA.filter(p=>!state.vgOcultos[p.k]).reduce((s,p)=>s+p.n,0);
+  const IDX_PROJ0 = 6, IDX_MAPA0 = IDX_PROJ0 + VG_VISIVEIS.length, IDX_SALVAR = IDX_MAPA0 + VG_MAPA.reduce((s,p)=>s+p.n,0);
+  const cabMapa = (()=>{   // linhas 2, 3 e 4 do cabeçalho do mapa; cada coluna leva data-cf-col (posição da célula na linha) pro filtro
+    let r2 = '', r3 = '', r4 = '', ix = IDX_MAPA0;
+    VG_MAPA.forEach(p=>{
+      r2 += `<th class="vg-c-${p.k}" colspan="${p.n}" style="background:${p.cor};color:${p.txt};text-align:center;">${p.nome}<button type="button" class="vg-x" data-k="${p.k}" title="Ocultar todas as colunas de ${p.nome}">✕</button></th>`;
+      p.g.forEach(([est, labels], gi)=>{
+        r3 += `<th class="vg-c-${p.k} vg-m-est" colspan="${labels.length}" style="${estiloTom(p.cor, gi, p.g.length)}">${labels.length===1 && est==='Colheita' ? 'Colh.' : est}</th>`;
+        labels.forEach(l=>{ const nome = `${p.nome} · ${est} · ${l}`; r4 += `<th class="vg-c-${p.k} vg-m-th" data-cf-col="${ix++}" data-cf-label="${esc(nome)}"></th>`; });
+      });
+    });
+    return { r2, r3, r4 };
+  })();
+  const chipsHtml = [ {k:'pp', nome:'Por projeto', cor:'#2d4a1f'}, ...VG_MAPA.map(p=>({k:p.k, nome:p.nome, cor:p.cor})) ]
+    .map(x=> `<button type="button" class="vg-chip ${state.vgOcultos[x.k]?'':'on'}" data-k="${x.k}" style="--c:${x.cor};--ct:${textoSobre(x.cor)};" title="Mostrar ou ocultar: ${x.nome}">${x.nome}</button>`).join('');
   container.innerHTML = `
   <style>
-    .vg-layout{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch;}
+    .vg-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:stretch;}
     .vg-map-card{height:540px;}
-    .vg-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
+    .vg-tab-card{height:clamp(560px, calc(100vh - 100px), 740px);}
+    .vg-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;min-height:0;min-width:0;}
     .vg-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
     .vg-filtro-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
     .vg-filtro-pill.active{color:#fff;}
@@ -11168,8 +11215,8 @@ function renderVisaoGeral(){
     .vg-lote select{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-family:inherit;font-size:12px;background:#fff;}
     .vg-chk{width:15px;height:15px;cursor:pointer;accent-color:#111;}
     .vg-table tr.vg-sel td:not(.vg-cell-on){background:#f3f8ea;}
-    .vg-parceiro{border:none;border-radius:6px;padding:4px 6px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;min-width:122px;color:#fff;}
-    .vg-salvar{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+    .vg-parceiro{border:none;border-radius:6px;padding:2px 3px;font-family:inherit;font-size:10.5px;font-weight:600;cursor:pointer;width:100%;min-width:0;color:#fff;}
+    .vg-salvar{border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
     .vg-salvar.alterado{background:#111;color:#fff;border-color:#111;}
     .vg-salvar.saved{color:var(--green-deep);border-color:var(--green-deep);}
     .vg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
@@ -11186,27 +11233,44 @@ function renderVisaoGeral(){
     .vg-legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:9.5px;color:var(--ink-soft);}
     .vg-legenda span{display:inline-flex;align-items:center;gap:4px;}
     .vg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
-    .vg-table-wrap{flex:1;min-height:0;overflow:auto;max-height:620px;}
+    .vg-table-wrap{flex:1;min-height:0;min-width:0;max-width:100%;overflow-x:scroll;overflow-y:auto;}
     .vg-table{width:100%;border-collapse:collapse;font-size:11px;}
-    .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);z-index:3;height:28px;box-sizing:border-box;white-space:nowrap;}
-    .vg-table thead tr:nth-child(2) th{top:28px;}
-    .vg-table td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+    .vg-table th{position:sticky;top:0;background:var(--paper);text-align:left;padding:3px 8px;border-bottom:2px solid var(--line);z-index:3;height:24px;box-sizing:border-box;white-space:nowrap;}
+    .vg-table thead tr:nth-child(2) th{top:24px;}
+    .vg-table td{padding:3px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
     .vg-table td.vg-fz, .vg-table td.vg-fzr{position:sticky;z-index:2;background:#fff;overflow:hidden;text-overflow:ellipsis;}
     .vg-table th.vg-fz, .vg-table th.vg-fzr{position:sticky;z-index:5;overflow:hidden;text-overflow:ellipsis;}
-    .vg-fz0{left:0;width:32px;min-width:32px;max-width:32px;}
-    .vg-fz1{left:32px;width:130px;min-width:130px;max-width:130px;}
-    .vg-fz2{left:162px;width:130px;min-width:130px;max-width:130px;}
-    .vg-fz3{left:292px;width:70px;min-width:70px;max-width:70px;}
-    .vg-fz4{left:362px;width:58px;min-width:58px;max-width:58px;}
-    .vg-fz5{left:420px;width:142px;min-width:142px;max-width:142px;box-shadow:2px 0 4px rgba(0,0,0,.10);}
-    .vg-fzr{right:0;width:112px;min-width:112px;max-width:112px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+    .vg-fz0{left:0;width:28px;min-width:28px;max-width:28px;}
+    .vg-fz1{left:28px;width:92px;min-width:92px;max-width:92px;}
+    .vg-fz2{left:120px;width:92px;min-width:92px;max-width:92px;}
+    .vg-fz3{left:212px;width:52px;min-width:52px;max-width:52px;}
+    .vg-fz4{left:264px;width:52px;min-width:52px;max-width:52px;}
+    .vg-fz5{left:316px;width:108px;min-width:108px;max-width:108px;box-shadow:2px 0 4px rgba(0,0,0,.10);}
+    .vg-fzr{right:0;width:92px;min-width:92px;max-width:92px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
+    .vg-table th.vg-fz, .vg-table td.vg-fz{padding-left:6px;padding-right:6px;}
+    .vg-table th.vg-fz .cf-btn{display:block;margin:3px 0 0 0;}
+    .vg-table th.vg-fz5{white-space:normal;line-height:1.15;font-size:10px;}
     .vg-proj-grp{background:#f1efe8 !important;text-align:center !important;}
-    .vg-proj-oculto .vg-proj{display:none;}
-    .vg-proj-ph{display:none;text-align:center;color:var(--ink-soft);}
-    .vg-proj-oculto .vg-proj-ph{display:table-cell;}
+    .vg-table .vg-mapa-grp{background:#e6f1fb !important;color:#0c447c;text-align:center !important;}
+    .vg-table thead tr:nth-child(3) th{top:48px;}
+    .vg-table thead tr:nth-child(4) th{top:72px;height:24px;}
+    .vg-oc-pp .vg-c-pp, .vg-oc-vns .vg-c-vns, .vg-oc-estr .vg-c-estr, .vg-oc-max .vg-c-max, .vg-oc-lad .vg-c-lad{display:none;}
+    .vg-table th.vg-m-est{text-align:center;font-size:10px;font-weight:600;color:var(--ink-soft);padding:2px 4px;}
+    .vg-table th.vg-m-th{width:22px;min-width:22px;max-width:22px;padding:0 !important;vertical-align:bottom;text-align:center;}
+    .vg-m-th .cf-btn{display:block;margin:2px auto;}
+    .vg-table th.vg-m-est[colspan="1"]{font-size:9px;padding:2px 0;}
+    .vg-x{background:#111;color:#fff;border:none;border-radius:4px;font-size:10px;line-height:1;padding:3px 6px;margin-left:6px;cursor:pointer;font-family:inherit;font-weight:700;vertical-align:middle;}
+    .vg-x:hover{background:#333;}
+    .vg-tip{position:fixed;z-index:6000;background:#111;color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;pointer-events:none;display:none;max-width:340px;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+    .vg-table td.vg-m-cell{width:22px;min-width:22px;max-width:22px;padding:0 !important;position:relative;border-right:1px solid #fff;}
+    .vg-m-on{background:#66bb6a;}
+    .vg-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}
+    .vg-colchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px;}
+    .vg-chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink-soft);text-decoration:line-through;}
+    .vg-chip.on{background:var(--c);color:var(--ct);border-color:var(--c);text-decoration:none;}
     .vg-cell-on{background:var(--lime-soft);text-align:center;}
     .vg-cell-off{text-align:center;color:var(--line);}
-    @media (max-width:1100px){ .vg-layout{grid-template-columns:1fr;height:auto;} .vg-map-card{height:440px;} .vg-table-wrap{max-height:440px;} }
+    @media (max-width:1100px){ .vg-layout{grid-template-columns:minmax(0,1fr);height:auto;} .vg-map-card{height:440px;} .vg-tab-card{height:620px;} }
   </style>
 
   <div class="vg-filtros">
@@ -11227,11 +11291,12 @@ function renderVisaoGeral(){
         ${VG_VISIVEIS.map(p=>`<span><span class="vg-dot" style="background:${p.cor};"></span>${p.label}</span>`).join('')}
       </div>
     </div>
-    <div class="vg-card">
+    <div class="vg-card vg-tab-card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;">
         <h3 style="margin:0;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
         <button type="button" class="btn btn-preto" id="vgExportarExcel" style="padding:6px 12px;font-size:12px;">⬇️ Exportar Excel</button>
       </div>
+      <div class="vg-colchips"><span style="color:var(--ink-soft);font-size:12px;">Colunas:</span>${chipsHtml}</div>
       <div class="vg-lote">
         <button type="button" class="btn ghost" id="vgSelTodos" style="padding:5px 10px;font-size:12px;" title="Marca todos os talhões que estão na tela (respeita os filtros)">Selecionar todos (0)</button>
         <button type="button" class="btn ghost" id="vgSelAberto" style="padding:5px 10px;font-size:12px;" title="Marca só os talhões que ainda estão como Em aberto, sem mexer nos que já têm parceiro">Só os "Em aberto" (0)</button>
@@ -11242,26 +11307,29 @@ function renderVisaoGeral(){
         <span id="vgLoteMsg" style="color:var(--ink-soft);flex:1;min-width:120px;"></span>
         <button type="button" class="btn btn-preto" id="vgSalvarLote" style="padding:6px 12px;font-size:12px;display:none;">💾 Salvar alterações (0)</button>
       </div>
-      <div class="vg-table-wrap" data-topscroll="1">
-        <table class="vg-table ${state.vgProjOculto?'vg-proj-oculto':''}" data-colfilter="vg-talhoes">
+      <div class="vg-table-wrap" data-topscroll="sempre">
+        <table class="vg-table ${Object.keys(state.vgOcultos).filter(k=>state.vgOcultos[k]).map(k=>'vg-oc-'+k).join(' ')}" data-colfilter="vg-talhoes">
           <thead>
             <tr>
-              <th class="vg-fz vg-fz0" rowspan="2"><input type="checkbox" class="vg-chk" id="vgChkTodos" title="Selecionar todos os talhões que estão na tela"></th>
-              <th class="vg-fz vg-fz1" rowspan="2">Cliente</th><th class="vg-fz vg-fz2" rowspan="2">Fazenda</th><th class="vg-fz vg-fz3" rowspan="2">Talhão</th>
-              <th class="vg-fz vg-fz4" rowspan="2" data-cf-skip>Estado<button type="button" class="cf-btn cg-fbtn vg-estado-btn ${state.vgF.estado.size?'active':''}" title="Filtrar: Estado (é o mesmo filtro do topo)">▾</button></th>
-              <th class="vg-fz vg-fz5" rowspan="2">Responsabilidade/Parceiro</th>
-              <th class="vg-proj-grp" id="vgProjGrp" colspan="${VG_VISIVEIS.length}"><span>Por projeto</span><button type="button" class="cf-btn vg-proj-toggle" title="Ocultar ou mostrar o bloco por projeto">▾</button></th>
-              <th class="vg-fzr" rowspan="2">Salvar</th>
+              <th class="vg-fz vg-fz0" rowspan="4" data-cf-col="0"><input type="checkbox" class="vg-chk" id="vgChkTodos" title="Selecionar todos os talhões que estão na tela"></th>
+              <th class="vg-fz vg-fz1" rowspan="4" data-cf-col="1">Cliente</th><th class="vg-fz vg-fz2" rowspan="4" data-cf-col="2">Fazenda</th><th class="vg-fz vg-fz3" rowspan="4" data-cf-col="3">Talhão</th>
+              <th class="vg-fz vg-fz4" rowspan="4" data-cf-col="4" data-cf-skip>Estado<button type="button" class="cf-btn cg-fbtn vg-estado-btn ${state.vgF.estado.size?'active':''}" title="Filtrar: Estado (é o mesmo filtro do topo)">▾</button></th>
+              <th class="vg-fz vg-fz5" rowspan="4" data-cf-col="5">Responsabilidade/<wbr>Parceiro</th>
+              <th class="vg-c-pp vg-proj-grp" colspan="${VG_VISIVEIS.length}">Por projeto<button type="button" class="vg-x" data-k="pp" title="Ocultar o bloco Por projeto">Ocultar</button></th>
+              <th class="vg-mapa-grp" id="vgGrpMapa" colspan="${Math.max(nMapaVis,1)}" style="${nMapaVis?'':'display:none;'}">Mapa de avaliações</th>
+              <th class="vg-fzr" rowspan="4" data-cf-col="${IDX_SALVAR}" data-cf-skip>Salvar</th>
             </tr>
-            <tr>${VG_VISIVEIS.map(p=>`<th class="vg-proj">${p.label}</th>`).join('')}</tr>
+            <tr>${VG_VISIVEIS.map((p,i)=>`<th class="vg-c-pp vg-proj" rowspan="3" data-cf-col="${IDX_PROJ0+i}" data-cf-label="${p.label}">${p.label}</th>`).join('')}${cabMapa.r2}</tr>
+            <tr>${cabMapa.r3}</tr>
+            <tr>${cabMapa.r4}</tr>
           </thead>
           <tbody>
             ${linhasFiltradas.map(l=>`<tr>
               <td class="vg-fz vg-fz0"><input type="checkbox" class="vg-chk vg-chk-linha" data-id="${l.rec.id}"></td>
-              <td class="vg-fz vg-fz1" title="${String(l.rec.cliente||'').replace(/"/g,'&quot;')}">${l.rec.cliente||''}</td><td class="vg-fz vg-fz2" title="${String(l.rec.fazenda||'').replace(/"/g,'&quot;')}">${l.rec.fazenda||''}</td><td class="vg-fz vg-fz3">${l.rec.talhao||''}</td>
+              <td class="vg-fz vg-fz1" title="${String(l.rec.cliente||'').replace(/"/g,'&quot;')}">${l.rec.cliente||''}</td><td class="vg-fz vg-fz2" title="${String(l.rec.fazenda||'').replace(/"/g,'&quot;')}">${l.rec.fazenda||''}</td><td class="vg-fz vg-fz3" title="${String(l.rec.talhao||'').replace(/"/g,'&quot;')}">${l.rec.talhao||''}</td>
               <td class="vg-fz vg-fz4">${(l.rec.estado||'').toUpperCase()}</td><td class="vg-fz vg-fz5">${parcSelectHtml(l.rec)}</td>
-              ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on vg-proj">✓</td>` : `<td class="vg-cell-off vg-proj">—</td>`).join('')}
-              <td class="vg-proj-ph">···</td>
+              ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on vg-c-pp">✓</td>` : `<td class="vg-cell-off vg-c-pp">—</td>`).join('')}
+              ${VG_MAPA.map(p=>{ const on = l.projetos.includes(p.pk); return `<td class="vg-m-cell vg-c-${p.k}${on?' vg-m-on':''}"><span class="vg-sr">${on?'Verde':'Sem cor'}</span></td>`.repeat(p.n); }).join('')}
               <td class="vg-fzr"><button type="button" class="vg-salvar ${parcAlterado(l.rec)?'alterado':''}" data-id="${l.rec.id}">💾 Salvar</button></td>
             </tr>`).join('')}
           </tbody>
@@ -11282,16 +11350,29 @@ function renderVisaoGeral(){
     if(cgPop && cgPop.dataset.f==='vg-'+f.k){ cgFecharPop(); return; }
     cgAbrirPop(btn, 'vg-'+f.k, f.label, ()=>opcoesVg(f.k), state.vgF[f.k], ()=>renderVisaoGeral());
   }));
-  const tabelaVg = container.querySelector('.vg-table'), grpVg = container.querySelector('#vgProjGrp');
-  const aplicarProjOculto = ()=>{
-    const oc = !!state.vgProjOculto;
-    tabelaVg.classList.toggle('vg-proj-oculto', oc);
-    grpVg.colSpan = oc ? 1 : VG_VISIVEIS.length; grpVg.rowSpan = oc ? 2 : 1;
-    grpVg.querySelector('button').textContent = oc ? '▶' : '▾';
-    grpVg.querySelector('span').textContent = oc ? 'Projetos' : 'Por projeto';
+  // ocultar / mostrar: "Por projeto" e cada projeto do mapa (só esconde; as colunas continuam na tabela, no filtro e no Excel)
+  const tabelaVg = container.querySelector('.vg-table'), grpMapa = container.querySelector('#vgGrpMapa');
+  const aplicarOcultos = ()=>{
+    Object.keys(state.vgOcultos).forEach(k=> tabelaVg.classList.toggle('vg-oc-'+k, !!state.vgOcultos[k]));
+    const vis = VG_MAPA.filter(p=>!state.vgOcultos[p.k]).reduce((s,p)=>s+p.n,0);
+    grpMapa.colSpan = Math.max(vis,1); grpMapa.style.display = vis ? '' : 'none';
+    container.querySelectorAll('.vg-chip').forEach(ch=> ch.classList.toggle('on', !state.vgOcultos[ch.dataset.k]));
   };
-  grpVg.querySelector('button').addEventListener('click', ()=>{ state.vgProjOculto = !state.vgProjOculto; aplicarProjOculto(); });
-  aplicarProjOculto();
+  container.querySelectorAll('.vg-chip').forEach(ch=> ch.addEventListener('click', ()=>{ state.vgOcultos[ch.dataset.k] = !state.vgOcultos[ch.dataset.k]; aplicarOcultos(); }));
+  container.querySelectorAll('.vg-x').forEach(bx=> bx.addEventListener('click', ()=>{ state.vgOcultos[bx.dataset.k] = true; aplicarOcultos(); }));   // botão preto: oculta o bloco; os botões "Colunas:" de cima trazem de volta
+  aplicarOcultos();
+  // nome da avaliação ao passar o mouse nas células e nos cabeçalhos do mapa (no lugar dos textos na vertical, que gastavam altura)
+  const rotulosCol = new Map([...container.querySelectorAll('thead th[data-cf-col]')].map(th=> [Number(th.dataset.cfCol), th.dataset.cfLabel || '']));
+  let dica = document.getElementById('vgTip'); if(!dica){ dica = document.createElement('div'); dica.id = 'vgTip'; dica.className = 'vg-tip'; document.body.appendChild(dica); }
+  dica.style.display = 'none';
+  const posDica = e=>{ dica.style.left = Math.max(4, Math.min(e.clientX+12, window.innerWidth - dica.offsetWidth - 8)) + 'px'; dica.style.top = (e.clientY+16) + 'px'; };
+  tabelaVg.addEventListener('mouseover', e=>{
+    const el = e.target.closest('td.vg-m-cell, th.vg-m-th'); if(!el){ dica.style.display = 'none'; return; }
+    const txt = rotulosCol.get(el.tagName==='TH' ? Number(el.dataset.cfCol) : el.cellIndex); if(!txt){ dica.style.display = 'none'; return; }
+    dica.textContent = txt; dica.style.display = 'block'; posDica(e);
+  });
+  tabelaVg.addEventListener('mousemove', e=>{ if(dica.style.display==='block') posDica(e); });
+  tabelaVg.addEventListener('mouseleave', ()=>{ dica.style.display = 'none'; });
   // Estado na tabela = o mesmo filtro do topo (mesma chave e mesmo conjunto): mexer em um muda o outro, e o mapa acompanha
   const btnEstadoTab = container.querySelector('.vg-estado-btn');
   if(btnEstadoTab) btnEstadoTab.addEventListener('click', e=>{
@@ -11417,12 +11498,12 @@ function renderVisaoGeral(){
   if(vgExp) vgExp.addEventListener('click', ()=>{
     if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
     const tabela = container.querySelector('.vg-table'); if(!tabela) return;
-    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro', ...VG_VISIVEIS.map(p=>p.label)];
-    const lerCelula = td=>{ const s = td.querySelector('select'); return s ? ((s.options[s.selectedIndex]||{}).text || '') : td.textContent.trim(); };
+    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro', ...VG_VISIVEIS.map(p=>p.label), ...VG_MAPA.flatMap(p=> p.g.flatMap(([est, ls])=> ls.map(l=> `${p.nome} · ${est} · ${l}`)))];
+    const lerCelula = td=>{ const s = td.querySelector('select'); if(s) return (s.options[s.selectedIndex]||{}).text || ''; if(td.classList.contains('vg-m-cell')) return td.classList.contains('vg-m-on') ? '✓' : '—'; return td.textContent.trim(); };
     const dados = [...tabela.querySelectorAll('tbody tr')].filter(tr=> tr.style.display!=='none')
       .map(tr=> [...tr.children].slice(1, cab.length+1).map(lerCelula));
     const ws = XLSX.utils.aoa_to_sheet([cab, ...dados]);
-    ws['!cols'] = [{wch:26},{wch:28},{wch:14},{wch:9},{wch:22}, ...VG_VISIVEIS.map(()=>({wch:16}))];
+    ws['!cols'] = [{wch:26},{wch:28},{wch:14},{wch:9},{wch:22}, ...VG_VISIVEIS.map(()=>({wch:16})), ...VG_MAPA.flatMap(p=> Array(p.n).fill({wch:10}))];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Talhões por Projeto');
     XLSX.writeFile(wb, 'Visao_Geral_Talhoes_por_Projeto_'+new Date().toISOString().slice(0,10)+'.xlsx');
   });
