@@ -2987,7 +2987,7 @@ function cfMapearColunas(table){
       const ultimo = comTxt[comTxt.length-1];
       col.th = ultimo.th;
       col.label = comTxt.slice(-3).map(x=>x.txt).join(' · ');
-      col.skip = /^(salvar|ações|acoes)$/i.test(ultimo.txt);
+      col.skip = /^(salvar|ações|acoes)$/i.test(ultimo.txt) || ultimo.th.hasAttribute('data-cf-skip');
     }
     cols.push(col);
   }
@@ -4022,6 +4022,7 @@ async function carregarDadosDoSupabase(){
       r.max_avaliacao = calc && calc.queda ? 'Queda' : null;
     });
 
+    await carregarParceiros(records);
     RECORDS = records; SEM_AREA = semArea;
     state.selectedCulturas = new Set();
     state.drillEstado = null; state.drillCliente = null;
@@ -10791,6 +10792,21 @@ const VG_PROJETOS = [
 // VG_PROJETOS continua inteira porque a Alimentação usa as cores dela.
 const VG_BLOQUEADOS = ['cond','op','micro'];
 const VG_VISIVEIS = VG_PROJETOS.filter(p=> !VG_BLOQUEADOS.includes(p.key));
+// Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
+const VG_PARCEIROS = [
+  { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Em aberto', cor:'#757575' },
+];
+const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
+// consulta separada de propósito: a carga principal usa uma lista fixa de colunas, e pedir uma coluna que ainda não existe derrubaria tudo.
+async function carregarParceiros(records){
+  try{
+    const { data, error } = await fetchAllPaginated('talhoes','id, responsavel_parceiro');
+    if(error){ console.warn('Responsabilidade/Parceiro indisponível (a coluna ainda não existe no banco):', error.message); return; }
+    const mapa = new Map(data.map(x=> [x.id, x.responsavel_parceiro || '']));
+    records.forEach(r=>{ r.responsavel_parceiro = mapa.get(r.id) || ''; });
+  }catch(e){ console.warn(e); }
+}
 /* ===== RESUMO DA FAZENDA (PDF) — um cartão por talhão, com linha do tempo por projeto, faixa de ±7 dias e link do Google Maps =====
    Projetos: Máximas, Ladrões, Estruturação, Vida no Solo e Óxido. Participação = critério de cada projeto (o mesmo da Visão Geral);
    pílula cheia = todas as avaliações do estádio com status concluído na tabela de acompanhamento do projeto. */
@@ -11125,6 +11141,13 @@ function renderVisaoGeral(){
   const textoVg = f=>{ const s = state.vgF[f.k]; return s.size===0 ? f.label+': Todos' : s.size===1 ? f.label+': '+[...s][0] : f.label+': '+s.size+' selec.'; };
   const comPonto = linhasFiltradas.filter(l=> l.rec.max_latitude!=null && l.rec.max_longitude!=null && !isNaN(Number(l.rec.max_latitude)) && !isNaN(Number(l.rec.max_longitude)));
 
+  if(!state.vgParceiroPend) state.vgParceiroPend = {};   // escolhas ainda não salvas (sobrevivem a um filtro que redesenha a tabela)
+  const parcAtual = r=> (r.id in state.vgParceiroPend) ? state.vgParceiroPend[r.id] : (r.responsavel_parceiro || '');
+  const parcAlterado = r=> (r.id in state.vgParceiroPend) && state.vgParceiroPend[r.id] !== (r.responsavel_parceiro || '');
+  const parcSelectHtml = r=>{
+    const atual = parcAtual(r), nome = atual || 'Em aberto';
+    return `<select class="vg-parceiro" data-id="${r.id}" style="background:${vgParceiroCor(atual)};">${VG_PARCEIROS.map(p=>`<option value="${p.v==='Em aberto'?'':p.v}" style="background:${p.cor};color:#fff;" ${p.v===nome?'selected':''}>${p.v}</option>`).join('')}</select>`;
+  };
   container.innerHTML = `
   <style>
     .vg-layout{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch;}
@@ -11136,6 +11159,14 @@ function renderVisaoGeral(){
     .vg-fbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
     .vg-fbtn:hover{background:var(--bg);}
     .vg-fbtn.ativo{background:#111;color:#fff;border-color:#111;}
+    .vg-lote{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;font-size:12px;}
+    .vg-lote select{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-family:inherit;font-size:12px;background:#fff;}
+    .vg-chk{width:15px;height:15px;cursor:pointer;accent-color:#111;}
+    .vg-table tr.vg-sel td:not(.vg-cell-on){background:#f3f8ea;}
+    .vg-parceiro{border:none;border-radius:6px;padding:4px 6px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;min-width:122px;color:#fff;}
+    .vg-salvar{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+    .vg-salvar.alterado{background:#111;color:#fff;border-color:#111;}
+    .vg-salvar.saved{color:var(--green-deep);border-color:var(--green-deep);}
     .vg-limpar{border:none;background:none;color:var(--ink-soft);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
     .mapa-busca{width:270px;font-family:inherit;}
     .mapa-busca-caixa{display:flex;align-items:center;background:#fff;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.25);overflow:hidden;}
@@ -11182,16 +11213,33 @@ function renderVisaoGeral(){
         <h3 style="margin:0;font-size:13px;">📋 Talhões por Projeto (${linhasFiltradas.length})</h3>
         <button type="button" class="btn btn-preto" id="vgExportarExcel" style="padding:6px 12px;font-size:12px;">⬇️ Exportar Excel</button>
       </div>
+      <div class="vg-lote">
+        <button type="button" class="btn ghost" id="vgSelTodos" style="padding:5px 10px;font-size:12px;" title="Marca todos os talhões que estão na tela (respeita os filtros)">Selecionar todos (0)</button>
+        <button type="button" class="btn ghost" id="vgSelAberto" style="padding:5px 10px;font-size:12px;" title="Marca só os talhões que ainda estão como Em aberto, sem mexer nos que já têm parceiro">Só os "Em aberto" (0)</button>
+        <span id="vgSelCount" style="color:var(--ink-soft);">0 selecionados</span>
+        <select id="vgLoteParceiro"><option value="__none__">Escolha o parceiro…</option>${VG_PARCEIROS.map(p=>`<option value="${p.v==='Em aberto'?'':p.v}">${p.v}</option>`).join('')}</select>
+        <button type="button" class="btn ghost" id="vgLoteAplicar" style="padding:5px 10px;font-size:12px;">Aplicar aos selecionados</button>
+        <button type="button" class="vg-limpar" id="vgLoteLimpar">Limpar seleção</button>
+        <span id="vgLoteMsg" style="color:var(--ink-soft);flex:1;min-width:120px;"></span>
+        <button type="button" class="btn btn-preto" id="vgSalvarLote" style="padding:6px 12px;font-size:12px;display:none;">💾 Salvar alterações (0)</button>
+      </div>
       <div class="vg-table-wrap">
         <table class="vg-table" data-colfilter="vg-talhoes">
           <thead><tr>
+            <th><input type="checkbox" class="vg-chk" id="vgChkTodos" title="Selecionar todos os talhões que estão na tela"></th>
             <th>Cliente</th><th>Fazenda</th><th>Talhão</th>
+            <th data-cf-skip>Estado<button type="button" class="cf-btn cg-fbtn vg-estado-btn ${state.vgF.estado.size?'active':''}" title="Filtrar: Estado (é o mesmo filtro do topo)">▾</button></th>
+            <th>Responsabilidade/Parceiro</th>
             ${VG_VISIVEIS.map(p=>`<th>${p.label}</th>`).join('')}
+            <th>Salvar</th>
           </tr></thead>
           <tbody>
             ${linhasFiltradas.map(l=>`<tr>
+              <td><input type="checkbox" class="vg-chk vg-chk-linha" data-id="${l.rec.id}"></td>
               <td>${l.rec.cliente||''}</td><td>${l.rec.fazenda||''}</td><td>${l.rec.talhao||''}</td>
+              <td>${(l.rec.estado||'').toUpperCase()}</td><td>${parcSelectHtml(l.rec)}</td>
               ${VG_VISIVEIS.map(p=> l.projetos.includes(p.key) ? `<td class="vg-cell-on">✓</td>` : `<td class="vg-cell-off">—</td>`).join('')}
+              <td><button type="button" class="vg-salvar ${parcAlterado(l.rec)?'alterado':''}" data-id="${l.rec.id}">💾 Salvar</button></td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -11211,16 +11259,137 @@ function renderVisaoGeral(){
     if(cgPop && cgPop.dataset.f==='vg-'+f.k){ cgFecharPop(); return; }
     cgAbrirPop(btn, 'vg-'+f.k, f.label, ()=>opcoesVg(f.k), state.vgF[f.k], ()=>renderVisaoGeral());
   }));
+  // Estado na tabela = o mesmo filtro do topo (mesma chave e mesmo conjunto): mexer em um muda o outro, e o mapa acompanha
+  const btnEstadoTab = container.querySelector('.vg-estado-btn');
+  if(btnEstadoTab) btnEstadoTab.addEventListener('click', e=>{
+    e.stopPropagation();
+    if(cgPop && cgPop.dataset.f==='vg-estado'){ cgFecharPop(); return; }
+    cgAbrirPop(btnEstadoTab, 'vg-estado', 'Estado', ()=>opcoesVg('estado'), state.vgF.estado, ()=>renderVisaoGeral());
+  });
+  // ---- Responsabilidade/Parceiro: escolher, aplicar em lote e salvar ----
+  const MSG_SQL = 'A coluna ainda não existe no banco. Rode no Supabase: alter table talhoes add column if not exists responsavel_parceiro text;';
+  const recPorId = new Map(RECORDS.map(r=> [String(r.id), r]));
+  const tbodyVg = container.querySelector('.vg-table tbody');
+  const linhasVisiveis = ()=> [...tbodyVg.querySelectorAll('tr')].filter(tr=> tr.style.display!=='none');
+  const marcadasVisiveis = ()=> linhasVisiveis().filter(tr=> tr.querySelector('.vg-chk-linha').checked);
+  const pendentes = ()=> Object.keys(state.vgParceiroPend).map(id=>({ rec:recPorId.get(String(id)), valor:state.vgParceiroPend[id] })).filter(x=> x.rec && x.valor !== (x.rec.responsavel_parceiro || ''));
+  const msgLote = (txt, erro)=>{ const m = container.querySelector('#vgLoteMsg'); m.textContent = txt || ''; m.style.color = erro ? 'var(--red)' : 'var(--ink-soft)'; };
+  const atualizarBarra = ()=>{
+    const marcadas = marcadasVisiveis(), vis = linhasVisiveis(), n = pendentes().length;
+    container.querySelector('#vgSelCount').textContent = marcadas.length + (marcadas.length===1 ? ' selecionado' : ' selecionados');
+    const topo = container.querySelector('#vgChkTodos');
+    topo.checked = vis.length>0 && marcadas.length===vis.length; topo.indeterminate = marcadas.length>0 && marcadas.length<vis.length;
+    const bl = container.querySelector('#vgSalvarLote'); bl.style.display = n ? '' : 'none'; bl.textContent = '💾 Salvar alterações ('+n+')';
+    const abertas = vis.filter(tr=> tr.querySelector('select.vg-parceiro').value==='').length;
+    container.querySelector('#vgSelTodos').textContent = 'Selecionar todos ('+vis.length+')';
+    container.querySelector('#vgSelAberto').textContent = 'Só os "Em aberto" ('+abertas+')';
+  };
+  const pintarLinha = (tr)=>{ tr.classList.toggle('vg-sel', tr.querySelector('.vg-chk-linha').checked); };
+  const registrarEscolha = (rec, valor)=>{
+    state.vgParceiroPend[rec.id] = valor;
+    const sel = container.querySelector(`select.vg-parceiro[data-id="${rec.id}"]`); if(sel){ sel.value = valor; sel.style.background = vgParceiroCor(valor); }
+    const b = container.querySelector(`button.vg-salvar[data-id="${rec.id}"]`);
+    if(b){ b.classList.toggle('alterado', valor !== (rec.responsavel_parceiro || '')); b.classList.remove('saved'); b.textContent = '💾 Salvar'; b.title = ''; }
+  };
+  const marcarFalha = (rec, msg)=>{ const b = container.querySelector(`button.vg-salvar[data-id="${rec.id}"]`); if(b){ b.classList.add('alterado'); b.textContent = '⚠ Erro'; b.title = msg; } };
+  const marcarSalvo = (rec)=>{ const b = container.querySelector(`button.vg-salvar[data-id="${rec.id}"]`); if(b){ b.classList.remove('alterado'); b.classList.add('saved'); b.textContent = '✓ Salvo'; b.title = ''; } };
+  const erroTexto = err=>{
+    const m = String((err && err.message) || err) + ' ' + String((err && err.code) || '');
+    return /responsavel_parceiro|42703|PGRST204/.test(m) ? MSG_SQL : 'Erro ao salvar: ' + m.trim();
+  };
+  const MSG_PERM = 'O banco não deixou gravar (permissão). Peça a um administrador ou ajuste a regra de segurança do Supabase.';
+
+  // caixinhas: uma por linha (Shift+clique marca/desmarca o intervalo), uma no cabeçalho pra "todos os que estão na tela"
+  let ultimaMarcada = null;
+  tbodyVg.querySelectorAll('.vg-chk-linha').forEach(ch=> ch.addEventListener('click', e=>{
+    const tr = ch.closest('tr');
+    if(e.shiftKey && ultimaMarcada && ultimaMarcada!==tr){
+      const vis = linhasVisiveis(), i1 = vis.indexOf(ultimaMarcada), i2 = vis.indexOf(tr);
+      if(i1>=0 && i2>=0) vis.slice(Math.min(i1,i2), Math.max(i1,i2)+1).forEach(t=>{ t.querySelector('.vg-chk-linha').checked = ch.checked; pintarLinha(t); });
+    }
+    pintarLinha(tr); ultimaMarcada = tr; atualizarBarra();
+  }));
+  container.querySelector('#vgChkTodos').addEventListener('click', e=>{
+    linhasVisiveis().forEach(tr=>{ tr.querySelector('.vg-chk-linha').checked = e.target.checked; pintarLinha(tr); }); atualizarBarra();
+  });
+  // atalhos pra definir o parceiro "padrão": todos os que estão na tela, ou só os que ainda estão Em aberto
+  container.querySelector('#vgSelTodos').addEventListener('click', ()=>{
+    linhasVisiveis().forEach(tr=>{ tr.querySelector('.vg-chk-linha').checked = true; pintarLinha(tr); }); msgLote(''); atualizarBarra();
+  });
+  container.querySelector('#vgSelAberto').addEventListener('click', ()=>{
+    linhasVisiveis().forEach(tr=>{ tr.querySelector('.vg-chk-linha').checked = (tr.querySelector('select.vg-parceiro').value===''); pintarLinha(tr); }); msgLote(''); atualizarBarra();
+  });
+  container.querySelector('#vgLoteLimpar').addEventListener('click', ()=>{
+    tbodyVg.querySelectorAll('.vg-chk-linha').forEach(ch=>{ ch.checked = false; pintarLinha(ch.closest('tr')); }); msgLote(''); atualizarBarra();
+  });
+  // filtros de coluna ▾ escondem linhas por fora desta tela: acompanha pra a contagem ficar certa
+  new MutationObserver(()=> atualizarBarra()).observe(tbodyVg, { subtree:true, attributes:true, attributeFilter:['style'] });
+
+  // aplicar o parceiro escolhido nas linhas marcadas (só nas que estão visíveis; ainda não grava)
+  container.querySelector('#vgLoteAplicar').addEventListener('click', ()=>{
+    const valor = container.querySelector('#vgLoteParceiro').value;
+    if(valor==='__none__'){ msgLote('Escolha o parceiro primeiro.', true); return; }
+    const trs = marcadasVisiveis(); if(!trs.length){ msgLote('Marque ao menos um talhão.', true); return; }
+    trs.forEach(tr=>{ const rec = recPorId.get(String(tr.querySelector('.vg-chk-linha').dataset.id)); if(rec) registrarEscolha(rec, valor); });
+    msgLote(trs.length + (trs.length===1 ? ' linha alterada' : ' linhas alteradas') + ' pra "' + (valor || 'Em aberto') + '". Clique em Salvar alterações.'); atualizarBarra();
+  });
+  container.querySelectorAll('select.vg-parceiro').forEach(sel=> sel.addEventListener('change', ()=>{
+    const rec = recPorId.get(String(sel.dataset.id)); if(!rec) return;
+    registrarEscolha(rec, sel.value); atualizarBarra();
+  }));
+
+  // salvar uma linha
+  container.querySelectorAll('button.vg-salvar').forEach(b=> b.addEventListener('click', async ()=>{
+    const rec = recPorId.get(String(b.dataset.id));
+    const sel = container.querySelector(`select.vg-parceiro[data-id="${b.dataset.id}"]`); if(!rec || !sel) return;
+    const valor = sel.value || null;
+    b.disabled = true; b.textContent = 'Salvando…';
+    try{
+      const { data, error } = await sb.from('talhoes').update({ responsavel_parceiro: valor }).eq('id', rec.id).select('id');
+      if(error) throw error;
+      if(!data || !data.length) throw new Error('SEM_PERMISSAO');   // o banco ignora em silêncio quando a regra de segurança não deixa gravar
+      rec.responsavel_parceiro = valor || ''; delete state.vgParceiroPend[rec.id]; marcarSalvo(rec);
+    }catch(err){
+      const msg = /SEM_PERMISSAO/.test(String((err && err.message) || err)) ? MSG_PERM : erroTexto(err);
+      marcarFalha(rec, msg); alert(msg);
+    }
+    b.disabled = false; atualizarBarra();
+  }));
+
+  // salvar tudo de uma vez: agrupa por parceiro (no máximo 7 grupos) e grava cada grupo em blocos
+  container.querySelector('#vgSalvarLote').addEventListener('click', async ()=>{
+    const lista = pendentes(); if(!lista.length) return;
+    const bl = container.querySelector('#vgSalvarLote'); bl.disabled = true; bl.textContent = 'Salvando…';
+    const grupos = new Map(); lista.forEach(({rec,valor})=>{ const k = valor || ''; if(!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(rec); });
+    let gravados = 0, naoGravados = 0, aviso = '';
+    for(const [k, recs] of grupos){
+      for(let i=0; i<recs.length; i+=80){
+        const bloco = recs.slice(i, i+80);
+        const { data, error } = await sb.from('talhoes').update({ responsavel_parceiro: k || null }).in('id', bloco.map(r=>r.id)).select('id');
+        if(error){ aviso = erroTexto(error); bloco.forEach(r=>{ marcarFalha(r, aviso); naoGravados++; }); continue; }
+        const ok = new Set((data || []).map(x=> String(x.id)));
+        bloco.forEach(r=>{
+          if(ok.has(String(r.id))){ r.responsavel_parceiro = k; delete state.vgParceiroPend[r.id]; marcarSalvo(r); gravados++; }
+          else { aviso = aviso || MSG_PERM; marcarFalha(r, MSG_PERM); naoGravados++; }
+        });
+      }
+    }
+    msgLote(naoGravados ? `⚠ ${gravados} gravados, ${naoGravados} não. ${aviso}` : `✅ ${gravados} ${gravados===1?'talhão gravado':'talhões gravados'}.`, !!naoGravados);
+    if(aviso === MSG_SQL) alert(MSG_SQL);
+    bl.disabled = false; atualizarBarra();
+  });
+  atualizarBarra();
   // exporta exatamente o que está na tabela agora (pill de projeto, filtros do topo e filtros de coluna ▾ já aplicados)
   const vgExp = container.querySelector('#vgExportarExcel');
   if(vgExp) vgExp.addEventListener('click', ()=>{
     if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
     const tabela = container.querySelector('.vg-table'); if(!tabela) return;
-    const cab = ['Cliente','Fazenda','Talhão', ...VG_VISIVEIS.map(p=>p.label)];
+    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro', ...VG_VISIVEIS.map(p=>p.label)];
+    const lerCelula = td=>{ const s = td.querySelector('select'); return s ? ((s.options[s.selectedIndex]||{}).text || '') : td.textContent.trim(); };
     const dados = [...tabela.querySelectorAll('tbody tr')].filter(tr=> tr.style.display!=='none')
-      .map(tr=> [...tr.children].map(td=> td.textContent.trim()));
+      .map(tr=> [...tr.children].slice(1, cab.length+1).map(lerCelula));
     const ws = XLSX.utils.aoa_to_sheet([cab, ...dados]);
-    ws['!cols'] = [{wch:26},{wch:28},{wch:14}, ...VG_VISIVEIS.map(()=>({wch:16}))];
+    ws['!cols'] = [{wch:26},{wch:28},{wch:14},{wch:9},{wch:22}, ...VG_VISIVEIS.map(()=>({wch:16}))];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Talhões por Projeto');
     XLSX.writeFile(wb, 'Visao_Geral_Talhoes_por_Projeto_'+new Date().toISOString().slice(0,10)+'.xlsx');
   });
