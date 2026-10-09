@@ -9407,6 +9407,8 @@ function abrirCronogramaGeral(ctxKey){
   const ctx = CG_CONTEXTOS[ctxKey]; if(!ctx) return;
   state.cgF = state.cgF || {}; state.cgMes = state.cgMes || {};
   const F = state.cgF[ctxKey] = state.cgF[ctxKey] || {};
+  const planejavel = (ctxKey==='geral');   // seleção de semanas + Planejar só no Cronograma Geral da Visão Geral
+  const semSel = new Set();                  // domingos (aaaa-mm-dd) das semanas marcadas
   const FILTROS = [
     ...(ctx.projetos.length>1 ? [{k:'projeto', label:'Projeto'}] : []),
     {k:'estado', label:'Estado'}, {k:'consultor', label:'Consultor'},
@@ -9443,6 +9445,13 @@ function abrirCronogramaGeral(ctxKey){
     .cg-nav .tit{font-size:16px;font-weight:700;color:var(--ink);min-width:190px;text-align:center;text-transform:capitalize;}
     .cg-nav .tot{font-size:12px;color:var(--ink-soft);margin-left:6px;}
     .cg-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+    .cg-cal.sem{grid-template-columns:26px repeat(7,minmax(0,1fr));}
+    .cg-wkc{display:flex;align-items:flex-start;justify-content:center;padding-top:4px;}
+    .cg-wk{width:20px;height:20px;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0;color:#fff;font-family:inherit;}
+    .cg-wk:hover{border-color:#111;}
+    .cg-wk.on{background:#111;border-color:#111;}
+    .cg-cel.cg-selw{border-color:#111;}
+    .cg-seminfo{font-size:12px;color:var(--ink-soft);margin-right:auto;align-self:center;}
     .cg-dow{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding:2px 0;text-transform:uppercase;letter-spacing:.04em;}
     .cg-cel{background:var(--paper);border:1px solid var(--line);border-radius:8px;min-height:104px;padding:4px 5px;overflow:hidden;min-width:0;}
     .cg-cel.tem{cursor:pointer;}
@@ -9479,11 +9488,11 @@ function abrirCronogramaGeral(ctxKey){
       <div id="cgLeg"></div>
       <div id="cgArea"></div>
       <div class="cg-detalhe" id="cgDetalhe"></div>
-      <div class="modal-actions"><button class="btn ghost" id="cgFecharBtn">Fechar</button></div>
+      <div class="modal-actions">${planejavel ? '<span class="cg-seminfo" id="cgSemInfo"></span><button class="btn btn-preto" id="cgPlanejarBtn" disabled>📋 Planejar</button>' : ''}<button class="btn ghost" id="cgFecharBtn">Fechar</button></div>
     </div>
   </div>`;
   const detEl = document.getElementById('cgDetalhe');
-  const fechar = ()=>{ cgFecharPop(); modalRoot.innerHTML = ''; };
+  const fechar = ()=>{ cgFecharPop(); fecharPlano(); modalRoot.innerHTML = ''; };
   document.getElementById('cgFecharBtn').addEventListener('click', fechar);
   document.getElementById('cgOverlay').addEventListener('click', e=>{ if(e.target.id==='cgOverlay') fechar(); });
   if(!cgListeners){
@@ -9542,22 +9551,32 @@ function abrirCronogramaGeral(ctxKey){
     const hojeStr = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
     const offset = new Date(ano, mes-1, 1).getDay(), dias = new Date(ano, mes, 0).getDate();
     const multi = ctx.projetos.length>1;
-    let h = '<div class="cg-cal">' + ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(n=>`<div class="cg-dow">${n}</div>`).join('');
-    for(let i=0;i<offset;i++) h += '<div></div>';
+    let h = `<div class="cg-cal ${planejavel?'sem':''}">` + (planejavel ? '<div></div>' : '') + ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(n=>`<div class="cg-dow">${n}</div>`).join('');
+    let pos = 0, linhaSel = false;   // pos = posição da célula na grade; a cada 7 começa uma semana (domingo)
+    const abrirLinha = ()=>{
+      if(!planejavel || pos%7!==0) return;
+      const dom = isoLocal(new Date(ano, mes-1, 1-offset+pos)), sab = new Date(ano, mes-1, 1-offset+pos+6);
+      linhaSel = semSel.has(dom);
+      h += `<div class="cg-wkc"><button type="button" class="cg-wk ${linhaSel?'on':''}" data-sem="${dom}" aria-pressed="${linhaSel}" title="${linhaSel?'Desmarcar':'Marcar'} a semana de ${dataBr(dom).slice(0,5)} a ${isoLocal(sab).split('-').reverse().slice(0,2).join('/')}">${linhaSel?'✓':''}</button></div>`;
+    };
+    for(let i=0;i<offset;i++){ abrirLinha(); h += '<div></div>'; pos++; }
     for(let d=1; d<=dias; d++){
+      abrirLinha();
       const ds = ano+'-'+String(mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const lista = porDia[ds] || [];
       const visiveis = lista.length>3 ? 2 : lista.length;
-      h += `<div class="cg-cel ${lista.length?'tem':''} ${ds===hojeStr?'hoje':''}" ${lista.length?`data-dia="${ds}"`:''}><div class="n">${d}</div>`;
+      h += `<div class="cg-cel ${lista.length?'tem':''} ${ds===hojeStr?'hoje':''} ${linhaSel?'cg-selw':''}" ${lista.length?`data-dia="${ds}"`:''}><div class="n">${d}</div>`;
       lista.slice(0,visiveis).forEach(g=>{
         const p = CG_PROJ[g.projeto];
         const txt = (multi ? p.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
         h += `<button type="button" class="cg-pill" data-g="${g.idx}" style="background:${p.cor};color:${p.txt};" title="${p.label} — ${g.fazenda} ${g.talhao}">${txt}</button>`;
       });
       if(lista.length>visiveis) h += `<button type="button" class="cg-pill mais" data-dia="${ds}">+${lista.length-visiveis} mais</button>`;
-      h += '</div>';
+      h += '</div>'; pos++;
     }
+    while(planejavel && pos%7!==0){ h += '<div></div>'; pos++; }   // completa a última semana pra o botão de cada linha ficar alinhado
     document.getElementById('cgArea').innerHTML = h + '</div>';
+    ligarSemanas();
     detEl.textContent = 'Clique numa pílula pra ver o talhão, ou no dia pra ver todos os eventos dele.';
     const mostrarDia = ds=>{
       const l = porDia[ds] || [];
@@ -9571,6 +9590,115 @@ function abrirCronogramaGeral(ctxKey){
     document.querySelectorAll('#cgArea .cg-pill.mais').forEach(btn=> btn.addEventListener('click', e=>{ e.stopPropagation(); mostrarDia(btn.dataset.dia); }));
     document.querySelectorAll('#cgArea .cg-cel.tem').forEach(cel=> cel.addEventListener('click', ()=> mostrarDia(cel.dataset.dia)));
   }
+  // ---------- Planejar: quadro de segunda a sexta pras semanas marcadas. Só visualização: nada é salvo, exportado ou alterado ----------
+  function isoLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function ligarSemanas(){
+    document.querySelectorAll('#cgArea .cg-wk').forEach(bt=> bt.addEventListener('click', ()=>{
+      if(semSel.has(bt.dataset.sem)) semSel.delete(bt.dataset.sem); else semSel.add(bt.dataset.sem);
+      desenharCalendario();
+    }));
+    atualizarPlanejar();
+  }
+  function atualizarPlanejar(){
+    const bt = document.getElementById('cgPlanejarBtn'); if(!bt) return;
+    const n = semSel.size; bt.disabled = n===0; bt.textContent = '📋 Planejar' + (n ? ' ('+n+')' : '');
+    const info = document.getElementById('cgSemInfo'); if(info) info.textContent = n ? n+(n===1?' semana marcada':' semanas marcadas') : 'Marque as semanas no quadradinho ao lado do calendário pra planejar';
+  }
+  const escPlano = e=>{ if(e.key==='Escape') fecharPlano(); };
+  function fecharPlano(){ const o = document.getElementById('cgPlanOverlay'); if(o) o.remove(); document.removeEventListener('keydown', escPlano); }
+  function abrirPlano(){
+    if(!semSel.size) return;
+    fecharPlano();
+    const escH = s=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    const NOMES = ['dom','seg','ter','qua','qui','sex','sáb'], UTEIS = ['Seg','Ter','Qua','Qui','Sex'];
+    const sete = dom=>{ const d0 = new Date(dom+'T00:00:00'); return Array.from({length:7},(_,i)=>{ const x = new Date(d0); x.setDate(x.getDate()+i); return isoLocal(x); }); };
+    const intervalos = [...semSel].sort().map(dom=>({ dom, dias:sete(dom) }));
+    const noIntervalo = ds=> intervalos.some(it=> it.dias[0]<=ds && ds<=it.dias[6]);
+    const multi = ctx.projetos.length>1;
+    const mapa = new Map();
+    pontos.filter(p=> passa(p,null) && noIntervalo(p.dataStr)).forEach(p=>{   // mesmos filtros do calendário; só as semanas marcadas
+      const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
+      if(!mapa.has(chave)) mapa.set(chave, { ...p, avaliacoes:[] });
+      mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
+    });
+    const grupos = [...mapa.values()].sort((a,b)=> a.dataStr.localeCompare(b.dataStr) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));
+    grupos.forEach((g,i)=> g.id = i);
+    const colocado = {};   // id do pill -> dia (aaaa-mm-dd). Vive só aqui dentro: nada é gravado e tudo some ao fechar.
+    const ov = document.createElement('div'); ov.id = 'cgPlanOverlay'; ov.className = 'cp-overlay';
+    ov.innerHTML = `<style>
+      .cp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7000;display:flex;align-items:center;justify-content:center;padding:3vh 2vw;}
+      .cp-box{background:var(--paper,#fff);border-radius:14px;width:min(96vw,1500px);height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+      .cp-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);}
+      .cp-tit{font-size:17px;font-weight:700;}
+      .cp-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:760px;}
+      .cp-acoes{display:flex;align-items:center;gap:8px;flex:none;}
+      .cp-cont{font-size:12.5px;color:var(--ink-soft);margin-right:4px;white-space:nowrap;}
+      .cp-corpo{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;padding:16px 20px;min-height:0;flex:1;}
+      .cp-pool{border:1.5px dashed var(--line);border-radius:12px;padding:10px;overflow-y:auto;background:var(--bg);min-height:0;}
+      .cp-pool.drop{border-color:#1d9e75;background:#eaf6f0;}
+      .cp-ptit{font-size:12px;font-weight:700;margin-bottom:8px;}
+      .cp-item{margin-bottom:8px;}
+      .cp-pill{cursor:grab;user-select:none;}
+      .cp-pill.arrastando{opacity:.4;}
+      .cp-leg{font-size:10.5px;color:var(--ink-soft);margin:2px 0 0 3px;}
+      .cp-vazio{font-size:12px;color:var(--ink-soft);padding:8px 2px;}
+      .cp-semanas{overflow:auto;min-width:0;min-height:0;}
+      .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;}
+      .cp-dias{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:20px;}
+      .cp-dia{border:1px solid var(--line);border-radius:10px;min-height:110px;padding:6px;background:#fff;min-width:0;}
+      .cp-dia.drop{border:2px dashed #1d9e75;background:#eaf6f0;padding:5px;}
+      .cp-dh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;}
+    </style>
+    <div class="cp-box" role="dialog" aria-modal="true" aria-label="Planejar semanas">
+      <div class="cp-topo">
+        <div><div class="cp-tit">📋 Planejar · ${intervalos.length} semana${intervalos.length===1?'':'s'}</div>
+        <div class="cp-sub">Arraste cada talhão pro dia que quiser (arrastar funciona no computador). Só visualização: nada é salvo nem exportado, e o quadro some ao fechar.</div></div>
+        <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span><button type="button" class="btn ghost" id="cpLimpar">Limpar</button><button type="button" class="btn ghost" id="cpFechar">Fechar</button></div>
+      </div>
+      <div class="cp-corpo"><div class="cp-pool" id="cpPool"></div><div class="cp-semanas" id="cpSemanas"></div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const pool = ov.querySelector('#cpPool'), semanasEl = ov.querySelector('#cpSemanas'), cont = ov.querySelector('#cpCont');
+    const pillHtml = (g, comLegenda)=>{
+      const pj = CG_PROJ[g.projeto], txt = (multi ? pj.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
+      const dt = new Date(g.dataStr+'T00:00:00');
+      const leg = comLegenda ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${dataBr(g.dataStr).slice(0,5)}</div>` : '';
+      const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
+      return `<div class="cp-item"><div class="cg-pill cp-pill" draggable="true" data-id="${g.id}" style="background:${pj.cor};color:${pj.txt};" title="${escH(dica)}">${escH(txt)}</div>${leg}</div>`;
+    };
+    const desenhar = ()=>{
+      const naLista = grupos.filter(g=> !(g.id in colocado));
+      pool.innerHTML = `<div class="cp-ptit">A planejar (${naLista.length})</div>` + (naLista.length ? naLista.map(g=>pillHtml(g,true)).join('') : `<div class="cp-vazio">${grupos.length ? 'Tudo planejado ✓' : 'Nenhum talhão com avaliação nessas semanas'}</div>`);
+      semanasEl.innerHTML = intervalos.map(it=>{
+        const uteis = it.dias.slice(1,6);
+        return `<div class="cp-sem"><div class="cp-semtit">Semana ${dataBr(uteis[0]).slice(0,5)} – ${dataBr(uteis[4]).slice(0,5)}</div><div class="cp-dias">` + uteis.map((ds,i)=>{
+          const l = grupos.filter(g=> colocado[g.id]===ds);
+          return `<div class="cp-dia" data-dia="${ds}"><div class="cp-dh"><span>${UTEIS[i]} ${dataBr(ds).slice(0,5)}</span><span>${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}</div>`;
+        }).join('') + '</div></div>';
+      }).join('');
+      cont.textContent = Object.keys(colocado).length+' de '+grupos.length+' planejados';
+    };
+    // arrastar e soltar (computador): da lista pro dia, de um dia pra outro, ou de volta pra lista
+    ov.addEventListener('dragstart', e=>{ const el = e.target.closest && e.target.closest('.cp-pill'); if(!el) return; e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('arrastando'); });
+    ov.addEventListener('dragend', ()=>{ ov.querySelectorAll('.arrastando,.drop').forEach(x=> x.classList.remove('arrastando','drop')); });
+    const alvo = e=> e.target.closest ? e.target.closest('.cp-dia, #cpPool') : null;
+    ov.addEventListener('dragover', e=>{ const al = alvo(e); if(!al) return; e.preventDefault(); al.classList.add('drop'); });
+    ov.addEventListener('dragleave', e=>{ const al = alvo(e); if(al && !al.contains(e.relatedTarget)) al.classList.remove('drop'); });
+    ov.addEventListener('drop', e=>{
+      const al = alvo(e); if(!al) return; e.preventDefault();
+      const id = Number(e.dataTransfer.getData('text/plain')); if(Number.isNaN(id) || !grupos[id]) return;
+      if(al.id==='cpPool') delete colocado[id]; else colocado[id] = al.dataset.dia;
+      desenhar();
+    });
+    ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecharPlano(); });
+    ov.querySelector('#cpFechar').addEventListener('click', fecharPlano);
+    ov.querySelector('#cpLimpar').addEventListener('click', ()=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); desenhar(); });
+    document.addEventListener('keydown', escPlano);
+    desenhar();
+    ov.querySelector('#cpFechar').focus();
+  }
+  const btnPlanejar = document.getElementById('cgPlanejarBtn');
+  if(btnPlanejar) btnPlanejar.addEventListener('click', abrirPlano);
   desenharBarra();
   desenharCalendario();
 }
