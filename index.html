@@ -11183,13 +11183,17 @@ function renderVisaoGeral(){
     { k:'estr', pk:'estr',    nome:'Estruturação', g:estrPorBloco },
     { k:'max',  pk:'maximas', nome:'Máximas',      g:agrupaOcs(LM_OCORRENCIAS_MAXIMAS) },
     { k:'lad',  pk:'ladroes', nome:'Ladrões',      g:agrupaOcs(LM_OCORRENCIAS_LADROES) },
-  ].map(p=>{ const cor = VG_PROJETOS.find(x=>x.key===p.pk).cor; return { ...p, cor, txt:textoSobre(cor), n:p.g.reduce((s,g)=>s+g[1].length,0) }; });
+  ].map(p=>{
+    const cor = VG_PROJETOS.find(x=>x.key===p.pk).cor;
+    const dapDe = est=> p.pk==='vns' ? (est==='R1/R2' ? VNS_ETAPA_PRAZO.etapa21_coleta_solo : VNS_ETAPA_PRAZO.etapa4_pos_colheita) : p.pk==='estr' ? ESTR_BLOCO_DAP[est] : LM_ESTAGIO_DAP[est];
+    return { ...p, cor, txt:textoSobre(cor), n:p.g.reduce((s,g)=>s+g[1].length,0), dap:Object.fromEntries(p.g.map(([est])=> [est, dapDe(est)])) };
+  });
   const nMapaVis = VG_MAPA.filter(p=>!state.vgOcultos[p.k]).reduce((s,p)=>s+p.n,0);
   const IDX_PROJ0 = 6, IDX_MAPA0 = IDX_PROJ0 + VG_VISIVEIS.length, IDX_SALVAR = IDX_MAPA0 + VG_MAPA.reduce((s,p)=>s+p.n,0);
   const cabMapa = (()=>{   // linhas 2, 3 e 4 do cabeçalho do mapa; cada coluna leva data-cf-col (posição da célula na linha) pro filtro
     let r2 = '', r3 = '', r4 = '', ix = IDX_MAPA0;
     VG_MAPA.forEach(p=>{
-      r2 += `<th class="vg-c-${p.k}" colspan="${p.n}" style="background:${p.cor};color:${p.txt};text-align:center;">${p.nome}<button type="button" class="vg-x" data-k="${p.k}" title="Ocultar todas as colunas de ${p.nome}">✕</button></th>`;
+      r2 += `<th class="vg-c-${p.k}" colspan="${p.n}" style="background:${p.cor};color:${p.txt};text-align:center;">${p.nome}<button type="button" class="vg-x" data-k="${p.k}" title="Ocultar todas as colunas de ${p.nome}">✕</button><button type="button" class="vg-lupa" data-k="${p.k}" title="Ver as avaliações de ${p.nome} por estádio">🔍</button></th>`;
       p.g.forEach(([est, labels], gi)=>{
         r3 += `<th class="vg-c-${p.k} vg-m-est" colspan="${labels.length}" style="${estiloTom(p.cor, gi, p.g.length)}">${labels.length===1 && est==='Colheita' ? 'Colh.' : est}</th>`;
         labels.forEach(l=>{ const nome = `${p.nome} · ${est} · ${l}`; r4 += `<th class="vg-c-${p.k} vg-m-th" data-cf-col="${ix++}" data-cf-label="${esc(nome)}"></th>`; });
@@ -11261,6 +11265,23 @@ function renderVisaoGeral(){
     .vg-table th.vg-m-est[colspan="1"]{font-size:9px;padding:2px 0;}
     .vg-x{background:#111;color:#fff;border:none;border-radius:4px;font-size:10px;line-height:1;padding:3px 6px;margin-left:6px;cursor:pointer;font-family:inherit;font-weight:700;vertical-align:middle;}
     .vg-x:hover{background:#333;}
+    .vg-lupa{background:#fff;color:#111;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;line-height:1;padding:0;margin-left:4px;cursor:pointer;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.15);}
+    .vg-lupa:hover{box-shadow:0 0 0 2px #111;}
+    .vgm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:6500;display:flex;align-items:center;justify-content:center;padding:3vh 2vw;}
+    .vgm-box{background:var(--paper,#fff);border-radius:14px;width:min(96vw,1600px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+    .vgm-topo{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);}
+    .vgm-tit{font-size:18px;font-weight:700;}
+    .vgm-sub{font-size:13px;color:var(--ink-soft);}
+    .vgm-fechar{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+    .vgm-fechar:hover{background:#111;color:#fff;border-color:#111;}
+    .vgm-corpo{overflow:auto;padding:30px 18px 26px;}
+    .vgm-linha{display:flex;position:relative;}
+    .vgm-trilho{position:absolute;top:31px;height:4px;background:var(--line);z-index:1;border-radius:2px;}
+    .vgm-col{flex:1 1 150px;min-width:150px;display:flex;flex-direction:column;align-items:center;padding:0 6px;}
+    .vgm-bola{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:4px solid #fff;box-shadow:0 0 0 2px var(--line);position:relative;z-index:2;}
+    .vgm-est{font-size:14px;font-weight:700;margin-top:8px;}
+    .vgm-dap{font-size:12px;color:var(--ink-soft);margin-bottom:6px;min-height:15px;}
+    .vgm-item{width:100%;max-width:200px;font-size:12.5px;line-height:1.3;padding:8px 10px;margin-top:6px;background:#f6f5f0;border-radius:7px;border-left:4px solid #999;text-align:left;}
     .vg-tip{position:fixed;z-index:6000;background:#111;color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;pointer-events:none;display:none;max-width:340px;box-shadow:0 2px 8px rgba(0,0,0,.3);}
     .vg-table td.vg-m-cell{width:22px;min-width:22px;max-width:22px;padding:0 !important;position:relative;border-right:1px solid #fff;}
     .vg-m-on{background:#66bb6a;}
@@ -11361,6 +11382,35 @@ function renderVisaoGeral(){
   container.querySelectorAll('.vg-chip').forEach(ch=> ch.addEventListener('click', ()=>{ state.vgOcultos[ch.dataset.k] = !state.vgOcultos[ch.dataset.k]; aplicarOcultos(); }));
   container.querySelectorAll('.vg-x').forEach(bx=> bx.addEventListener('click', ()=>{ state.vgOcultos[bx.dataset.k] = true; aplicarOcultos(); }));   // botão preto: oculta o bloco; os botões "Colunas:" de cima trazem de volta
   aplicarOcultos();
+  // lupa: modal grande com a linha do tempo do projeto (estádios nas bolinhas, avaliações embaixo — só os nomes)
+  const fecharModalProj = ()=>{ const m = document.getElementById('vgModalProj'); if(m) m.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', escModalProj); };
+  const escModalProj = e=>{ if(e.key==='Escape') fecharModalProj(); };
+  const abrirModalProj = k=>{
+    const p = VG_MAPA.find(x=>x.k===k); if(!p) return;
+    fecharModalProj();
+    const nEst = p.g.length, nAv = p.n;
+    const colunas = p.g.map(([est, labels], i)=>{
+      const ch = canaisTom(p.cor, razaoTom(i, nEst)), cor = `rgb(${ch.join(',')})`, claro = (0.299*ch[0]+0.587*ch[1]+0.114*ch[2])/255 > 0.58;
+      const d = p.dap[est];
+      return `<div class="vgm-col">
+        <div class="vgm-bola" style="background:${cor};color:${claro?'#1a2019':'#fff'};">${est==='Colheita' ? 'Colh.' : esc(est)}</div>
+        <div class="vgm-est">${esc(est)}</div>
+        <div class="vgm-dap">${d ? d.dap+' DAP ±'+d.faixa : ''}</div>
+        ${labels.map(l=>`<div class="vgm-item" style="border-left-color:${cor};">${esc(l)}</div>`).join('')}
+      </div>`;
+    }).join('');
+    const ov = document.createElement('div'); ov.id = 'vgModalProj'; ov.className = 'vgm-overlay';
+    ov.innerHTML = `<div class="vgm-box" role="dialog" aria-modal="true" aria-label="Avaliações de ${esc(p.nome)} por estádio">
+      <div class="vgm-topo"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="width:14px;height:14px;border-radius:50%;background:${p.cor};display:inline-block;"></span><span class="vgm-tit">${esc(p.nome)} · avaliações por estádio</span><span class="vgm-sub">${nEst} estádio${nEst===1?'':'s'} · ${nAv} avaliaç${nAv===1?'ão':'ões'}</span></div><button type="button" class="vgm-fechar" id="vgModalProjFechar">✕ Fechar</button></div>
+      <div class="vgm-corpo"><div class="vgm-linha" style="min-width:${nEst*150}px;"><div class="vgm-trilho" style="left:calc(100% / ${nEst*2});right:calc(100% / ${nEst*2});"></div>${colunas}</div></div>
+    </div>`;
+    document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecharModalProj(); });
+    ov.querySelector('#vgModalProjFechar').addEventListener('click', fecharModalProj);
+    document.addEventListener('keydown', escModalProj);
+    ov.querySelector('#vgModalProjFechar').focus();
+  };
+  container.querySelectorAll('.vg-lupa').forEach(bt=> bt.addEventListener('click', e=>{ e.stopPropagation(); abrirModalProj(bt.dataset.k); }));
   // nome da avaliação ao passar o mouse nas células e nos cabeçalhos do mapa (no lugar dos textos na vertical, que gastavam altura)
   const rotulosCol = new Map([...container.querySelectorAll('thead th[data-cf-col]')].map(th=> [Number(th.dataset.cfCol), th.dataset.cfLabel || '']));
   let dica = document.getElementById('vgTip'); if(!dica){ dica = document.createElement('div'); dica.id = 'vgTip'; dica.className = 'vg-tip'; document.body.appendChild(dica); }
