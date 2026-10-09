@@ -11807,12 +11807,24 @@ function renderVisaoGeral(){
   if(vgExp) vgExp.addEventListener('click', ()=>{
     if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
     const tabela = container.querySelector('.vg-table'); if(!tabela) return;
-    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro', ...VG_VISIVEIS.map(p=>p.label), ...VG_MAPA.flatMap(p=> p.g.flatMap(([est, ls])=> ls.map(l=> `${p.nome} · ${est} · ${l}`)))];
+    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro','Georreferência', ...VG_VISIVEIS.map(p=>p.label), ...VG_MAPA.flatMap(p=> p.g.flatMap(([est, ls])=> ls.map(l=> `${p.nome} · ${est} · ${l}`)))];
+    const georrefDe = r=>{
+      if(!r || r.max_latitude==null || r.max_longitude==null || r.max_latitude==='' || r.max_longitude==='') return '';
+      const lat = parseFloat(String(r.max_latitude).replace(',','.')), lon = parseFloat(String(r.max_longitude).replace(',','.'));
+      if(!isFinite(lat) || !isFinite(lon)) return '';
+      const fora = lat<-35 || lat>6 || lon<-75 || lon>-33;   // fora do Brasil: provável latitude e longitude trocadas
+      return lat.toFixed(6)+', '+lon.toFixed(6)+(fora ? ' (verificar)' : '');
+    };
     const lerCelula = td=>{ const s = td.querySelector('select'); if(s) return (s.options[s.selectedIndex]||{}).text || ''; if(td.classList.contains('vg-m-cell')) return td.classList.contains('vg-m-na') ? 'Não se aplica' : (td.classList.contains('vg-m-on') ? '✓' : '—'); return td.textContent.trim(); };
     const dados = [...tabela.querySelectorAll('tbody tr')].filter(tr=> tr.style.display!=='none')
-      .map(tr=> [...tr.children].slice(1, cab.length+1).map(lerCelula));
+      .map(tr=>{
+        // a georreferência não é coluna da tela: vem do cadastro do talhão (as mesmas coordenadas do mapa e do PDF), no formato "latitude, longitude"
+        const cels = [...tr.children].slice(1, cab.length).map(lerCelula);
+        cels.splice(5, 0, georrefDe(recPorId.get(String(tr.querySelector('.vg-chk-linha').dataset.id))));
+        return cels;
+      });
     const ws = XLSX.utils.aoa_to_sheet([cab, ...dados]);
-    ws['!cols'] = [{wch:26},{wch:28},{wch:14},{wch:9},{wch:22}, ...VG_VISIVEIS.map(()=>({wch:16})), ...VG_MAPA.flatMap(p=> Array(p.n).fill({wch:10}))];
+    ws['!cols'] = [{wch:26},{wch:28},{wch:14},{wch:9},{wch:22},{wch:24}, ...VG_VISIVEIS.map(()=>({wch:16})), ...VG_MAPA.flatMap(p=> Array(p.n).fill({wch:10}))];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Talhões por Projeto');
     XLSX.writeFile(wb, 'Visao_Geral_Talhoes_por_Projeto_'+new Date().toISOString().slice(0,10)+'.xlsx');
   });
