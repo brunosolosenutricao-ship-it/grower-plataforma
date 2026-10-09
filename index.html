@@ -3445,6 +3445,16 @@ const VNS_ETAPA_PRAZO = {
   etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
   etapa4_pos_colheita:{ dap:130, faixa:5 },
 };
+// Só vale guardar uma data que a pessoa realmente escolheu. Igual à previsão (plantio + DAP) ou apagada = guarda vazio: a tabela continua
+// mostrando a previsão e acompanha qualquer correção da data de plantio. Campos que não são de data (status) passam direto.
+function vnsNormalizarData(rec, campo, valor){
+  const m = /^(.*)_data$/.exec(campo || '');
+  if(!m) return valor;
+  if(!valor) return null;
+  const prazo = VNS_ETAPA_PRAZO[m[1]];
+  if(!prazo || !rec || !rec.data_plantio) return valor;
+  return valor===vnsDataPrevista(rec.data_plantio, prazo.dap) ? null : valor;
+}
 function vnsDataPrevista(dataPlantio, dap){
   if(!dataPlantio) return '';
   const d = new Date(dataPlantio+'T00:00:00'); d.setDate(d.getDate()+dap);
@@ -8199,7 +8209,8 @@ function renderEstruturacao(){
     el.addEventListener('change', ()=>{
       const key = decodeURIComponent(el.dataset.estrKey);
       const campo = el.dataset.estrCampo;
-      const valor = el.value || null;
+      const recLinha = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const valor = estrNormalizarData(recLinha, campo, el.value || null);
       if(!state.estrAcomp[key]){
         state.estrAcomp[key] = {};
         ESTR_ETAPAS.forEach(e=>{ state.estrAcomp[key][e.key+'_mes'] = null; state.estrAcomp[key][e.key+'_exec'] = 'Pendente'; });
@@ -8218,7 +8229,7 @@ function renderEstruturacao(){
       const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
       const entry = getEstrAcompEntry(key);
       container.querySelectorAll(`.estr-acomp-input[data-estr-key="${btn.dataset.estrKey}"]`).forEach(el=>{
-        entry[el.dataset.estrCampo] = el.value || null;
+        entry[el.dataset.estrCampo] = estrNormalizarData(rec, el.dataset.estrCampo, el.value || null);
       });
       if(!state.estrAcomp[key]) state.estrAcomp[key] = {};
       Object.assign(state.estrAcomp[key], entry);
@@ -9316,8 +9327,10 @@ const CG_CONTEXTOS = {
 };
 function cgColetarPontos(projetos, ini, fim){
   const out = [];
-  const add = (r, proj, dap, avaliacao, estagio)=>{
-    const d = new Date(r.data_plantio+'T00:00:00'); d.setDate(d.getDate()+dap);
+  // dataSalva (aaaa-mm-dd, opcional): data que a pessoa escolheu na tabela de acompanhamento. Sem ela, vale plantio + DAP.
+  const add = (r, proj, dap, avaliacao, estagio, dataSalva)=>{
+    const d = (dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva)) ? new Date(dataSalva+'T00:00:00') : new Date(r.data_plantio+'T00:00:00');
+    if(!(dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva))) d.setDate(d.getDate()+dap);
     if(d<ini || d>fim) return;
     out.push({
       dataStr:d.toISOString().slice(0,10), mesStr:d.toISOString().slice(0,7), projeto:proj,
@@ -9327,15 +9340,19 @@ function cgColetarPontos(projetos, ini, fim){
   };
   RECORDS.forEach(r=>{
     if(!r.data_plantio) return;
-    if(r.max_selecao==='Ladrões' && projetos.includes('ladroes')) LM_OCORRENCIAS_LADROES.forEach(oc=> add(r,'ladroes',oc.dap,oc.avaliacaoLabel,oc.estagio));
-    if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio));
+    // Máximas e Ladrões: a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
+    const entLm = (r.max_selecao==='Ladrões' || r.max_selecao==='Máximas') ? getLmAcompEntry(cronogramaKey(r)) : null;
+    if(r.max_selecao==='Ladrões' && projetos.includes('ladroes')) LM_OCORRENCIAS_LADROES.forEach(oc=> add(r,'ladroes',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data']));
+    if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data']));
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
-      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2'));
-      add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita');
+      // a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
+      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data']));
+      add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita', r['vns_etapa4_pos_colheita_data']);
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
-      ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info) add(r,'estr',info.dap,e.label,e.bloco); });
+      const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
+      ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info) add(r,'estr',info.dap,e.label,e.bloco, entEstr[e.key+'_mes']); });
     }
     if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',45,'Coleta foliar prevista (Etapa 3)','45 DAP');
     if(projetos.includes('cf') && r.cultura==='Soja'){
@@ -9574,27 +9591,31 @@ function abrirModalLadroesMaximasTalhao(rec){
   // agrupa as 30 ocorrências por estádio — cada estádio vira 1 "bolinha" (Plantio + V4 + R1 + R4 + R5.4 + R8 + Colheita)
   // a bolinha fica vermelha se tiver algo atrasado ali dentro, verde se tudo realizado no prazo, cinza se só previsão ainda
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
+  const hojeLm = new Date(); hojeLm.setHours(0,0,0,0);
   const ESTAGIOS_ORDEM = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
   const gruposEstagio = ESTAGIOS_ORDEM.map(estagio=>{
     const ocorrenciasDoEstagio = LM_OCORRENCIAS_MAXIMAS.filter(oc=>oc.estagio===estagio);
     const detalhes = ocorrenciasDoEstagio.map(oc=>{
+      // mesma regra da tabela e do Cronograma: data = a escolhida na tabela (se houver) ou plantio + DAP; "feita" = status Executado
       const d = rec['max_aval_'+oc.campoKey+'_data'];
+      const feito = rec['max_aval_'+oc.campoKey]==='Executado';
       let status = 'previsto', sub = 'previsto', dataMostrar = null;
       if(dataPlantioObj){
         const esperada = new Date(dataPlantioObj); esperada.setDate(esperada.getDate()+oc.dap);
-        if(d){
-          dataMostrar = new Date(d+'T00:00:00');
+        dataMostrar = d ? new Date(d+'T00:00:00') : esperada;
+        if(feito){
           const diffDias = Math.round((dataMostrar-esperada)/86400000);
           if(Math.abs(diffDias)<=oc.faixa){ status='no_prazo'; sub='no prazo'; }
           else { status = diffDias>0 ? 'atrasado' : 'adiantado'; sub = diffDias>0 ? `${diffDias}d atrasado` : `${Math.abs(diffDias)}d adiantado`; }
         } else {
-          dataMostrar = esperada;
+          const diasPassou = Math.round((hojeLm-dataMostrar)/86400000);   // o atraso conta a partir da data mostrada (a nova, se foi replanejada)
+          if(diasPassou > oc.faixa){ status='atrasado'; sub=`pendente — ${diasPassou}d atrasado`; }
         }
-      }
+      } else if(feito){ status='executado'; sub='executado'; dataMostrar = d ? new Date(d+'T00:00:00') : null; }
       return { label: oc.avaliacaoLabel, status, sub, data: dataMostrar };
     });
     const temAtrasado = detalhes.some(x=>x.status==='atrasado');
-    const todasOk = detalhes.length>0 && detalhes.every(x=>x.status==='no_prazo'||x.status==='adiantado');
+    const todasOk = detalhes.length>0 && detalhes.every(x=>x.status==='no_prazo'||x.status==='adiantado'||x.status==='executado');
     const cor = temAtrasado ? '#e74c3c' : (todasOk ? '#2ecc71' : '#c7cdbd');
     const dapInfo = LM_ESTAGIO_DAP[estagio];
     const dataEstagio = dataPlantioObj ? (()=>{ const d=new Date(dataPlantioObj); d.setDate(d.getDate()+dapInfo.dap); return d; })() : null;
@@ -9791,9 +9812,9 @@ function renderLadroesMaximasMapa(){
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const limite = new Date(hoje); limite.setDate(limite.getDate()+10);
     return ocorrencias.some(oc=>{
-      const jaFeita = rec['max_aval_'+oc.campoKey+'_data'];
-      if(jaFeita) return false; // já foi feita, não é mais "próxima"
-      const prevista = new Date(dataPlantioObj); prevista.setDate(prevista.getDate()+oc.dap);
+      if(rec['max_aval_'+oc.campoKey]==='Executado') return false; // já foi feita (status), não é mais "próxima"
+      const salva = rec['max_aval_'+oc.campoKey+'_data'];            // data escolhida na tabela; sem ela, plantio + DAP
+      const prevista = salva ? new Date(salva+'T00:00:00') : (()=>{ const x = new Date(dataPlantioObj); x.setDate(x.getDate()+oc.dap); return x; })();
       return prevista>=hoje && prevista<=limite;
     });
   }
@@ -10002,7 +10023,8 @@ function renderLadroesMaximasMapa(){
     el.addEventListener('change', ()=>{
       const key = decodeURIComponent(el.dataset.lmKey);
       const campo = el.dataset.lmCampo;
-      const valor = el.value;
+      const recLinha = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
+      const valor = lmNormalizarData(recLinha, campo, el.value);
       if(!state.lmAcomp[key]){
         state.lmAcomp[key] = {};
         LM_OCORRENCIAS_TODAS.forEach(oc=>{ state.lmAcomp[key][oc.campoKey] = 'Pendente'; state.lmAcomp[key][oc.campoKey+'_data'] = null; });
@@ -10022,11 +10044,11 @@ function renderLadroesMaximasMapa(){
       const key = decodeURIComponent(btn.dataset.lmKey);
       const msgEl = container.querySelector(`.lm-acomp-msg[data-lm-msg-key="${btn.dataset.lmKey}"]`);
       const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
-      // lê o que está exibido na tela (não só o que já tinha sido alterado/salvo) — pega também datas
-      // previstas que a pessoa deixou como estavam, sem precisar clicar no campo antes de salvar
+      // lê o que está exibido na tela (não só o que já tinha sido alterado/salvo) — status e datas escolhidas.
+      // Data igual à previsão (plantio + DAP) não é gravada: continua seguindo o plantio
       const entry = getLmAcompEntry(key);
       container.querySelectorAll(`.lm-acomp-input[data-lm-key="${btn.dataset.lmKey}"]`).forEach(el=>{
-        entry[el.dataset.lmCampo] = el.value || null;
+        entry[el.dataset.lmCampo] = lmNormalizarData(rec, el.dataset.lmCampo, el.value || null);   // datas que são só previsão não são mais gravadas
       });
       if(!state.lmAcomp[key]) state.lmAcomp[key] = {};
       Object.assign(state.lmAcomp[key], entry);
@@ -10158,17 +10180,18 @@ function abrirModalVidaNoSoloTalhao(rec){
     const detalhes = est.etapas.map(key=>{
       const def = VNS_ETAPAS.find(e=>e.key===key);
       const feito = rec['vns_'+key]==='Executado';
-      const dReal = rec['vns_'+key+'_data'] ? new Date(rec['vns_'+key+'_data']+'T00:00:00') : null;
-      let status = 'previsto', sub = 'previsto', dataMostrar = esperada;
+      // mesma regra da tabela e do Cronograma: data = a escolhida na tabela (se houver) ou plantio + DAP
+      const dSalva = rec['vns_'+key+'_data'] ? new Date(rec['vns_'+key+'_data']+'T00:00:00') : null;
+      const dExibida = dSalva || esperada;
+      let status = 'previsto', sub = 'previsto', dataMostrar = dExibida;
       if(feito){
-        if(dReal && esperada){
-          const diff = Math.round((dReal-esperada)/86400000);
-          dataMostrar = dReal;
+        if(dExibida && esperada){
+          const diff = Math.round((dExibida-esperada)/86400000);
           if(Math.abs(diff)<=est.faixa){ status='no_prazo'; sub='no prazo'; }
           else { status = diff>0 ? 'atrasado' : 'adiantado'; sub = diff>0 ? `${diff}d atrasado` : `${Math.abs(diff)}d adiantado`; }
-        } else { status='executado'; sub='executado (sem data)'; dataMostrar = dReal; }
-      } else if(esperada){
-        const diasPassou = Math.round((hojeTl-esperada)/86400000);
+        } else { status='executado'; sub='executado (sem data)'; dataMostrar = dSalva; }
+      } else if(dExibida){
+        const diasPassou = Math.round((hojeTl-dExibida)/86400000);   // o atraso conta a partir da data mostrada (a nova, se foi replanejada)
         if(diasPassou > est.faixa){ status='atrasado'; sub=`pendente — ${diasPassou}d atrasado`; }
         else sub = 'pendente — previsto';
       } else { sub = 'pendente'; dataMostrar = null; }
@@ -10651,7 +10674,8 @@ function renderVidaNoSolo(){
   container.querySelectorAll('.vns-etapa-input').forEach(el=>{
     el.addEventListener('change', ()=>{
       if(el.dataset.vnsCampo==='status_plantio') el.style.background = el.value==='Plantado' ? '#c8e6c9' : el.value==='Estimativa' ? '#fff3b0' : '#fff';
-      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, el.value || null, el);
+      const recCampo = RECORDS.find(r=>r.id===el.dataset.vnsTalhaoId) || SEM_AREA.find(r=>r.id===el.dataset.vnsTalhaoId);
+      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null), el);
     });
   });
   container.querySelectorAll('.vns-linha-save-btn').forEach(btn=>{
@@ -10662,7 +10686,7 @@ function renderVidaNoSolo(){
       // Status de compra não é mais editável aqui — só na Alimentação; aqui só reforça o valor que já está lá
       const entry = { status_compra: recLinha ? (recLinha.vns_status_compra || null) : null };
       container.querySelectorAll(`.vns-etapa-input[data-vns-talhao-id="${talhaoId}"]`).forEach(el=>{
-        entry[el.dataset.vnsCampo] = el.value || null;
+        entry[el.dataset.vnsCampo] = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null);   // datas que são só previsão não são mais gravadas
       });
       const textoOriginal = btn.textContent;
       btn.disabled = true; btn.textContent = '⏳ Salvando…';
@@ -10856,23 +10880,30 @@ function rfLinkMapa(r){
   if(lat<-35 || lat>6 || lon<-75 || lon>-33) return null; // fora do Brasil: provável latitude/longitude trocadas
   return { url:`https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`, txt:`${lat.toFixed(5)}, ${lon.toFixed(5)}` };
 }
+// DAP efetivo de um estádio: se TODAS as avaliações dele têm a mesma data escolhida na tabela, vale essa data; senão, a do estádio (plantio + DAP).
+function rfDapEfetivo(r, dapBase, salvas){
+  if(!r.data_plantio || !salvas.length) return dapBase;
+  const p = new Date(r.data_plantio+'T00:00:00');
+  const offs = salvas.map(s=> s ? Math.round((new Date(s+'T00:00:00')-p)/86400000) : dapBase);
+  return offs.every(o=> o===offs[0]) ? offs[0] : dapBase;
+}
 function rfMarcos(r,k){
   if(k==='maximas' || k==='ladroes'){
     const ocs = k==='maximas' ? LM_OCORRENCIAS_MAXIMAS : LM_OCORRENCIAS_LADROES;
     return ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'].map(est=>{
       const l = ocs.filter(oc=>oc.estagio===est); if(!l.length) return null;
-      return { rot: est==='Colheita' ? 'Colh.' : est, dap: LM_ESTAGIO_DAP[est].dap, total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
+      return { rot: est==='Colheita' ? 'Colh.' : est, dap: rfDapEfetivo(r, LM_ESTAGIO_DAP[est].dap, l.map(oc=> r['max_aval_'+oc.campoKey+'_data'])), total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
     }).filter(Boolean);
   }
   if(k==='estr') return ['V4','R1/R2','R6/R7'].map(b=>{
     const l = ESTR_ETAPAS.filter(e=>e.bloco===b);
-    return { rot:b, dap:ESTR_BLOCO_DAP[b].dap, total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
+    return { rot:b, dap:rfDapEfetivo(r, ESTR_BLOCO_DAP[b].dap, l.map(e=> r['estr_acomp_'+e.key+'_mes'])), total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
   });
   if(k==='vns'){
     const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'];
     return [
-      { rot:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length },
-      { rot:'Colh.', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
+      { rot:'R1/R2', dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length },
+      { rot:'Colh.', dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, [r.vns_etapa4_pos_colheita_data]), total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
     ];
   }
   if(k==='oxc') return [{ rot:'Coleta', dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
@@ -11782,6 +11813,21 @@ function montarDadosEstrBase(rec){
     status_plantio_acomp: rec.estr_acomp_status_plantio ?? null,
   };
 }
+// Data prevista de um bloco da Estruturação (plantio + DAP), no mesmo formato aaaa-mm-dd que os campos de data usam.
+function estrDataPrevistaBloco(rec, bloco){
+  const info = ESTR_BLOCO_DAP[bloco];
+  if(!rec || !rec.data_plantio || !info) return '';
+  const d = new Date(rec.data_plantio+'T00:00:00'); d.setDate(d.getDate()+info.dap);
+  return d.toISOString().slice(0,10);
+}
+// Só vale guardar uma data que a pessoa realmente escolheu. Se ela é igual à previsão, guarda vazio: a tabela continua mostrando plantio + DAP
+// e acompanha qualquer correção da data de plantio. Campos que não são de data passam direto.
+function estrNormalizarData(rec, campo, valor){
+  const m = /^(.*)_mes$/.exec(campo || '');
+  if(!m || !valor) return valor;
+  const et = ESTR_ETAPAS.find(x=> x.key===m[1]);
+  return (et && valor===estrDataPrevistaBloco(rec, et.bloco)) ? null : valor;
+}
 async function salvarEstrAcompCampo(key, campoKey, valor, el){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
   if(!rec || !projetosIds['projeto-estruturacao']){
@@ -12007,6 +12053,21 @@ async function salvarCicloLadroesMaximas(talhaoId, valor, el){
   }
   rec.max_ciclo = valor;
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
+}
+// Data prevista (plantio + DAP) de uma avaliação do Máximas/Ladrões, no formato aaaa-mm-dd que os campos de data usam.
+function lmDataPrevistaOc(rec, campoKey){
+  const oc = LM_OCORRENCIAS_TODAS.find(o=> o.campoKey===campoKey);
+  if(!rec || !rec.data_plantio || !oc) return '';
+  const d = new Date(rec.data_plantio+'T00:00:00'); d.setDate(d.getDate()+oc.dap);
+  return d.toISOString().slice(0,10);
+}
+// Só vale guardar uma data que a pessoa realmente escolheu. Igual à previsão (ou apagada) = guarda vazio: a tabela continua mostrando
+// plantio + DAP e acompanha qualquer correção da data de plantio. Campos que não são de data (status) passam direto.
+function lmNormalizarData(rec, campo, valor){
+  const m = /^(.*)_data$/.exec(campo || '');
+  if(!m) return valor;
+  if(!valor) return null;
+  return valor===lmDataPrevistaOc(rec, m[1]) ? null : valor;
 }
 async function salvarLmAcompCampo(key, campoKey, valor, el){
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
