@@ -9345,6 +9345,75 @@ const CG_CONTEXTOS = {
   cf:    { titulo:'Cronograma — Coleta Foliar 2026.27', projetos:['cf'] },
   geral: { titulo:'Cronograma Geral — todos os projetos', projetos:['vns','estr','oxc','cf','ladroes','maximas'] },
 };
+// ---------- Distribuição inteligente do Planejar ----------
+const CG_PLANO_UM_ESTADO_POR_DIA = true;     // regra inicial: um estado por dia (pra permitir mais de um, é só trocar aqui)
+const CG_PLANO_MAX_POR_PROJETO_DIA = 3;      // até 3 pills de CADA projeto por dia (com 4 projetos, até 12 no dia)
+// grupos: pills [{id, projeto, estado, fazenda, dataStr, faixa}]; dias: dias úteis das semanas marcadas (aaaa-mm-dd, em ordem).
+// Cada pill só pode ir pra um dia dentro da tolerância do estádio dele (faixa) em torno da data prevista. Prioridade na escolha do dia:
+// 1) mesma fazenda no dia; 2) dia que já tem viagem (gasta menos dias); 3) dia vazio que ainda serve pra mais outros do mesmo estado; 4) o mais perto da data prevista.
+// Começa pelos pills com menos dias possíveis; se um pill não achar lugar, tenta tirar do caminho (uma troca) quem está bloqueando; no fim, tenta esvaziar dias.
+function cgDistribuirPlano(grupos, dias, cfg){
+  cfg = Object.assign({ umEstado:CG_PLANO_UM_ESTADO_POR_DIA, maxPorProjeto:CG_PLANO_MAX_POR_PROJETO_DIA }, cfg || {});
+  const num = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
+  const D = dias.map(d=>({ d, n:num(d), pills:[], estado:null, porProj:{} }));
+  const P = grupos.map(g=>({ id:g.id, projeto:g.projeto, fazenda:g.fazenda||'', estado:(String(g.estado||'').toUpperCase()||'—'), n:num(g.dataStr), faixa:Number.isFinite(g.faixa)?g.faixa:4, dia:null }));
+  P.forEach(p=>{ p.cand = D.filter(x=> Math.abs(x.n-p.n) <= p.faixa); });
+  const cabe = (x,p)=> (!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) < cfg.maxPorProjeto;
+  const por = (x,p)=>{ x.pills.push(p); x.porProj[p.projeto] = (x.porProj[p.projeto]||0)+1; if(x.estado===null) x.estado = p.estado; p.dia = x; };
+  const tira = p=>{ const x = p.dia; x.pills = x.pills.filter(q=>q!==p); x.porProj[p.projeto]--; if(!x.pills.length){ x.estado = null; x.porProj = {}; } p.dia = null; };
+  const nota = (x,p)=>{
+    const mesmaFaz = x.pills.some(q=>q.fazenda===p.fazenda && q.estado===p.estado) ? 1 : 0, usado = x.pills.length ? 1 : 0;
+    const cob = usado ? 0 : P.filter(q=>q!==p && !q.dia && q.estado===p.estado && q.cand.includes(x)).length;   // dia vazio: quantos outros pills do mesmo estado ainda cabem nele
+    return [mesmaFaz, usado, cob, -Math.abs(x.n-p.n), -x.n];
+  };
+  const melhor = (p, lista)=> lista.reduce((b,x)=>{
+    const nx = nota(x,p); if(!b) return { x, n:nx };
+    for(let i=0;i<nx.length;i++) if(nx[i]!==b.n[i]) return nx[i]>b.n[i] ? { x, n:nx } : b;
+    return b;
+  }, null);
+  // tira do caminho quem bloqueia o dia x (de outro estado, ou o excesso do projeto), se cada um tiver outro dia possível
+  const liberar = p=>{
+    for(const x of p.cand.slice().sort((a,b)=> Math.abs(a.n-p.n)-Math.abs(b.n-p.n) || a.n-b.n)){
+      const trocas = [], desfaz = ()=>{ trocas.reverse().forEach(([b,de])=>{ tira(b); por(de,b); }); };
+      const mover = b=>{ const alts = b.cand.filter(y=>y!==x && cabe(y,b)); if(!alts.length) return false; const y = melhor(b,alts).x; trocas.push([b,x]); tira(b); por(y,b); return true; };
+      if(cfg.umEstado && x.estado!==null && x.estado!==p.estado){
+        if(x.pills.slice().every(mover) && cabe(x,p)){ por(x,p); return true; }
+        desfaz();
+      } else if((x.porProj[p.projeto]||0) >= cfg.maxPorProjeto){
+        for(const b of x.pills.filter(q=>q.projeto===p.projeto)){ if(mover(b) && cabe(x,p)){ por(x,p); return true; } desfaz(); }
+      }
+    }
+    return false;
+  };
+  P.filter(q=>q.cand.length).sort((a,b)=> a.cand.length-b.cand.length || a.estado.localeCompare(b.estado) || a.fazenda.localeCompare(b.fazenda,'pt-BR') || a.n-b.n || a.id-b.id).forEach(p=>{
+    const viaveis = p.cand.filter(x=>cabe(x,p));
+    if(viaveis.length) por(melhor(p,viaveis).x, p); else liberar(p);
+  });
+  // compactar: tenta esvaziar os dias com menos pills, levando tudo pra dias que já têm viagem (menos dias de viagem)
+  for(let volta=0, mudou=true; mudou && volta<60; volta++){
+    mudou = false;
+    for(const x of D.filter(y=>y.pills.length).sort((a,b)=> a.pills.length-b.pills.length || a.n-b.n)){
+      const feitos = []; let tudo = true;
+      for(const b of x.pills.slice()){
+        const alts = b.cand.filter(y=>y!==x && y.pills.length>0 && cabe(y,b)); if(!alts.length){ tudo = false; break; }
+        tira(b); por(melhor(b,alts).x, b); feitos.push([b,x]);
+      }
+      if(tudo){ mudou = true; break; }
+      feitos.reverse().forEach(([b,de])=>{ tira(b); por(de,b); });
+    }
+  }
+  const motivo = p=>{
+    if(!p.cand.length) return 'nenhum dia útil das semanas marcadas dentro da tolerância (±'+p.faixa+' dias)';
+    const porEstado = p.cand.filter(x=> cfg.umEstado && x.estado!==null && x.estado!==p.estado).length;
+    const porLimite = p.cand.filter(x=> (!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) >= cfg.maxPorProjeto).length;
+    if(porEstado && porLimite) return 'os dias possíveis já estão com outro estado ou no limite de '+cfg.maxPorProjeto+' do projeto';
+    if(porEstado) return 'os dias possíveis já estão com outro estado';
+    return 'os dias possíveis já estão no limite de '+cfg.maxPorProjeto+' pills do projeto';
+  };
+  const colocado = {}, desvio = {}, motivos = {};
+  P.forEach(p=>{ if(p.dia){ colocado[p.id] = p.dia.d; desvio[p.id] = p.dia.n-p.n; } else motivos[p.id] = motivo(p); });
+  return { colocado, desvio, motivos, colocados:Object.keys(colocado).length, semDia:Object.keys(motivos).length, diasUsados:D.filter(x=>x.pills.length).length };
+}
 function cgColetarPontos(projetos, ini, fim){
   const out = [];
   // dataSalva (aaaa-mm-dd, opcional): data que a pessoa escolheu na tabela de acompanhamento. Sem ela, vale plantio + DAP.
@@ -9353,6 +9422,12 @@ function cgColetarPontos(projetos, ini, fim){
     const v = proj==='estr' ? r.estr_acomp_status_plantio : proj==='vns' ? r.vns_status_plantio : (proj==='maximas' || proj==='ladroes') ? r.max_status_plantio : '';
     return (v==='Plantado' || v==='Estimativa') ? v : '';
   };
+  // tolerância (± dias) do estádio do evento, a mesma das tabelas, dos modais e do PDF; Óxido e Coleta Foliar usam a do R1/R2 (mesmo dia, 45 DAP)
+  const faixaDe = (proj, estagio)=>{
+    const lm = (typeof LM_ESTAGIO_DAP!=='undefined') ? LM_ESTAGIO_DAP : {}, es = (typeof ESTR_BLOCO_DAP!=='undefined') ? ESTR_BLOCO_DAP : {}, vn = (typeof VNS_ETAPA_PRAZO!=='undefined') ? VNS_ETAPA_PRAZO : {};
+    const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pos_colheita : vn.etapa21_coleta_solo) : lm['R1/R2'];
+    return (f && f.faixa) || 4;
+  };
   const add = (r, proj, dap, avaliacao, estagio, dataSalva)=>{
     const d = (dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva)) ? new Date(dataSalva+'T00:00:00') : new Date(r.data_plantio+'T00:00:00');
     if(!(dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva))) d.setDate(d.getDate()+dap);
@@ -9360,7 +9435,7 @@ function cgColetarPontos(projetos, ini, fim){
     out.push({
       dataStr:d.toISOString().slice(0,10), mesStr:d.toISOString().slice(0,7), projeto:proj,
       estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', cliente:r.cliente||'', fazenda:r.fazenda||'', talhao:r.talhao||'',
-      avaliacao, estagio, statusPlantio: statusDe(r, proj),
+      avaliacao, estagio, statusPlantio: statusDe(r, proj), faixa: faixaDe(proj, estagio),
     });
   };
   RECORDS.forEach(r=>{
@@ -9655,11 +9730,14 @@ function abrirCronogramaGeral(ctxKey){
     pontos.filter(p=> passa(p,null) && noIntervalo(p.dataStr)).forEach(p=>{   // mesmos filtros do calendário; só as semanas marcadas
       const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
       if(!mapa.has(chave)) mapa.set(chave, { ...p, avaliacoes:[] });
-      mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
+      const gg = mapa.get(chave); gg.avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio }); gg.faixa = Math.min(gg.faixa ?? 99, p.faixa ?? 4);   // a tolerância do pill é a mais apertada entre as avaliações dele
     });
     const grupos = [...mapa.values()].sort((a,b)=> a.dataStr.localeCompare(b.dataStr) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));
     grupos.forEach((g,i)=> g.id = i);
     const colocado = {};   // id do pill -> dia (aaaa-mm-dd). Vive só aqui dentro: nada é gravado e tudo some ao fechar.
+    let motivos = {}, snapshot = null, resumoTxt = '';   // motivo de cada pill que ficou sem dia na distribuição; arranjo de antes dela (pra desfazer); linha de resumo
+    const diasUteis = intervalos.flatMap(it=> it.dias.slice(1,6));
+    const nDia = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
     const ov = document.createElement('div'); ov.id = 'cgPlanOverlay'; ov.className = 'cp-overlay';
     ov.innerHTML = `<style>
       .cp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7000;display:flex;align-items:center;justify-content:center;padding:3vh 2vw;}
@@ -9684,21 +9762,31 @@ function abrirCronogramaGeral(ctxKey){
       .cp-dia{border:1px solid var(--line);border-radius:10px;min-height:110px;padding:6px;background:#fff;min-width:0;}
       .cp-dia.drop{border:2px dashed #1d9e75;background:#eaf6f0;padding:5px;}
       .cp-dh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;}
+      .cp-dh b{color:#1a2019;}
+      .cp-aviso{color:#c62828;cursor:help;}
+      .cp-leg.cp-dev{color:#5f5e5a;}
+      .cp-leg.cp-dev.fora{color:#c62828;font-weight:700;}
+      .cp-mot{font-size:10.5px;color:#c62828;margin:2px 0 0 3px;line-height:1.3;}
+      .cp-resumo{font-size:12.5px;font-weight:700;color:#0f6e56;margin-top:5px;min-height:16px;}
     </style>
     <div class="cp-box" role="dialog" aria-modal="true" aria-label="Planejar semanas">
       <div class="cp-topo">
         <div><div class="cp-tit">📋 Planejar · ${intervalos.length} semana${intervalos.length===1?'':'s'}</div>
-        <div class="cp-sub">Arraste cada talhão pro dia que quiser (arrastar funciona no computador). Só visualização: nada é salvo nem exportado, e o quadro some ao fechar.</div></div>
-        <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span><button type="button" class="btn ghost" id="cpLimpar">Limpar</button><button type="button" class="btn ghost" id="cpFechar">Fechar</button></div>
+        <div class="cp-sub">Arraste cada talhão pro dia que quiser (arrastar funciona no computador) ou use a Distribuição inteligente. Só visualização: nada é salvo nem exportado, e o quadro some ao fechar.</div>
+        <div class="cp-resumo" id="cpResumo"></div></div>
+        <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span><button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button><button type="button" class="btn ghost" id="cpDesfazer" disabled>Desfazer distribuição</button><button type="button" class="btn ghost" id="cpLimpar">Limpar</button><button type="button" class="btn ghost" id="cpFechar">Fechar</button></div>
       </div>
       <div class="cp-corpo"><div class="cp-pool" id="cpPool"></div><div class="cp-semanas" id="cpSemanas"></div></div>
     </div>`;
     document.body.appendChild(ov);
-    const pool = ov.querySelector('#cpPool'), semanasEl = ov.querySelector('#cpSemanas'), cont = ov.querySelector('#cpCont');
+    const pool = ov.querySelector('#cpPool'), semanasEl = ov.querySelector('#cpSemanas'), cont = ov.querySelector('#cpCont'), resumoEl = ov.querySelector('#cpResumo'), btnDist = ov.querySelector('#cpDistribuir'), btnDesf = ov.querySelector('#cpDesfazer');
     const pillHtml = (g, comLegenda)=>{
       const pj = CG_PROJ[g.projeto], txt = (multi ? pj.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
       const dt = new Date(g.dataStr+'T00:00:00');
-      const leg = comLegenda ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${dataBr(g.dataStr).slice(0,5)}</div>` : '';
+      const dia = colocado[g.id], dev = dia ? nDia(dia)-nDia(g.dataStr) : 0, fora = Math.abs(dev) > (g.faixa ?? 4);
+      const leg = comLegenda
+        ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${dataBr(g.dataStr).slice(0,5)}</div>` + (motivos[g.id] ? `<div class="cp-mot">sem dia possível: ${escH(motivos[g.id])}</div>` : '')
+        : (dia && dev!==0 ? `<div class="cp-leg cp-dev${fora?' fora':''}" title="tolerância deste estádio: ±${g.faixa ?? 4} dias">${dev>0?'+':'−'}${Math.abs(dev)}d · prev. ${dataBr(g.dataStr).slice(0,5)}${fora?' · fora da tolerância':''}</div>` : '');
       const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+(emEst(g)?' (plantio em estimativa)':'')+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
       return `<div class="cp-item"><div class="cg-pill cp-pill${emEst(g)?' est':''}" draggable="true" data-id="${g.id}" style="${estiloPill(g,pj)}" title="${escH(dica)}">${escH(txt)}</div>${leg}</div>`;
     };
@@ -9709,10 +9797,15 @@ function abrirCronogramaGeral(ctxKey){
         const uteis = it.dias.slice(1,6);
         return `<div class="cp-sem"><div class="cp-semtit">Semana ${dataBr(uteis[0]).slice(0,5)} – ${dataBr(uteis[4]).slice(0,5)}</div><div class="cp-dias">` + uteis.map((ds,i)=>{
           const l = grupos.filter(g=> colocado[g.id]===ds);
-          return `<div class="cp-dia" data-dia="${ds}"><div class="cp-dh"><span>${UTEIS[i]} ${dataBr(ds).slice(0,5)}</span><span>${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}</div>`;
+          const ufs = [...new Set(l.map(g=> String(g.estado||'—').toUpperCase()))], avisos = [];
+          if(CG_PLANO_UM_ESTADO_POR_DIA && ufs.length>1) avisos.push('mais de um estado no mesmo dia ('+ufs.join(', ')+')');
+          Object.keys(CG_PROJ).forEach(k=>{ const n = l.filter(g=>g.projeto===k).length; if(n>CG_PLANO_MAX_POR_PROJETO_DIA) avisos.push(n+' de '+CG_PROJ[k].label+' (o limite é '+CG_PLANO_MAX_POR_PROJETO_DIA+')'); });
+          return `<div class="cp-dia" data-dia="${ds}"><div class="cp-dh"><span>${UTEIS[i]} ${dataBr(ds).slice(0,5)}${ufs.length?' · <b>'+ufs.join('+')+'</b>':''}</span><span>${avisos.length?`<span class="cp-aviso" title="${escH(avisos.join('; '))}">⚠</span> `:''}${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}</div>`;
         }).join('') + '</div></div>';
       }).join('');
-      cont.textContent = Object.keys(colocado).length+' de '+grupos.length+' planejados';
+      const usados = new Set(Object.values(colocado)).size;
+      cont.textContent = Object.keys(colocado).length+' de '+grupos.length+' planejados'+(usados ? ' · '+usados+(usados===1?' dia':' dias')+' de viagem' : '');
+      resumoEl.textContent = resumoTxt; btnDesf.disabled = !snapshot; btnDist.disabled = !grupos.length;
     };
     // arrastar e soltar (computador): da lista pro dia, de um dia pra outro, ou de volta pra lista
     ov.addEventListener('dragstart', e=>{ const el = e.target.closest && e.target.closest('.cp-pill'); if(!el) return; e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('arrastando'); });
@@ -9724,11 +9817,26 @@ function abrirCronogramaGeral(ctxKey){
       const al = alvo(e); if(!al) return; e.preventDefault();
       const id = Number(e.dataTransfer.getData('text/plain')); if(Number.isNaN(id) || !grupos[id]) return;
       if(al.id==='cpPool') delete colocado[id]; else colocado[id] = al.dataset.dia;
+      delete motivos[id]; resumoTxt = '';   // mexeu à mão: o resumo da distribuição deixou de valer
       desenhar();
     });
     ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecharPlano(); });
     ov.querySelector('#cpFechar').addEventListener('click', fecharPlano);
-    ov.querySelector('#cpLimpar').addEventListener('click', ()=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); desenhar(); });
+    ov.querySelector('#cpLimpar').addEventListener('click', ()=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); motivos = {}; snapshot = null; resumoTxt = ''; desenhar(); });
+    btnDist.addEventListener('click', ()=>{
+      if(!grupos.length) return;
+      snapshot = { colocado:{...colocado}, motivos:{...motivos}, resumoTxt };          // guarda o arranjo de agora (inclusive o que você arrastou à mão)
+      const r = cgDistribuirPlano(grupos, diasUteis);
+      Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, r.colocado);
+      motivos = r.motivos;
+      resumoTxt = r.colocados+(r.colocados===1?' distribuído':' distribuídos')+' · '+r.semDia+' sem dia possível · '+r.diasUsados+(r.diasUsados===1?' dia':' dias')+' de viagem';
+      desenhar();
+    });
+    btnDesf.addEventListener('click', ()=>{
+      if(!snapshot) return;
+      Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, snapshot.colocado);
+      motivos = snapshot.motivos; resumoTxt = snapshot.resumoTxt; snapshot = null; desenhar();
+    });
     document.addEventListener('keydown', escPlano);
     desenhar();
     ov.querySelector('#cpFechar').focus();
@@ -11007,7 +11115,7 @@ const VG_VISIVEIS = VG_PROJETOS.filter(p=> !VG_BLOQUEADOS.includes(p.key));
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
-  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' },
   { v:'Em aberto', cor:'#757575' },
 ];
 const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
