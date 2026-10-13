@@ -11020,12 +11020,12 @@ async function carregarParceiros(records){
     records.forEach(r=>{ r.responsavel_parceiro = mapa.get(r.id) || ''; });
   }catch(e){ console.warn(e); }
 }
-/* ===== RESUMO DA FAZENDA (PDF) — um cartão por talhão, com linha do tempo por projeto, faixa de ±7 dias e link do Google Maps =====
+/* ===== RESUMO DA FAZENDA (PDF) — um cartão por talhão, com linha do tempo por projeto, faixa de tolerância de cada estádio e link do Google Maps =====
    Projetos: Máximas, Ladrões, Estruturação, Vida no Solo e Óxido. Participação = critério de cada projeto (o mesmo da Visão Geral);
    pílula cheia = todas as avaliações do estádio com status concluído na tabela de acompanhamento do projeto. */
 const RF_PROJ_ORDEM = ['maximas','ladroes','estr','vns','oxc'];
 const RF_SAFRA = '2026/27';
-const RF_JANELA = 7;
+const RF_JANELA = 7;   // só como reserva, se um marco vier sem tolerância
 const RF_OXC_DAP = 45;
 const RF_OXC_FEITO = ['Coletado','No laboratório','Laudo recebido'];
 const RF_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -11067,26 +11067,31 @@ function rfEhNA(r,k,chave){
        : k==='estr' ? r['estr_acomp_'+chave+'_exec']===STATUS_NAO_SE_APLICA
        : k==='vns' ? r['vns_'+chave]===STATUS_NAO_SE_APLICA : false;
 }
+// tolerância (± dias) dos estádios, lida das mesmas listas das tabelas: o texto do PDF mostra o intervalo real, e não um número fixo
+function rfTolTxt(){
+  const f = [...Object.values(LM_ESTAGIO_DAP), ...Object.values(ESTR_BLOCO_DAP), ...Object.values(VNS_ETAPA_PRAZO)].map(x=>x.faixa), mn = Math.min(...f), mx = Math.max(...f);
+  return mn===mx ? '±'+mn : '±'+mn+' a ±'+mx;
+}
 function rfMarcos(r,k){
   if(k==='maximas' || k==='ladroes'){
     const ocs = k==='maximas' ? LM_OCORRENCIAS_MAXIMAS : LM_OCORRENCIAS_LADROES;
     return ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'].map(est=>{
       const l = ocs.filter(oc=>oc.estagio===est && !rfEhNA(r,k,oc.campoKey)); if(!l.length) return null;   // estádio sem avaliação aplicável: não tem marco
-      return { rot: est==='Colheita' ? 'Colh.' : est, dap: rfDapEfetivo(r, LM_ESTAGIO_DAP[est].dap, l.map(oc=> r['max_aval_'+oc.campoKey+'_data'])), total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
+      return { rot: est==='Colheita' ? 'Colh.' : est, faixa: LM_ESTAGIO_DAP[est].faixa, dap: rfDapEfetivo(r, LM_ESTAGIO_DAP[est].dap, l.map(oc=> r['max_aval_'+oc.campoKey+'_data'])), total:l.length, feitas:l.filter(oc=> r['max_aval_'+oc.campoKey]==='Executado').length };
     }).filter(Boolean);
   }
   if(k==='estr') return ['V4','R1/R2','R6/R7'].map(b=>{
     const l = ESTR_ETAPAS.filter(e=>e.bloco===b && !rfEhNA(r,'estr',e.key)); if(!l.length) return null;
-    return { rot:b, dap:rfDapEfetivo(r, ESTR_BLOCO_DAP[b].dap, l.map(e=> r['estr_acomp_'+e.key+'_mes'])), total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
+    return { rot:b, faixa:ESTR_BLOCO_DAP[b].faixa, dap:rfDapEfetivo(r, ESTR_BLOCO_DAP[b].dap, l.map(e=> r['estr_acomp_'+e.key+'_mes'])), total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
   }).filter(Boolean);
   if(k==='vns'){
     const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(x=>!rfEhNA(r,'vns',x));
     return [
-      r1.length ? { rot:'R1/R2', dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length } : null,
-      rfEhNA(r,'vns','etapa4_pos_colheita') ? null : { rot:'Colh.', dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, [r.vns_etapa4_pos_colheita_data]), total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
+      r1.length ? { rot:'R1/R2', faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length } : null,
+      rfEhNA(r,'vns','etapa4_pos_colheita') ? null : { rot:'Colh.', faixa:VNS_ETAPA_PRAZO.etapa4_pos_colheita.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, [r.vns_etapa4_pos_colheita_data]), total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
     ].filter(Boolean);
   }
-  if(k==='oxc') return [{ rot:'Coleta', dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
+  if(k==='oxc') return [{ rot:'Coleta', faixa:LM_ESTAGIO_DAP['R1/R2'].faixa, dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
   return [];
 }
 // lista "principais avaliações" do cartão do talhão: cada item some quando TODAS as avaliações que ele descreve não se aplicam ao talhão.
@@ -11193,13 +11198,14 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
       baseEsq = by+30*K+4+14;
     }
     // linha do tempo
-    const tx = RX+LAB+4, yt = y0+10, d0 = new Date(r.data_plantio+'T00:00:00'), fim = somaDias(d0,HORIZ), n = t.projs.length, yl = yt+22*K, LH = 44*K;
+    const tx = RX+LAB+4, yt = y0+10, d0 = new Date(r.data_plantio+'T00:00:00'), fim = somaDias(d0,HORIZ), n = t.projs.length, yl = yt+22*K, LH = 56*K;
     LN(tx,yt+18*K,tx+TLW,yt+18*K,'#d3d1c7',1);
     let mm = new Date(d0.getFullYear(),d0.getMonth(),1);
     while(mm<=fim){
       if(mm>=d0){ const xm = tx+Math.round((mm-d0)/86400000)*PXD; LN(xm,yt+18*K,xm,yl+n*LH,'#ececE6',1); T(xm+3,yt+2,RF_MESES[mm.getMonth()],11*K,true,'#888780'); }
       mm = new Date(mm.getFullYear(),mm.getMonth()+1,1);
     }
+    const omitidos = {};   // projeto -> janelas "início – fim" que não couberam embaixo do marco (vão pra lista do cartão)
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], marcos = rfMarcos(r,k), ly = yl+i*LH;
       RR(RX,ly+8*K,RX+LAB-8,ly+32*K,12*K,p.cor); let fl = 12*K; while(tw(p.label,fl,true) > LAB-8-18 && fl>8) fl -= 0.4; T(RX+10,ly+13*K+(12*K-fl)/2,p.label,fl,true,p.txt);
@@ -11207,16 +11213,20 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
       if(!marcos.length) T(tx+8,ly+13*K,'nenhuma avaliação deste projeto se aplica a este talhão',10.5*K,false,'#888780');
       marcos.forEach(m=>{
         const dd = somaDias(d0,m.dap), xm = tx+m.dap*PXD, passou = (m.total>0 && m.feitas===m.total);
-        const xa = xm-RF_JANELA*PXD, xb = xm+RF_JANELA*PXD;
+        const fx = m.faixa ?? RF_JANELA, xa = xm-fx*PXD, xb = xm+fx*PXD;   // faixa = tolerância do estádio (a mesma das tabelas, modais e Cronograma)
         RR(xa,ly+15*K,xb,ly+25*K,5,rfMistura(p.cor, passou?0.16:0.34));
         [xa,xb].forEach(xc=> LN(xc,ly+10*K,xc,ly+30*K,p.cor,2));
       });
+      let ultFim = -1e9;   // onde terminou o último texto "início – fim" desta linha
       marcos.forEach(m=>{
         const dd = somaDias(d0,m.dap), xm = tx+m.dap*PXD, feito = (m.total>0 && m.feitas===m.total), w = tw(m.rot,11.5*K,true)+16;
         if(feito){ RR(xm-w/2,ly+9*K,xm+w/2,ly+31*K,11*K,p.cor); T(xm-tw(m.rot,11.5*K,true)/2,ly+13*K,m.rot,11.5*K,true,p.txt); }
         else { RR(xm-w/2,ly+9*K,xm+w/2,ly+31*K,11*K,'#ffffff',p.cor,1.8); T(xm-tw(m.rot,11.5*K,true)/2,ly+13*K,m.rot,11.5*K,true,'#1a2019'); }
         const parcial = (!feito && m.feitas>0 && m.total>1) ? ` · ${m.feitas}/${m.total}` : '';
-        const ds = dm(dd)+parcial; T(xm-tw(ds,10*K,false)/2,ly+33*K,ds,10*K,false,'#5f5e5a');
+        const ds = dm(dd)+parcial; T(xm-tw(ds,10.5*K,true)/2,ly+33*K,ds,10.5*K,true,'#1a2019');      // data prevista (centro da faixa), em destaque
+        const fxm = m.faixa ?? RF_JANELA, jan = dm(somaDias(d0,m.dap-fxm))+' – '+dm(somaDias(d0,m.dap+fxm)), jw = tw(jan,8.6*K,false), jx = xm-jw/2;
+        if(jx >= ultFim+3){ T(jx,ly+45*K,jan,8.6*K,false,'#7a7970'); ultFim = jx+jw; }                // início – fim da janela (tolerância do estádio)
+        else (omitidos[k] = omitidos[k] || []).push({ rot:m.rot, jan });                               // marco colado no anterior: a janela vai pra lista do cartão
       });
     });
     // principais avaliações — uma coluna por projeto
@@ -11229,6 +11239,7 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
         wrapTk(tokens(nm,e,ds,p.cor),colw-30).forEach(lin=>{ runs(lin).forEach(u=> T(xc+17+u.xo,yp,u.txt,u.px,u.b,u.c)); yp += 15*K; });
         yp += 4*K;
       });
+      (omitidos[k] || []).forEach(o=>{ T(xc+17,yp,'Janela de '+o.rot+': '+o.jan,10*K,false,'#7a7970'); yp += 14*K; });
       baseDir = Math.max(baseDir,yp);
     });
     if(h>0) LN(M+LEFT,y0+12,M+LEFT,y0+h-12,'#ececE6',1);
@@ -11268,7 +11279,7 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
     RR(lx,ly+3,lx+28,ly+17,7,'#5f5e5a'); T(lx+34,ly+2,'todas as avaliações do estádio feitas',11.5,false,'#5f5e5a'); lx += 34+tw('todas as avaliações do estádio feitas',11.5,false)+22;
     RR(lx,ly+3,lx+28,ly+17,7,'#ffffff','#5f5e5a',1.6); T(lx+34,ly+2,'a fazer ou em andamento (n/total)',11.5,false,'#5f5e5a'); lx += 34+tw('a fazer ou em andamento (n/total)',11.5,false)+22;
     RR(lx,ly+6,lx+70,ly+14,4,rfMistura('#2e6e76',0.34)); [lx,lx+70].forEach(xc=> LN(xc,ly+1,xc,ly+19,'#2e6e76',2)); RR(lx+25,ly+3,lx+45,ly+17,7,'#ffffff','#2e6e76',1.6);
-    T(lx+80,ly+2,'faixa = pode ser feita até 7 dias antes ou 7 dias depois',11.5,true,'#2e6e76');
+    T(lx+80,ly+2,'faixa: início – data prevista (centro, em negrito) – fim, pela tolerância de cada estádio ('+rfTolTxt()+' dias)',11.5,true,'#2e6e76');
   }
   function cabecalhoPaginaN(){
     D.setFillColor(45,74,31); D.rect(0,0,W*sc,34*sc,'F');
@@ -11278,7 +11289,7 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
   function rodape(p){
     const fy = H-44; LN(M,fy,W-M,fy,'#d3d1c7',1); PIN(M+7,fy+14,'#1a73e8','#ffffff',5);
     T(M+20,fy+7,'No PDF, o botão "Abrir no Google Maps" é um link: um toque abre o ponto do talhão direto no app de mapas do celular.',10.5,false,'#5f5e5a');
-    T(M,fy+24,'Datas previstas = data de plantio + DAP (dias após o plantio) de cada estádio; cada avaliação pode ser feita até 7 dias antes ou 7 dias depois (faixa clara).',10.5,false,'#888780');
+    T(M,fy+24,'Datas previstas = data de plantio + DAP (dias após o plantio) de cada estádio, em negrito; abaixo, o início e o fim da janela de tolerância do estádio ('+rfTolTxt()+' dias, faixa clara).',10.5,false,'#888780');
     const pg = `Página ${p} de ${nPag}`; T(W-M-tw(pg,10.5,true),fy+7,pg,10.5,true,'#5f5e5a');
   }
   REAL = true;
