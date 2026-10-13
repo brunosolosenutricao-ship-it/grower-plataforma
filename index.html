@@ -198,6 +198,7 @@
   .vns-card-oculto > *:not(h3){display:none !important;}
   input.dt-br{min-width:118px;padding-right:26px !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");background-repeat:no-repeat;background-position:right 6px center;background-size:15px;}
   input.dt-br.dt-invalida{outline:2px solid var(--red);}
+.dt-exec-vazia{outline:2px solid #e0a200 !important;outline-offset:-2px;background:#fff8e1 !important;}
   .alim-fbtn{border:none;background:transparent;color:inherit;opacity:.55;cursor:pointer;font-size:10px;line-height:1;padding:2px 4px;margin-left:3px;border-radius:4px;vertical-align:middle;}
   .alim-fbtn:hover{opacity:1;background:rgba(0,0,0,.10);}
   .alim-fbtn.ativo{opacity:1;background:#111;color:#fff;}
@@ -219,6 +220,12 @@
   .reg-freeze-r1 > span{display:block;font-size:10px;white-space:normal;}
   .ts-topo{overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:2px;}
   .ts-inner{height:1px;}
+/* barras de rolagem sempre visíveis (no Mac o sistema esconde as finas até você rolar): a de cima e a de baixo das tabelas que têm barra em cima */
+.ts-topo::-webkit-scrollbar, .table-scroll[data-topscroll]::-webkit-scrollbar, .vg-table-wrap::-webkit-scrollbar{height:12px;width:12px;}
+.ts-topo::-webkit-scrollbar-track, .table-scroll[data-topscroll]::-webkit-scrollbar-track, .vg-table-wrap::-webkit-scrollbar-track{background:#eceae2;border-radius:6px;}
+.ts-topo::-webkit-scrollbar-thumb, .table-scroll[data-topscroll]::-webkit-scrollbar-thumb, .vg-table-wrap::-webkit-scrollbar-thumb{background:#9a998f;border-radius:6px;border:2px solid #eceae2;}
+.ts-topo::-webkit-scrollbar-thumb:hover, .table-scroll[data-topscroll]::-webkit-scrollbar-thumb:hover, .vg-table-wrap::-webkit-scrollbar-thumb:hover{background:#6f6e66;}
+@supports (-moz-appearance:none){ .ts-topo, .table-scroll[data-topscroll], .vg-table-wrap{scrollbar-width:auto;scrollbar-color:#9a998f #eceae2;} }
   .cf-btn{border:1px solid var(--line);background:#fff;border-radius:5px;font-size:9px;line-height:1;padding:2px 4px;margin-left:4px;cursor:pointer;color:var(--ink-soft);vertical-align:middle;font-family:inherit;text-transform:none;letter-spacing:0;}
   .cf-btn:hover{background:var(--bg);}
   .cf-btn.active{background:#111;color:#fff;border-color:#111;font-weight:700;}
@@ -2939,6 +2946,9 @@ sb.auth.getSession().then(({data:{session}})=>{
 });
 </script>
 <script>
+// Texto do status "Não se aplica": fica aqui, no bloco global, porque as rotinas de cor e de data (logo abaixo) também o usam.
+// (Dentro do bloco principal elas não enxergavam esta constante: dava ReferenceError e parava as cores e a barra de cima.)
+const STATUS_NAO_SE_APLICA = 'Não se aplica';
 /* ===== FILTRO POR COLUNA GENÉRICO — qualquer <table data-colfilter="chave"> ganha um ▾ em cada cabeçalho ===== */
 const COLFILTROS = {}; // chaveTabela -> { rotuloColuna: Set(valores marcados) }
 let cfPop = null;
@@ -3131,15 +3141,31 @@ function estiloStatusPorData(status, dataStr, usaData){
   return { bg:'rgb('+rgb.join(',')+')', fg: t>=0.55 ? '#fff' : '#4a1a1a' };
 }
 function corStatusPorData(status, dataStr, faixa){ return estiloStatusPorData(status, dataStr, faixa!==null).bg; }
-function recolorirStatusData(el){
+// a data desta linha é a "data de execução"? (o status da mesma avaliação está em Executado/Feito)
+function dataEhExecucao(el){
+  const tr = el.closest ? el.closest('tr') : null; if(!tr || el.dataset.corData===undefined) return false;
+  const sel = tr.querySelector('[data-cor-status="'+el.dataset.corData+'"]');
+  return !!sel && (sel.value==='Executado' || sel.value==='Feito');
+}
+function recolorirStatusData(el, mudouStatus){
   const tr = el.closest('tr'); if(!tr) return;
   const uid = el.dataset.corStatus !== undefined ? el.dataset.corStatus : el.dataset.corData;
   const sel = tr.querySelector('[data-cor-status="'+uid+'"]');
   if(!sel) return;
   const dt = tr.querySelector('[data-cor-data="'+uid+'"]');
+  const exec = (sel.value==='Executado' || sel.value==='Feito');
   if(dt){   // "Não se aplica": a data some e o campo trava; ao voltar pra outro status, reaparece a previsão (plantio + DAP)
     if(sel.value===STATUS_NAO_SE_APLICA){ dt.value = ''; dt.disabled = true; }
-    else if(dt.disabled){ dt.disabled = false; if(!dt.value) dt.value = dt.dataset.prevista || ''; }
+    else {
+      if(dt.disabled){ dt.disabled = false; if(!dt.value) dt.value = exec ? '' : (dt.dataset.prevista || ''); }
+      if(mudouStatus){
+        if(exec){ if(dt.value && dt.value===dt.dataset.prevista) dt.value = ''; }   // Executado: a previsão automática não vale como data de execução; fica vazio e destacado (não inventa data)
+        else dt.value = dt.dataset.prevista || '';                                     // voltou pra Pendente: a data de execução é limpa e volta a previsão automática
+      }
+    }
+    const falta = exec && !dt.disabled && !dt.value;   // Executado sem a data real
+    dt.classList.toggle('dt-exec-vazia', falta);
+    dt.title = falta ? 'Executado sem data: informe a data real da execução' : '';
   }
   const e = estiloStatusPorData(sel.value, dt ? dt.value : '', sel.dataset.corFaixa!==undefined);
   sel.style.background = e.bg; sel.style.color = e.fg; sel.style.fontWeight = '700';
@@ -3239,7 +3265,7 @@ function corVarrer(){
 }
 document.addEventListener('change', e=>{
   const t = e.target;
-  if(t && t.dataset && (t.dataset.corStatus!==undefined || t.dataset.corData!==undefined)) recolorirStatusData(t);
+  if(t && t.dataset && (t.dataset.corStatus!==undefined || t.dataset.corData!==undefined)) recolorirStatusData(t, t.dataset.corStatus!==undefined);
 });
 (function(){
   let raf = null;
@@ -3337,7 +3363,6 @@ const MESES_OPTIONS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Ju
 const EXECUCAO_OPTIONS = ['Pendente','Feito'];
 // "Não se aplica": o talhão não faz essa avaliação. Vale no status das tabelas de acompanhamento (Estruturação, Máximas/Ladrões e Vida no Solo)
 // e é lido pelo mapa da Visão Geral, pelo Cronograma, pelos modais e pelo PDF.
-const STATUS_NAO_SE_APLICA = 'Não se aplica';
 const EXECUCAO_OPTIONS_ESTR = [...EXECUCAO_OPTIONS, STATUS_NAO_SE_APLICA];   // só a Estruturação (o Condicionador, bloqueado, continua com a lista antiga)
 const ESTR_ETAPAS = [
   { key:'altura_v4', label:'Altura V4', bloco:'V4' },
@@ -3456,10 +3481,11 @@ const VNS_ETAPA_PRAZO = {
 };
 // Só vale guardar uma data que a pessoa realmente escolheu. Igual à previsão (plantio + DAP) ou apagada = guarda vazio: a tabela continua
 // mostrando a previsão e acompanha qualquer correção da data de plantio. Campos que não são de data (status) passam direto.
-function vnsNormalizarData(rec, campo, valor){
+function vnsNormalizarData(rec, campo, valor, exec){
   const m = /^(.*)_data$/.exec(campo || '');
   if(!m) return valor;
   if(!valor) return null;
+  if(exec) return valor;   // Executado: é a data da execução e vale mesmo igual à prevista
   const prazo = VNS_ETAPA_PRAZO[m[1]];
   if(!prazo || !rec || !rec.data_plantio) return valor;
   return valor===vnsDataPrevista(rec.data_plantio, prazo.dap) ? null : valor;
@@ -8133,7 +8159,7 @@ function renderEstruturacao(){
   <div class="estr-card full-card" style="margin-top:12px;animation-delay:.34s;">
     <h3>🗓️ Acompanhamento</h3>
     <p class="sub-sm">Talhões com Área do projeto (Estruturação) &gt; 0 · ${acompRowsEstr.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
-    <div class="table-scroll" data-topscroll="1">
+    <div class="table-scroll" data-topscroll="sempre">
       <table data-colfilter="estr-acomp">
         <thead><tr>
           <th colspan="3" class="lm-freeze-span"></th><th colspan="5"></th>
@@ -8182,7 +8208,7 @@ function renderEstruturacao(){
               <td><input type="text" inputmode="numeric" class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="ciclo" value="${entry.ciclo!=null?entry.ciclo:''}" placeholder="—" style="width:50px;"></td>
               <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="tipo_material"><option value="" ${!entry.tipo_material?'selected':''}>—</option>${ESTR_TIPO_MATERIAL_OPTIONS.map(o=>`<option value="${o}" ${entry.tipo_material===o?'selected':''}>${o}</option>`).join('')}</select></td>
               ${ESTR_ETAPAS.map(e=>`
-                <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" data-prevista="${dataPrevistaEstrStr(e.bloco)}" value="${entry[e.key+'_mes']||dataPrevistaEstrStr(e.bloco)}"></td>
+                <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" data-prevista="${dataPrevistaEstrStr(e.bloco)}" value="${entry[e.key+'_mes']||(entry[e.key+'_exec']==='Feito'?'':dataPrevistaEstrStr(e.bloco))}"></td>
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${e.key}" data-cor-faixa="${(ESTR_BLOCO_DAP[e.bloco]||{}).faixa||0}">${EXECUCAO_OPTIONS_ESTR.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
               `).join('')}
               <td class="lm-freeze-right" style="white-space:nowrap;">
@@ -8229,13 +8255,14 @@ function renderEstruturacao(){
       const key = decodeURIComponent(el.dataset.estrKey);
       const campo = el.dataset.estrCampo;
       const recLinha = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
-      const valor = estrNormalizarData(recLinha, campo, el.value || null);
+      const valor = estrNormalizarData(recLinha, campo, el.value || null, dataEhExecucao(el));
       if(!state.estrAcomp[key]){
         state.estrAcomp[key] = {};
         ESTR_ETAPAS.forEach(e=>{ state.estrAcomp[key][e.key+'_mes'] = null; state.estrAcomp[key][e.key+'_exec'] = 'Pendente'; });
       }
+      const eraExecEs = /_exec$/.test(campo) && getEstrAcompEntry(key)[campo]==='Feito' && valor!=='Feito';   // voltou de Feito: a data de execução é limpa
       state.estrAcomp[key][campo] = valor;
-      if(/_exec$/.test(campo) && valor===STATUS_NAO_SE_APLICA) state.estrAcomp[key][campo.replace(/_exec$/,'_mes')] = null;
+      if(/_exec$/.test(campo) && (valor===STATUS_NAO_SE_APLICA || eraExecEs)) state.estrAcomp[key][campo.replace(/_exec$/,'_mes')] = null;
       if(campo==='status_plantio'){
         el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff';
       }
@@ -8249,7 +8276,7 @@ function renderEstruturacao(){
       const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
       const entry = getEstrAcompEntry(key);
       container.querySelectorAll(`.estr-acomp-input[data-estr-key="${btn.dataset.estrKey}"]`).forEach(el=>{
-        entry[el.dataset.estrCampo] = estrNormalizarData(rec, el.dataset.estrCampo, el.value || null);
+        entry[el.dataset.estrCampo] = estrNormalizarData(rec, el.dataset.estrCampo, el.value || null, dataEhExecucao(el));
       });
       if(!state.estrAcomp[key]) state.estrAcomp[key] = {};
       Object.assign(state.estrAcomp[key], entry);
@@ -9352,15 +9379,18 @@ const CG_PLANO_MAX_POR_PROJETO_DIA = 3;      // até 3 pills de CADA projeto por
 // Cada pill só pode ir pra um dia dentro da tolerância do estádio dele (faixa) em torno da data prevista. Prioridade na escolha do dia:
 // 1) mesma fazenda no dia; 2) dia que já tem viagem (gasta menos dias); 3) dia vazio que ainda serve pra mais outros do mesmo estado; 4) o mais perto da data prevista.
 // Começa pelos pills com menos dias possíveis; se um pill não achar lugar, tenta tirar do caminho (uma troca) quem está bloqueando; no fim, tenta esvaziar dias.
+// cfg.fixos = { id: dia }: pills que já têm dia e NÃO se mexem (só ocupam lugar: contam pro estado e pro limite do dia).
 function cgDistribuirPlano(grupos, dias, cfg){
   cfg = Object.assign({ umEstado:CG_PLANO_UM_ESTADO_POR_DIA, maxPorProjeto:CG_PLANO_MAX_POR_PROJETO_DIA }, cfg || {});
   const num = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
   const D = dias.map(d=>({ d, n:num(d), pills:[], estado:null, porProj:{} }));
-  const P = grupos.map(g=>({ id:g.id, projeto:g.projeto, fazenda:g.fazenda||'', estado:(String(g.estado||'').toUpperCase()||'—'), n:num(g.dataStr), faixa:Number.isFinite(g.faixa)?g.faixa:4, dia:null }));
-  P.forEach(p=>{ p.cand = D.filter(x=> Math.abs(x.n-p.n) <= p.faixa); });
+  const P = grupos.map(g=>({ id:g.id, projeto:g.projeto, fazenda:g.fazenda||'', estado:(String(g.estado||'').toUpperCase()||'—'), n:num(g.dataStr), faixa:Number.isFinite(g.faixa)?g.faixa:4, dia:null, fixo:false }));
+  // cfg.apartirDe (aaaa-mm-dd): a distribuição nunca usa dia anterior a ele (dia que já passou); quem já está lá (fixo) continua.
+  P.forEach(p=>{ p.candTodos = D.filter(x=> Math.abs(x.n-p.n) <= p.faixa); p.cand = p.candTodos.filter(x=> !cfg.apartirDe || x.d >= cfg.apartirDe); });
   const cabe = (x,p)=> (!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) < cfg.maxPorProjeto;
   const por = (x,p)=>{ x.pills.push(p); x.porProj[p.projeto] = (x.porProj[p.projeto]||0)+1; if(x.estado===null) x.estado = p.estado; p.dia = x; };
   const tira = p=>{ const x = p.dia; x.pills = x.pills.filter(q=>q!==p); x.porProj[p.projeto]--; if(!x.pills.length){ x.estado = null; x.porProj = {}; } p.dia = null; };
+  P.forEach(p=>{ const d = cfg.fixos && cfg.fixos[p.id]; const x = d && D.find(y=>y.d===d); if(x){ p.fixo = true; por(x,p); } });   // quem já tem dia fica onde está
   const nota = (x,p)=>{
     const mesmaFaz = x.pills.some(q=>q.fazenda===p.fazenda && q.estado===p.estado) ? 1 : 0, usado = x.pills.length ? 1 : 0;
     const cob = usado ? 0 : P.filter(q=>q!==p && !q.dia && q.estado===p.estado && q.cand.includes(x)).length;   // dia vazio: quantos outros pills do mesmo estado ainda cabem nele
@@ -9375,24 +9405,24 @@ function cgDistribuirPlano(grupos, dias, cfg){
   const liberar = p=>{
     for(const x of p.cand.slice().sort((a,b)=> Math.abs(a.n-p.n)-Math.abs(b.n-p.n) || a.n-b.n)){
       const trocas = [], desfaz = ()=>{ trocas.reverse().forEach(([b,de])=>{ tira(b); por(de,b); }); };
-      const mover = b=>{ const alts = b.cand.filter(y=>y!==x && cabe(y,b)); if(!alts.length) return false; const y = melhor(b,alts).x; trocas.push([b,x]); tira(b); por(y,b); return true; };
+      const mover = b=>{ if(b.fixo) return false; const alts = b.cand.filter(y=>y!==x && cabe(y,b)); if(!alts.length) return false; const y = melhor(b,alts).x; trocas.push([b,x]); tira(b); por(y,b); return true; };
       if(cfg.umEstado && x.estado!==null && x.estado!==p.estado){
         if(x.pills.slice().every(mover) && cabe(x,p)){ por(x,p); return true; }
         desfaz();
       } else if((x.porProj[p.projeto]||0) >= cfg.maxPorProjeto){
-        for(const b of x.pills.filter(q=>q.projeto===p.projeto)){ if(mover(b) && cabe(x,p)){ por(x,p); return true; } desfaz(); }
+        for(const b of x.pills.filter(q=>q.projeto===p.projeto && !q.fixo)){ if(mover(b) && cabe(x,p)){ por(x,p); return true; } desfaz(); }
       }
     }
     return false;
   };
-  P.filter(q=>q.cand.length).sort((a,b)=> a.cand.length-b.cand.length || a.estado.localeCompare(b.estado) || a.fazenda.localeCompare(b.fazenda,'pt-BR') || a.n-b.n || a.id-b.id).forEach(p=>{
+  P.filter(q=>!q.fixo && q.cand.length).sort((a,b)=> a.cand.length-b.cand.length || a.estado.localeCompare(b.estado) || a.fazenda.localeCompare(b.fazenda,'pt-BR') || a.n-b.n || a.id-b.id).forEach(p=>{
     const viaveis = p.cand.filter(x=>cabe(x,p));
     if(viaveis.length) por(melhor(p,viaveis).x, p); else liberar(p);
   });
   // compactar: tenta esvaziar os dias com menos pills, levando tudo pra dias que já têm viagem (menos dias de viagem)
   for(let volta=0, mudou=true; mudou && volta<60; volta++){
     mudou = false;
-    for(const x of D.filter(y=>y.pills.length).sort((a,b)=> a.pills.length-b.pills.length || a.n-b.n)){
+    for(const x of D.filter(y=>y.pills.length && !y.pills.some(q=>q.fixo)).sort((a,b)=> a.pills.length-b.pills.length || a.n-b.n)){   // dia com pill fixo não dá pra esvaziar
       const feitos = []; let tudo = true;
       for(const b of x.pills.slice()){
         const alts = b.cand.filter(y=>y!==x && y.pills.length>0 && cabe(y,b)); if(!alts.length){ tudo = false; break; }
@@ -9403,7 +9433,7 @@ function cgDistribuirPlano(grupos, dias, cfg){
     }
   }
   const motivo = p=>{
-    if(!p.cand.length) return 'nenhum dia útil das semanas marcadas dentro da tolerância (±'+p.faixa+' dias)';
+    if(!p.cand.length) return p.candTodos.length ? 'só há dias que já passaram dentro da tolerância (±'+p.faixa+' dias)' : 'nenhum dia útil das semanas marcadas dentro da tolerância (±'+p.faixa+' dias)';
     const porEstado = p.cand.filter(x=> cfg.umEstado && x.estado!==null && x.estado!==p.estado).length;
     const porLimite = p.cand.filter(x=> (!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) >= cfg.maxPorProjeto).length;
     if(porEstado && porLimite) return 'os dias possíveis já estão com outro estado ou no limite de '+cfg.maxPorProjeto+' do projeto';
@@ -9428,7 +9458,7 @@ function cgColetarPontos(projetos, ini, fim){
     const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pos_colheita : vn.etapa21_coleta_solo) : lm['R1/R2'];
     return (f && f.faixa) || 4;
   };
-  const add = (r, proj, dap, avaliacao, estagio, dataSalva)=>{
+  const add = (r, proj, dap, avaliacao, estagio, dataSalva, exec)=>{
     const d = (dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva)) ? new Date(dataSalva+'T00:00:00') : new Date(r.data_plantio+'T00:00:00');
     if(!(dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva))) d.setDate(d.getDate()+dap);
     if(d<ini || d>fim) return;
@@ -9436,23 +9466,24 @@ function cgColetarPontos(projetos, ini, fim){
       dataStr:d.toISOString().slice(0,10), mesStr:d.toISOString().slice(0,7), projeto:proj,
       estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', cliente:r.cliente||'', fazenda:r.fazenda||'', talhao:r.talhao||'',
       avaliacao, estagio, statusPlantio: statusDe(r, proj), faixa: faixaDe(proj, estagio),
+      exec: !!exec, execSemData: !!exec && !(dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva)),   // executada: o evento fica na data da execução; sem data escolhida, fica na prevista
     });
   };
   RECORDS.forEach(r=>{
     if(!r.data_plantio) return;
     // Máximas e Ladrões: a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
     const entLm = (r.max_selecao==='Ladrões' || r.max_selecao==='Máximas') ? getLmAcompEntry(cronogramaKey(r)) : null;
-    if(r.max_selecao==='Ladrões' && projetos.includes('ladroes')) LM_OCORRENCIAS_LADROES.filter(oc=> entLm[oc.campoKey]!==STATUS_NAO_SE_APLICA).forEach(oc=> add(r,'ladroes',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data']));
-    if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.filter(oc=> entLm[oc.campoKey]!==STATUS_NAO_SE_APLICA).forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data']));
+    if(r.max_selecao==='Ladrões' && projetos.includes('ladroes')) LM_OCORRENCIAS_LADROES.filter(oc=> entLm[oc.campoKey]!==STATUS_NAO_SE_APLICA).forEach(oc=> add(r,'ladroes',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data'], entLm[oc.campoKey]==='Executado'));
+    if(r.max_selecao==='Máximas' && projetos.includes('maximas')) LM_OCORRENCIAS_MAXIMAS.filter(oc=> entLm[oc.campoKey]!==STATUS_NAO_SE_APLICA).forEach(oc=> add(r,'maximas',oc.dap,oc.avaliacaoLabel,oc.estagio, entLm[oc.campoKey+'_data'], entLm[oc.campoKey]==='Executado'));
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
       // a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
-      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data']));
-      if(r.vns_etapa4_pos_colheita!==STATUS_NAO_SE_APLICA) add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita', r['vns_etapa4_pos_colheita_data']);
+      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
+      if(r.vns_etapa4_pos_colheita!==STATUS_NAO_SE_APLICA) add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita', r['vns_etapa4_pos_colheita_data'], r['vns_etapa4_pos_colheita']==='Executado');
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
       const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
-      ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info && entEstr[e.key+'_exec']!==STATUS_NAO_SE_APLICA) add(r,'estr',info.dap,e.label,e.bloco, entEstr[e.key+'_mes']); });
+      ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info && entEstr[e.key+'_exec']!==STATUS_NAO_SE_APLICA) add(r,'estr',info.dap,e.label,e.bloco, entEstr[e.key+'_mes'], entEstr[e.key+'_exec']==='Feito'); });
     }
     if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',45,'Coleta foliar prevista (Etapa 3)','45 DAP');
     if(projetos.includes('cf') && r.cultura==='Soja'){
@@ -9503,6 +9534,440 @@ function cgAbrirPop(btn, chave, titulo, getOpcoes, sel, aoMudar){
 }
 
 const CG_NOMES_MES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+// ================= Planejamentos salvos (Planejar → Salvar → cards na Visão Geral) =================
+const cgIsoLocal = d=> d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const cgDataBr = s=> new Date(s+'T00:00:00').toLocaleDateString('pt-BR');
+const cgNumDia = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
+const cgEscH = s=> String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const cgTintaClara = hex=>{ const n = parseInt(hex.slice(1),16); return 'rgb('+[n>>16&255, n>>8&255, n&255].map(x=> Math.round(x+(255-x)*0.86)).join(',')+')'; };
+const cgTomMisto = (hex, f)=>{ const n = parseInt(hex.slice(1),16); return 'rgb('+[n>>16&255, n>>8&255, n&255].map(x=> Math.round(x+(255-x)*f)).join(',')+')'; };
+const cgHojeISO = ()=> (typeof window!=='undefined' && window.__hojeISO) || cgIsoLocal(new Date());   // (window.__hojeISO só existe nos testes)
+const cgEmEst = g=> g.statusPlantio==='Estimativa' && !g.exec;   // executado vale mais que estimativa
+const cgEstiloPill = (g, p)=> g.exec ? `--c:${cgTomMisto(p.cor,0.5)};--t:${cgTintaClara(p.cor)};` : cgEmEst(g) ? `--c:${p.cor};--t:${cgTintaClara(p.cor)};` : `background:${p.cor};color:${p.txt};`;
+function cgSeteDias(dom){ const d0 = new Date(dom+'T00:00:00'); return Array.from({length:7},(_,i)=>{ const x = new Date(d0); x.setDate(x.getDate()+i); return cgIsoLocal(x); }); }
+
+// Números do card: talhão em mais de um projeto conta uma vez; produtor = cliente
+function cgPlanoResumo(itens, semanas){
+  const dias = [...new Set(itens.map(i=>i.dia))].sort();
+  return {
+    talhoes: new Set(itens.map(i=>[i.cliente,i.fazenda,i.talhao].join('|'))).size,
+    produtores: new Set(itens.map(i=>i.cliente)).size,
+    dias: dias.length, ini: dias[0] || null, fim: dias[dias.length-1] || null,
+    projetos: ['maximas','ladroes','estr','vns','oxc','cf'].filter(k=> CG_PROJ[k] && itens.some(i=>i.projeto===k)),   // mesma ordem do PDF
+    semanas: (semanas || []).length,
+  };
+}
+// Compara o planejamento salvo com os dados de hoje. Um planejamento é uma FOTO: talhões novos não entram sozinhos.
+// - o dia escolhido continua valendo se ainda está dentro da tolerância do estádio (só o desvio muda)
+// - se a data prevista andou e o dia ficou fora da tolerância, o talhão vai pra lista, com o motivo
+// - se não há mais avaliação pendente (feita, não se aplica, saiu do projeto), o talhão sai do planejamento
+function cgReconciliarPlano(plano, pontos, existeTalhao){
+  const itens = plano.itens || [], vivos = new Map();
+  pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
+  const comoSalvo = { grupos:[], colocado:{}, executados:[] }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[] };
+  let mudaram = 0;
+  itens.forEach(it=>{
+    const tudo = (vivos.get([it.projeto,it.cliente,it.fazenda,it.talhao].join('|')) || []).filter(p=> it.avaliacoes.some(a=> a.avaliacao===p.avaliacao && a.estagio===p.estagio));
+    const rot = (CG_PROJ[it.projeto] ? CG_PROJ[it.projeto].s : it.projeto)+' · '+it.fazenda+' '+it.talhao;
+    if(tudo.length && tudo.every(p=>p.exec)){   // todas as avaliações dele foram executadas: fica travado no dia da execução e não conta como mudança nem como saída
+      const ex = { projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:tudo[0].estado, consultor:tudo[0].consultor, dataStr:tudo.map(p=>p.dataStr).sort()[0], faixa:it.faixa, statusPlantio:'', exec:true, execSemData:tudo.every(p=>p.execSemData), planejadoPara:it.dia, itemOriginal:it, avaliacoes:tudo.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio, exec:true, semData:p.execSemData })) };
+      comoSalvo.executados.push({ ...ex, id:'x'+comoSalvo.executados.length }); revisado.executados.push({ ...ex, id:'x'+revisado.executados.length });
+      return;
+    }
+    // "como salvo": a foto do que foi planejado (inclusive o que depois saiu); só os executados vão pra parte travada
+    const idS = comoSalvo.grupos.length;
+    comoSalvo.grupos.push({ id:idS, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:it.estado, consultor:it.consultor, dataStr:it.dataPrev, faixa:it.faixa, statusPlantio:it.statusPlantio, avaliacoes:it.avaliacoes });
+    comoSalvo.colocado[idS] = it.dia;
+    if(!tudo.length){
+      revisado.saiu.push({ rot, motivo: existeTalhao(it) ? 'não há mais avaliação pendente: não se aplica ou saiu do projeto' : 'o talhão não está mais no cadastro' });
+      return;
+    }
+    const pend = tudo.filter(p=>!p.exec);
+    const novaData = pend.map(p=>p.dataStr).sort()[0], faixa = Math.min(...pend.map(p=> p.faixa ?? 4)), id = revisado.grupos.length;
+    revisado.grupos.push({ id, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:pend[0].estado, consultor:pend[0].consultor, dataStr:novaData, faixa, statusPlantio:pend[0].statusPlantio, avaliacoes:pend.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio })) });
+    if(Math.abs(cgNumDia(it.dia)-cgNumDia(novaData)) <= faixa) revisado.colocado[id] = it.dia;
+    else { mudaram++; revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }
+  });
+  return { comoSalvo, revisado, mudaram, saiu:revisado.saiu.length };
+}
+function cgTextoRevisao(mudaram, saiu){
+  const p = [];
+  if(mudaram) p.push(mudaram+(mudaram===1?' talhão foi pra lista':' talhões foram pra lista')+' (a data prevista mudou e o dia escolhido ficou fora da tolerância)');
+  if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
+  return p.length ? 'Revisão aplicada: '+p.join('. ')+'. Nada foi gravado ainda: use Atualizar planejamento pra salvar.' : '';
+}
+function cgPontosVivos(){ return cgColetarPontos(CG_CONTEXTOS.geral.projetos, new Date(2026,8,1), new Date(2027,4,0)); }
+const cgExisteTalhao = it=> RECORDS.some(r=> r.cliente===it.cliente && r.fazenda===it.fazenda && r.talhao===it.talhao);
+
+// ---------- Supabase (tabela planejamentos) ----------
+function cgPlanosEstado(){ return state.planos || (state.planos = { carregado:false, carregando:false, lista:[], erro:null }); }
+async function cgPlanosCarregar(forcar){
+  const st = cgPlanosEstado(); if(st.carregando || (st.carregado && !forcar)) return;
+  st.carregando = true;
+  try{
+    const { data, error } = await sb.from('planejamentos').select('*').order('criado_em',{ascending:false}).order('atualizado_em',{ascending:false});
+    st.lista = error ? [] : (data || []); st.erro = error ? (error.message || String(error)) : null;
+  }catch(e){ st.lista = []; st.erro = e.message || String(e); }
+  st.carregado = true; st.carregando = false;
+}
+async function cgPlanosSalvar(reg){
+  const st = cgPlanosEstado(), agora = new Date().toISOString();
+  let q;
+  if(reg.id){   // atualizar: só manda o que veio
+    const dados = { atualizado_em:agora };
+    ['regiao','responsavel','subtitulo','semanas','itens'].forEach(k=>{ if(reg[k]!==undefined) dados[k] = reg[k]; });
+    q = sb.from('planejamentos').update(dados).eq('id',reg.id).select().single();
+  } else {
+    q = sb.from('planejamentos').insert({ regiao:reg.regiao, responsavel:reg.responsavel, subtitulo:reg.subtitulo, criado_em:reg.criado_em, semanas:reg.semanas, itens:reg.itens, atualizado_em:agora }).select().single();
+  }
+  const { data, error } = await q; if(error) throw error;
+  const i = st.lista.findIndex(p=>p.id===data.id); if(i>=0) st.lista[i] = data; else st.lista.unshift(data);
+  st.carregado = true; st.erro = null;
+  cgRenderPlanosSalvos();
+  return data;
+}
+async function cgPlanosExcluir(id){
+  const { error } = await sb.from('planejamentos').delete().eq('id',id); if(error) throw error;
+  const st = cgPlanosEstado(); st.lista = st.lista.filter(p=>p.id!==id); cgRenderPlanosSalvos();
+}
+
+// ---------- caixinha de Salvar / Editar ----------
+function cgDialogoPlano(cfg){
+  const antigo = document.getElementById('cpDlg'); if(antigo) antigo.remove();
+  const v = cfg.valores || {}, r = cfg.resumo;
+  const chips = r ? r.projetos.map(k=>`<span class="cpd-chip" style="background:${CG_PROJ[k].cor};color:${CG_PROJ[k].txt}">${cgEscH(CG_PROJ[k].label)}</span>`).join('') : '';
+  const resumoHtml = r ? `<div class="cpd-res"><div class="cpd-resl">Calculado do planejamento</div>
+      <div class="cpd-nums"><span><b>${r.talhoes}</b> ${r.talhoes===1?'talhão':'talhões'}</span><span><b>${r.produtores}</b> ${r.produtores===1?'produtor':'produtores'}</span><span><b>${r.dias}</b> ${r.dias===1?'dia':'dias'} de viagem</span></div>
+      <div class="cpd-chips">${chips}</div>
+      ${r.semDia ? `<div class="cpd-semdia">${r.semDia} ${r.semDia===1?'talhão ficou sem dia e não entra':'talhões ficaram sem dia e não entram'} neste planejamento.</div>` : ''}</div>` : '';
+  const dlg = document.createElement('div'); dlg.id = 'cpDlg'; dlg.className = 'cpd-overlay';
+  dlg.innerHTML = `<style>
+    .cpd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:7100;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
+    .cpd-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,470px);padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+    .cpd-tit{font-size:16px;font-weight:700;margin-bottom:14px;}
+    .cpd-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .cpd-grid label{font-size:12px;color:var(--ink-soft);display:block;}
+    .cpd-grid input{width:100%;margin-top:4px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13.5px;}
+    .cpd-grid input:disabled{background:var(--bg);color:var(--ink-soft);}
+    .cpd-full{grid-column:1/-1;}
+    .cpd-res{background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:14px;}
+    .cpd-resl{font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
+    .cpd-nums{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:8px;}
+    .cpd-chips{display:flex;gap:6px;flex-wrap:wrap;}
+    .cpd-chip{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;}
+    .cpd-semdia{margin-top:8px;font-size:12.5px;color:#a04b00;background:#fff3e0;border-radius:6px;padding:6px 8px;}
+    .cpd-erro{font-size:12.5px;color:#c62828;margin-top:10px;min-height:16px;}
+    .cpd-acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+  </style>
+  <div class="cpd-box" role="dialog" aria-modal="true" aria-label="${cgEscH(cfg.titulo)}">
+    <div class="cpd-tit">${cgEscH(cfg.titulo)}</div>
+    <div class="cpd-grid">
+      <label>Região<input type="text" id="cpdRegiao" value="${cgEscH(v.regiao||'')}" placeholder="Sudoeste de MS"></label>
+      <label>Responsável<input type="text" id="cpdResp" value="${cgEscH(v.responsavel||'')}" placeholder="Igor"></label>
+      <label class="cpd-full">Subtítulo<input type="text" id="cpdSub" value="${cgEscH(v.subtitulo||'')}" placeholder="Coletas R1/R2 + Máximas V4"></label>
+      <label>Data de criação<input type="text" id="cpdData" value="${cgDataBr(v.criado_em)}" data-iso="${cgEscH(v.criado_em)}" disabled></label>
+    </div>
+    ${resumoHtml}
+    <div class="cpd-erro" id="cpdErro" role="alert"></div>
+    <div class="cpd-acoes"><button type="button" class="btn ghost" id="cpdCancelar">Cancelar</button><button type="button" class="btn btn-preto" id="cpdOk">${cgEscH(cfg.textoOk)}</button></div>
+  </div>`;
+  document.body.appendChild(dlg);
+  const erro = dlg.querySelector('#cpdErro'), ok = dlg.querySelector('#cpdOk'), cancelar = dlg.querySelector('#cpdCancelar'), inRegiao = dlg.querySelector('#cpdRegiao');
+  inRegiao.addEventListener('input', ()=>{ erro.textContent = ''; });
+  cancelar.addEventListener('click', ()=> dlg.remove());
+  dlg.addEventListener('mousedown', e=>{ if(e.target===dlg) dlg.remove(); });
+  ok.addEventListener('click', async ()=>{
+    const vals = { regiao:inRegiao.value.trim(), responsavel:dlg.querySelector('#cpdResp').value.trim(), subtitulo:dlg.querySelector('#cpdSub').value.trim(), criado_em:dlg.querySelector('#cpdData').dataset.iso };
+    if(!vals.regiao){ erro.textContent = 'Informe a região.'; inRegiao.focus(); return; }
+    ok.disabled = true; cancelar.disabled = true; erro.textContent = '';
+    try{ await cfg.onOk(vals); dlg.remove(); }
+    catch(e){ erro.textContent = 'Não foi possível salvar: '+(e && e.message ? e.message : e)+'. Confira se a tabela planejamentos foi criada no Supabase.'; ok.disabled = false; cancelar.disabled = false; }
+  });
+  inRegiao.focus();
+}
+
+// ---------- quadro Planejar (independente: abre do Cronograma ou de um card salvo) ----------
+function cgFecharPlanejador(){ const d = document.getElementById('cpDlg'); if(d) d.remove(); const o = document.getElementById('cgPlanOverlay'); if(o) o.remove(); document.removeEventListener('keydown', cgEscPlanejador); }
+function cgEscPlanejador(e){ if(e.key!=='Escape') return; const d = document.getElementById('cpDlg'); if(d){ d.remove(); return; } cgFecharPlanejador(); }
+// cfg: { semanas:[domingos], grupos:[{id,projeto,cliente,fazenda,talhao,estado,dataStr,faixa,statusPlantio,avaliacoes}], colocado:{id:dia}, motivos:{id:texto},
+//        plano:null|registro salvo, revisao:null|{grupos,colocado,motivos,saiu,mudaram}, info:'texto' }
+function cgAbrirPlanejador(cfg){
+  cgFecharPlanejador();
+  const NOMES = ['dom','seg','ter','qua','qui','sex','sáb'], UTEIS = ['Seg','Ter','Qua','Qui','Sex'];
+  const intervalos = cfg.semanas.map(dom=>({ dom, dias:cgSeteDias(dom) }));
+  const diasUteis = intervalos.flatMap(it=> it.dias.slice(1,6));
+  let grupos = cfg.grupos, plano = cfg.plano || null, revisao = cfg.revisao || null, info = cfg.info || '';
+  const executados = cfg.executados || [], hojeISO = cgHojeISO();   // executados: ficam travados no dia da execução (não entram na lista, na distribuição nem nas regras)
+  const colocado = Object.assign({}, cfg.colocado || {});
+  let motivos = Object.assign({}, cfg.motivos || {}), snapshot = null, resumoTxt = '';   // nada é gravado até clicar em Salvar/Atualizar
+  const nDia = cgNumDia;
+  const itensAtuais = ()=> grupos.filter(g=> g.id in colocado).map(g=>({ dia:colocado[g.id], projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado||'', consultor:g.consultor||'', dataPrev:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:g.statusPlantio||'', avaliacoes:g.avaliacoes }))
+    .sort((a,b)=> a.dia.localeCompare(b.dia) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));
+  const ov = document.createElement('div'); ov.id = 'cgPlanOverlay'; ov.className = 'cp-overlay';
+  ov.innerHTML = `<style>
+      .cp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7000;display:flex;align-items:center;justify-content:center;padding:3vh 2vw;}
+      .cp-box{background:var(--paper,#fff);border-radius:14px;width:min(96vw,1500px);height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+      .cp-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);}
+      .cp-tit{font-size:17px;font-weight:700;}
+      .cp-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:680px;}
+      .cp-acoes{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;flex:none;max-width:760px;}
+      .cp-cont{font-size:12.5px;color:var(--ink-soft);margin-right:4px;white-space:nowrap;}
+      .cp-acoes button[hidden]{display:none;}
+      .cp-verde{background:#0f6e56;color:#fff;border-color:#0f6e56;}
+      .cp-av{margin:10px 20px 0;padding:8px 12px;border-radius:8px;font-size:12.5px;display:flex;gap:12px;align-items:center;justify-content:space-between;}
+      .cp-av.am{background:#fff3e0;color:#7a4300;}
+      .cp-av.inf{background:#e6f1fb;color:#0c447c;}
+      .cp-overlay .cg-pill{display:block;box-sizing:border-box;width:100%;margin-top:3px;padding:2px 6px;border:none;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;text-align:left;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .cp-overlay .cg-pill.est{font-weight:700;color:#c62828;border:1.5px solid var(--c);background:var(--t);padding-top:1px;padding-bottom:1px;}
+      .cp-overlay .cg-pill.ex{font-weight:500;color:#5f5e5a;border:1px solid var(--c);background:var(--t);padding:1px 5px 2px;cursor:not-allowed;}
+      .cp-overlay .cg-pill.ex .s{display:block;font-size:10.5px;font-weight:700;color:#0f6e56;line-height:1.25;}
+      .cp-corpo{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;padding:16px 20px;min-height:0;flex:1;}
+      .cp-pool{border:1.5px dashed var(--line);border-radius:12px;padding:10px;overflow-y:auto;background:var(--bg);min-height:0;}
+      .cp-pool.drop{border-color:#1d9e75;background:#eaf6f0;}
+      .cp-ptit{font-size:12px;font-weight:700;margin-bottom:8px;}
+      .cp-item{margin-bottom:8px;}
+      .cp-pill{cursor:grab;user-select:none;}
+      .cp-pill.arrastando{opacity:.4;}
+      .cp-leg{font-size:10.5px;color:var(--ink-soft);margin:2px 0 0 3px;}
+      .cp-vazio{font-size:12px;color:var(--ink-soft);padding:8px 2px;}
+      .cp-semanas{overflow:auto;min-width:0;min-height:0;}
+      .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;}
+      .cp-dias{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:20px;}
+      .cp-dia{border:1px solid var(--line);border-radius:10px;min-height:110px;padding:6px;background:#fff;min-width:0;}
+      .cp-dia.drop{border:2px dashed #1d9e75;background:#eaf6f0;padding:5px;}
+      .cp-dh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;}
+      .cp-dh b{color:#1a2019;}
+      .cp-aviso{color:#c62828;cursor:help;}
+      .cp-leg.cp-dev{color:#5f5e5a;}
+      .cp-leg.cp-dev.fora{color:#c62828;font-weight:700;}
+      .cp-mot{font-size:10.5px;color:#c62828;margin:2px 0 0 3px;line-height:1.3;}
+      .cp-resumo{font-size:12.5px;font-weight:700;color:#0f6e56;margin-top:5px;min-height:16px;}
+    </style>
+    <div class="cp-box" role="dialog" aria-modal="true" aria-label="Planejar semanas">
+      <div class="cp-topo">
+        <div><div class="cp-tit" id="cpTit"></div>
+        <div class="cp-sub" id="cpSub"></div>
+        <div class="cp-resumo" id="cpResumo"></div></div>
+        <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span>
+          <button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button>
+          <button type="button" class="btn ghost" id="cpDistLista" title="Distribui só os talhões que estão na lista e deixa os que já têm dia onde estão.">Distribuir só os da lista</button>
+          <button type="button" class="btn ghost" id="cpDesfazer" disabled>Desfazer distribuição</button>
+          <button type="button" class="btn ghost" id="cpLimpar">Limpar</button>
+          <button type="button" class="btn cp-verde" id="cpSalvar">Salvar planejamento</button>
+          <button type="button" class="btn cp-verde" id="cpAtualizar" hidden>Atualizar planejamento</button>
+          <button type="button" class="btn ghost" id="cpSalvarNovo" hidden>Salvar como novo</button>
+          <button type="button" class="btn ghost" id="cpFechar">Fechar</button></div>
+      </div>
+      <div id="cpAviso"></div>
+      <div class="cp-corpo"><div class="cp-pool" id="cpPool"></div><div class="cp-semanas" id="cpSemanas"></div></div>
+    </div>`;
+  document.body.appendChild(ov);
+  const $ = s=> ov.querySelector(s);
+  const pool = $('#cpPool'), semanasEl = $('#cpSemanas'), cont = $('#cpCont'), resumoEl = $('#cpResumo'), avisoEl = $('#cpAviso'), titEl = $('#cpTit'), subEl = $('#cpSub');
+  const btnDist = $('#cpDistribuir'), btnDistLista = $('#cpDistLista'), btnDesf = $('#cpDesfazer'), btnSalvar = $('#cpSalvar'), btnAtualizar = $('#cpAtualizar'), btnNovo = $('#cpSalvarNovo');
+  const pillHtml = (g, comLegenda)=>{
+    const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
+    const dt = new Date(g.dataStr+'T00:00:00');
+    const dia = colocado[g.id], dev = dia ? nDia(dia)-nDia(g.dataStr) : 0, fora = Math.abs(dev) > (g.faixa ?? 4);
+    const leg = comLegenda
+      ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${cgDataBr(g.dataStr).slice(0,5)}</div>` + (motivos[g.id] ? `<div class="cp-mot">${cgEscH(String(motivos[g.id]).startsWith('data prevista') ? motivos[g.id] : 'sem dia possível: '+motivos[g.id])}</div>` : '')
+      : (dia && dev!==0 ? `<div class="cp-leg cp-dev${fora?' fora':''}" title="tolerância deste estádio: ±${g.faixa ?? 4} dias">${dev>0?'+':'−'}${Math.abs(dev)}d · prev. ${cgDataBr(g.dataStr).slice(0,5)}${fora?' · fora da tolerância':''}</div>` : '');
+    const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+(cgEmEst(g)?' (plantio em estimativa)':'')+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
+    return `<div class="cp-item"><div class="cg-pill cp-pill${cgEmEst(g)?' est':''}" draggable="true" data-id="${g.id}" style="${cgEstiloPill(g,pj)}" title="${cgEscH(dica)}">${cgEscH(txt)}</div>${leg}</div>`;
+  };
+  const exHtml = g=>{
+    const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
+    const leg = g.planejadoPara && g.planejadoPara!==g.dataStr ? `<div class="cp-leg">planejado pra ${cgDataBr(g.planejadoPara).slice(0,5)}</div>` : '';
+    return `<div class="cp-item"><div class="cg-pill cp-lock ex" style="${cgEstiloPill(g,pj)}" title="${cgEscH(pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+'\nExecutado'+(g.execSemData?' (sem data: fica na prevista)':' em '+cgDataBr(g.dataStr))+'. Não dá pra mover.')}"><span class="s">✓ Executado${g.execSemData?' · sem data':''}</span>${cgEscH(txt)}</div>${leg}</div>`;
+  };
+  const avisoHtml = ()=>{
+    let h = '';
+    const disp = new Set(diasUteis), fora = executados.filter(g=> !disp.has(g.dataStr));
+    if(fora.length) h += `<div class="cp-av inf"><span>Executado fora dos dias deste quadro: ${fora.map(g=> cgEscH(CG_PROJ[g.projeto].s+' · '+g.fazenda+' '+g.talhao)+' ('+cgDataBr(g.dataStr).slice(0,5)+')').join('; ')}.</span></div>`;
+    if(revisao && (revisao.mudaram || revisao.saiu.length)){
+      const partes = []; if(revisao.mudaram) partes.push(revisao.mudaram+(revisao.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); if(revisao.saiu.length) partes.push(revisao.saiu.length+(revisao.saiu.length===1?' saiu':' saíram'));
+      h += `<div class="cp-av am"><span>Há mudanças desde que você salvou: ${partes.join(' · ')}.</span><button type="button" class="btn ghost" id="cpRever">Rever mudanças</button></div>`;
+    }
+    if(info) h += `<div class="cp-av inf"><span>${cgEscH(info)}</span></div>`;
+    return h;
+  };
+  const desenhar = ()=>{
+    const nSem = intervalos.length;
+    titEl.textContent = plano ? '📋 '+plano.regiao+' · '+nSem+(nSem===1?' semana':' semanas') : '📋 Planejar · '+nSem+(nSem===1?' semana':' semanas');
+    subEl.textContent = plano && plano.subtitulo ? plano.subtitulo : 'Arraste cada talhão pro dia que quiser (arrastar funciona no computador) ou use a Distribuição inteligente. Só fica salvo se você clicar em Salvar planejamento.';
+    const naLista = grupos.filter(g=> !(g.id in colocado));
+    pool.innerHTML = `<div class="cp-ptit">A planejar (${naLista.length})</div>` + (naLista.length ? naLista.map(g=>pillHtml(g,true)).join('') : `<div class="cp-vazio">${grupos.length ? 'Tudo planejado ✓' : 'Nenhum talhão com avaliação nessas semanas'}</div>`);
+    semanasEl.innerHTML = intervalos.map(it=>{
+      const uteis = it.dias.slice(1,6);
+      return `<div class="cp-sem"><div class="cp-semtit">Semana ${cgDataBr(uteis[0]).slice(0,5)} – ${cgDataBr(uteis[4]).slice(0,5)}</div><div class="cp-dias">` + uteis.map((ds,i)=>{
+        const l = grupos.filter(g=> colocado[g.id]===ds);
+        const ufs = [...new Set(l.map(g=> String(g.estado||'—').toUpperCase()))], avisos = [];
+        if(CG_PLANO_UM_ESTADO_POR_DIA && ufs.length>1) avisos.push('mais de um estado no mesmo dia ('+ufs.join(', ')+')');
+        Object.keys(CG_PROJ).forEach(k=>{ const n = l.filter(g=>g.projeto===k).length; if(n>CG_PLANO_MAX_POR_PROJETO_DIA) avisos.push(n+' de '+CG_PROJ[k].label+' (o limite é '+CG_PLANO_MAX_POR_PROJETO_DIA+')'); });
+        return `<div class="cp-dia" data-dia="${ds}"><div class="cp-dh"><span>${UTEIS[i]} ${cgDataBr(ds).slice(0,5)}${ufs.length?' · <b>'+ufs.join('+')+'</b>':''}</span><span>${avisos.length?`<span class="cp-aviso" title="${cgEscH(avisos.join('; '))}">⚠</span> `:''}${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}${executados.filter(g=> g.dataStr===ds).map(exHtml).join('')}</div>`;
+      }).join('') + '</div></div>';
+    }).join('');
+    const usados = new Set(Object.values(colocado)).size, nPlan = Object.keys(colocado).length;
+    cont.textContent = nPlan+' de '+grupos.length+' planejados'+(usados ? ' · '+usados+(usados===1?' dia':' dias')+' de viagem' : '');
+    resumoEl.textContent = resumoTxt; avisoEl.innerHTML = avisoHtml();
+    btnDesf.disabled = !snapshot; btnDist.disabled = !grupos.length; btnDistLista.disabled = !naLista.length;
+    btnSalvar.hidden = !!plano; btnAtualizar.hidden = !plano; btnNovo.hidden = !plano;
+    btnSalvar.disabled = btnAtualizar.disabled = btnNovo.disabled = !(nPlan + executados.filter(g=>g.itemOriginal).length);   // os executados de um planejamento salvo também contam: dá pra atualizar mesmo que só eles tenham sobrado
+  };
+  // arrastar e soltar (computador): da lista pro dia, de um dia pra outro, ou de volta pra lista
+  ov.addEventListener('dragstart', e=>{ const el = e.target.closest && e.target.closest('.cp-pill'); if(!el) return; e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('arrastando'); });
+  ov.addEventListener('dragend', ()=>{ ov.querySelectorAll('.arrastando,.drop').forEach(x=> x.classList.remove('arrastando','drop')); });
+  const alvo = e=> e.target.closest ? e.target.closest('.cp-dia, #cpPool') : null;
+  ov.addEventListener('dragover', e=>{ const al = alvo(e); if(!al) return; e.preventDefault(); al.classList.add('drop'); });
+  ov.addEventListener('dragleave', e=>{ const al = alvo(e); if(al && !al.contains(e.relatedTarget)) al.classList.remove('drop'); });
+  ov.addEventListener('drop', e=>{
+    const al = alvo(e); if(!al) return; e.preventDefault();
+    const id = Number(e.dataTransfer.getData('text/plain')); if(Number.isNaN(id) || !grupos.some(g=>g.id===id)) return;
+    if(al.id==='cpPool') delete colocado[id]; else colocado[id] = al.dataset.dia;
+    delete motivos[id]; resumoTxt = '';   // mexeu à mão: o resumo da distribuição deixou de valer
+    desenhar();
+  });
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) cgFecharPlanejador(); });
+  ov.addEventListener('click', e=>{ if(e.target && e.target.id==='cpRever') aplicarRevisao(); });
+  $('#cpFechar').addEventListener('click', cgFecharPlanejador);
+  $('#cpLimpar').addEventListener('click', ()=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); motivos = {}; snapshot = null; resumoTxt = ''; desenhar(); });
+  const aplicarResultado = r=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, r.colocado); motivos = r.motivos; };
+  btnDist.addEventListener('click', ()=>{
+    if(!grupos.length) return;
+    snapshot = { colocado:{...colocado}, motivos:{...motivos}, resumoTxt };          // guarda o arranjo de agora (inclusive o que você arrastou à mão)
+    const r = cgDistribuirPlano(grupos, diasUteis, { apartirDe:hojeISO });   // nunca em dia que já passou
+    aplicarResultado(r);
+    resumoTxt = r.colocados+(r.colocados===1?' distribuído':' distribuídos')+' · '+r.semDia+' sem dia possível · '+r.diasUsados+(r.diasUsados===1?' dia':' dias')+' de viagem';
+    desenhar();
+  });
+  btnDistLista.addEventListener('click', ()=>{
+    const antes = {...colocado}, daLista = grupos.filter(g=> !(g.id in antes));
+    if(!daLista.length) return;
+    snapshot = { colocado:{...colocado}, motivos:{...motivos}, resumoTxt };
+    const r = cgDistribuirPlano(grupos, diasUteis, { fixos:antes, apartirDe:hojeISO });   // quem já tem dia fica parado; só a lista é distribuída, nunca em dia que já passou
+    aplicarResultado(r);
+    const novos = daLista.filter(g=> g.id in colocado).length;
+    resumoTxt = novos+(novos===1?' da lista distribuído':' da lista distribuídos')+' · '+(daLista.length-novos)+' sem dia possível · os que já tinham dia ficaram onde estavam';
+    desenhar();
+  });
+  btnDesf.addEventListener('click', ()=>{
+    if(!snapshot) return;
+    Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, snapshot.colocado);
+    motivos = snapshot.motivos; resumoTxt = snapshot.resumoTxt; snapshot = null; desenhar();
+  });
+  const aplicarRevisao = ()=>{
+    if(!revisao) return;
+    grupos = revisao.grupos; aplicarResultado(revisao);
+    info = cgTextoRevisao(revisao.mudaram, revisao.saiu); revisao = null; snapshot = null; resumoTxt = ''; desenhar();
+  };
+  // salvar / atualizar / salvar como novo: abre a caixinha
+  const abrirSalvar = modo=>{
+    const pendentes = itensAtuais();
+    const itens = [...pendentes, ...executados.map(g=>g.itemOriginal).filter(Boolean)].sort((a,b)=> a.dia.localeCompare(b.dia) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));   // os já executados continuam no planejamento salvo
+    if(!itens.length) return;
+    const base = plano || {}, naLista = grupos.filter(g=> !(g.id in colocado)).length;
+    cgDialogoPlano({
+      titulo: modo==='atualizar' ? 'Atualizar planejamento' : 'Salvar planejamento',
+      valores: { regiao:base.regiao||'', responsavel:base.responsavel||'', subtitulo:base.subtitulo||'', criado_em: modo==='atualizar' ? base.criado_em : cgIsoLocal(new Date()) },
+      resumo: { ...cgPlanoResumo(itens, cfg.semanas), semDia:naLista },
+      textoOk: modo==='atualizar' ? 'Atualizar' : 'Salvar',
+      onOk: async v=>{
+        plano = await cgPlanosSalvar({ id: modo==='atualizar' ? plano.id : null, regiao:v.regiao, responsavel:v.responsavel, subtitulo:v.subtitulo, criado_em:v.criado_em, semanas:cfg.semanas, itens });
+        revisao = null; info = ''; resumoTxt = 'Planejamento salvo ✓'; desenhar();
+      },
+    });
+  };
+  btnSalvar.addEventListener('click', ()=> abrirSalvar('novo'));
+  btnAtualizar.addEventListener('click', ()=> abrirSalvar('atualizar'));
+  btnNovo.addEventListener('click', ()=> abrirSalvar('novo'));
+  document.addEventListener('keydown', cgEscPlanejador);
+  desenhar();
+  $('#cpFechar').focus();
+}
+
+// ---------- cards na Visão Geral ----------
+function cgPlanosAbrir(id, revisar){
+  const plano = cgPlanosEstado().lista.find(p=>p.id===id); if(!plano) return;
+  const rec = cgReconciliarPlano(plano, cgPontosVivos(), cgExisteTalhao), mudou = rec.mudaram || rec.saiu;
+  const cfg = { semanas:plano.semanas, plano };
+  cfg.executados = revisar ? rec.revisado.executados : rec.comoSalvo.executados;
+  if(revisar){ cfg.grupos = rec.revisado.grupos; cfg.colocado = rec.revisado.colocado; cfg.motivos = rec.revisado.motivos; cfg.info = cgTextoRevisao(rec.mudaram, rec.revisado.saiu); }
+  else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram } : null; }
+  cgAbrirPlanejador(cfg);
+}
+function cgRenderPlanosSalvos(){
+  const el = document.getElementById('vgPlanosSalvos'); if(!el) return;
+  const st = cgPlanosEstado();
+  if(!st.carregado){ if(!st.carregando) cgPlanosCarregar().then(()=> cgRenderPlanosSalvos()); return; }
+  const css = `<style>
+    .pl-sec{margin-top:26px;}
+    .pl-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+    .pl-cab h3{margin:0;font-size:16px;}
+    .pl-cab h3 span{font-size:13px;color:var(--ink-soft);font-weight:400;}
+    .pl-filtros{display:flex;gap:6px;}
+    .pl-filtros select{font-family:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff;}
+    .pl-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;}
+    .pl-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0;}
+    .pl-topo{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+    .pl-reg{font-size:15px;font-weight:700;}
+    .pl-sub{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+    .pl-data{font-size:12px;color:var(--ink-soft);white-space:nowrap;}
+    .pl-resp{display:flex;align-items:center;gap:8px;font-size:13px;}
+    .pl-av{width:24px;height:24px;border-radius:50%;background:#e6f1fb;color:#0c447c;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+    .pl-stats{display:flex;gap:8px;}
+    .pl-stats div{flex:1;background:var(--bg);border-radius:8px;padding:8px 10px;}
+    .pl-stats b{display:block;font-size:20px;line-height:1.2;}
+    .pl-stats span{font-size:11.5px;color:var(--ink-soft);}
+    .pl-per{font-size:12.5px;color:var(--ink-soft);}
+    .pl-aviso{border:1px solid #f0b36b;background:#fff3e0;color:#7a4300;border-radius:8px;padding:6px 10px;font-family:inherit;font-size:12.5px;text-align:left;cursor:pointer;}
+    .pl-aviso:hover{background:#ffe9c7;}
+    .pl-chips{display:flex;gap:6px;flex-wrap:wrap;}
+    .pl-chip{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;}
+    .pl-acoes{display:flex;gap:6px;border-top:1px solid var(--line);padding-top:10px;}
+    .pl-acoes button{flex:none;}
+    .pl-acoes button[data-acao="abrir"]{flex:1;}
+    .pl-acoes button[data-acao="excluir"]{color:#c62828;}
+    .pl-vazio{font-size:13px;color:var(--ink-soft);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:14px 16px;}
+  </style>`;
+  if(st.erro){ el.innerHTML = css+`<div class="pl-sec"><div class="pl-cab"><h3>Planejamentos salvos</h3></div><div class="pl-vazio">Os planejamentos salvos não estão disponíveis: ${cgEscH(st.erro)}. Confira se a tabela <b>planejamentos</b> foi criada no Supabase.</div></div>`; return; }
+  const f = state.planosFiltro = state.planosFiltro || { regiao:'', responsavel:'' };
+  const lista = st.lista.filter(p=> (!f.regiao || p.regiao===f.regiao) && (!f.responsavel || p.responsavel===f.responsavel));
+  const regioes = [...new Set(st.lista.map(p=>p.regiao).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')), resps = [...new Set(st.lista.map(p=>p.responsavel).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const pontos = lista.length ? cgPontosVivos() : [];
+  const iniciais = s=> (String(s||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()) || '—';
+  const cards = lista.map(p=>{
+    const itens = p.itens || [], res = cgPlanoResumo(itens, p.semanas), rec = cgReconciliarPlano(p, pontos, cgExisteTalhao);
+    const partes = []; if(rec.mudaram) partes.push(rec.mudaram+(rec.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); if(rec.saiu) partes.push(rec.saiu+(rec.saiu===1?' talhão saiu':' talhões saíram'));
+    return `<div class="pl-card" data-id="${cgEscH(p.id)}">
+      <div class="pl-topo"><div style="min-width:0"><div class="pl-reg">📍 ${cgEscH(p.regiao)}</div>${p.subtitulo?`<div class="pl-sub">${cgEscH(p.subtitulo)}</div>`:''}</div><span class="pl-data">${cgDataBr(p.criado_em)}</span></div>
+      <div class="pl-resp"><span class="pl-av">${cgEscH(iniciais(p.responsavel))}</span>${cgEscH(p.responsavel||'—')}</div>
+      <div class="pl-stats"><div><b>${res.talhoes}</b><span>${res.talhoes===1?'talhão':'talhões'}</span></div><div><b>${res.produtores}</b><span>${res.produtores===1?'produtor':'produtores'}</span></div><div><b>${res.dias}</b><span>${res.dias===1?'dia':'dias'} de viagem</span></div></div>
+      ${res.ini ? `<div class="pl-per">📅 ${cgDataBr(res.ini).slice(0,5)} a ${cgDataBr(res.fim).slice(0,5)} · ${res.semanas} ${res.semanas===1?'semana':'semanas'}</div>` : ''}
+      ${partes.length ? `<button type="button" class="pl-aviso" data-acao="rever" title="Abre o planejamento com esses talhões na lista, pra você escolher um dia novo">⚠ ${partes.join(' · ')} desde que salvou. Rever</button>` : ''}
+      <div class="pl-chips">${res.projetos.map(k=>`<span class="pl-chip" style="background:${CG_PROJ[k].cor};color:${CG_PROJ[k].txt}">${cgEscH(CG_PROJ[k].label)}</span>`).join('')}</div>
+      <div class="pl-acoes"><button type="button" class="btn ghost" data-acao="abrir">Abrir</button><button type="button" class="btn ghost" data-acao="editar">Editar</button><button type="button" class="btn ghost" data-acao="excluir">Excluir</button></div>
+    </div>`;
+  }).join('');
+  el.innerHTML = css+`<div class="pl-sec"><div class="pl-cab"><h3>Planejamentos salvos <span>· ${st.lista.length}</span></h3>
+      ${st.lista.length>1 ? `<div class="pl-filtros"><select data-filtro="regiao"><option value="">Região: todas</option>${regioes.map(r=>`<option value="${cgEscH(r)}" ${f.regiao===r?'selected':''}>${cgEscH(r)}</option>`).join('')}</select><select data-filtro="responsavel"><option value="">Responsável: todos</option>${resps.map(r=>`<option value="${cgEscH(r)}" ${f.responsavel===r?'selected':''}>${cgEscH(r)}</option>`).join('')}</select></div>` : ''}</div>
+    ${st.lista.length ? `<div class="pl-grade">${cards || '<div class="pl-vazio">Nenhum planejamento com esses filtros.</div>'}</div>` : '<div class="pl-vazio">Nenhum planejamento salvo ainda. No Cronograma, marque semanas, clique em Planejar e use Salvar planejamento.</div>'}</div>`;
+  el.onclick = async e=>{
+    const bt = e.target.closest && e.target.closest('button[data-acao]'); if(!bt) return;
+    const card = bt.closest('.pl-card'), id = card && card.dataset.id, plano = st.lista.find(p=> String(p.id)===id); if(!plano) return;
+    const acao = bt.dataset.acao;
+    if(acao==='abrir') cgPlanosAbrir(plano.id, false);
+    else if(acao==='rever') cgPlanosAbrir(plano.id, true);
+    else if(acao==='editar'){
+      cgDialogoPlano({ titulo:'Editar planejamento', valores:{ regiao:plano.regiao, responsavel:plano.responsavel, subtitulo:plano.subtitulo, criado_em:plano.criado_em }, resumo:null, textoOk:'Salvar alterações',
+        onOk: v=> cgPlanosSalvar({ id:plano.id, regiao:v.regiao, responsavel:v.responsavel, subtitulo:v.subtitulo }) });
+    } else if(acao==='excluir'){
+      if(!confirm('Excluir o planejamento "'+plano.regiao+(plano.subtitulo?' — '+plano.subtitulo:'')+'"? Não dá pra desfazer.')) return;
+      try{ await cgPlanosExcluir(plano.id); }catch(err){ alert('Erro ao excluir: '+(err.message||err)); }
+    }
+  };
+  el.onchange = e=>{ const s = e.target.closest && e.target.closest('select[data-filtro]'); if(!s) return; f[s.dataset.filtro] = s.value; cgRenderPlanosSalvos(); };
+}
+
 function abrirCronogramaGeral(ctxKey){
   const ctx = CG_CONTEXTOS[ctxKey]; if(!ctx) return;
   state.cgF = state.cgF || {}; state.cgMes = state.cgMes || {};
@@ -9551,6 +10016,8 @@ function abrirCronogramaGeral(ctxKey){
     .cg-nav .tot{font-size:12px;color:var(--ink-soft);margin-left:6px;}
     .cg-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
     .cg-pill.est, .cp-pill.est{font-weight:700;color:#c62828;border:1.5px solid var(--c);background:var(--t);padding-top:1px;padding-bottom:1px;}
+    .cg-pill.ex{font-weight:500;color:#5f5e5a;border:1px solid var(--c);background:var(--t);padding:1px 5px 2px;}
+    .cg-pill.ex .s{display:block;font-size:10.5px;font-weight:700;color:#0f6e56;line-height:1.25;}
     .cg-cal.sem{grid-template-columns:26px repeat(7,minmax(0,1fr));}
     .cg-wkc{display:flex;align-items:flex-start;justify-content:center;padding-top:4px;}
     .cg-wk{width:20px;height:20px;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12px;line-height:1;padding:0;color:#fff;font-family:inherit;}
@@ -9631,9 +10098,9 @@ function abrirCronogramaGeral(ctxKey){
   const dataBr = s=> new Date(s+'T00:00:00').toLocaleDateString('pt-BR');
   // pill de talhão com plantio em Estimativa (no próprio projeto): letras vermelhas sobre um tom bem claro da cor do projeto, com borda na cor do projeto
   const tintaClara = hex=>{ const n = parseInt(hex.slice(1),16); return 'rgb('+[n>>16&255, n>>8&255, n&255].map(x=> Math.round(x+(255-x)*0.86)).join(',')+')'; };
-  const emEst = g=> planejavel && g.statusPlantio==='Estimativa';
-  const estiloPill = (g, p)=> emEst(g) ? `--c:${p.cor};--t:${tintaClara(p.cor)};` : `background:${p.cor};color:${p.txt};`;
-  const itemGrupo = g=>`<div class="cg-det-it"><i style="background:${CG_PROJ[g.projeto].cor}"></i><div><b>${CG_PROJ[g.projeto].label} · ${g.cliente} / ${g.fazenda} / ${g.talhao}</b> (${g.estado||'—'}${g.consultor?', '+g.consultor:''})${emEst(g)?' · <b style="color:#c62828">plantio em estimativa</b>':''}<br><span style="color:var(--ink-soft)">${g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ')}</span></div></div>`;
+  const emEst = g=> planejavel && g.statusPlantio==='Estimativa' && !g.exec;   // executada vale mais que estimativa: não fica vermelha
+  const estiloPill = (g, p)=> cgEstiloPill({ ...g, statusPlantio: emEst(g) ? 'Estimativa' : '' }, p);
+  const itemGrupo = g=>`<div class="cg-det-it"><i style="background:${CG_PROJ[g.projeto].cor}"></i><div><b>${CG_PROJ[g.projeto].label} · ${g.cliente} / ${g.fazenda} / ${g.talhao}</b> (${g.estado||'—'}${g.consultor?', '+g.consultor:''})${g.exec?' · <b style="color:#0f6e56">✓ Executado'+(g.execSemData?' · sem data':' em '+dataBr(g.dataStr).slice(0,5))+'</b>':''}${emEst(g)?' · <b style="color:#c62828">plantio em estimativa</b>':''}<br><span style="color:var(--ink-soft)">${g.avaliacoes.map(a=>(a.exec?'✓ ':'')+a.avaliacao+' ('+a.estagio+')').join(', ')}</span></div></div>`;
 
   function desenharCalendario(){
     const mesKey = state.cgMes[ctxKey];
@@ -9643,9 +10110,10 @@ function abrirCronogramaGeral(ctxKey){
     filtrados.forEach(p=>{
       const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
       if(!mapa.has(chave)) mapa.set(chave, { ...p, avaliacoes:[] });
-      mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio });
+      mapa.get(chave).avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio, exec:p.exec, semData:p.execSemData });
     });
     const grupos = [...mapa.values()];
+    grupos.forEach(g=>{ g.exec = g.avaliacoes.every(a=>a.exec); g.execSemData = g.exec && g.avaliacoes.every(a=>a.semData); });   // pill executado: todas as avaliações dele foram feitas
     const porDia = {};
     grupos.forEach((g,idx)=>{ g.idx = idx; (porDia[g.dataStr] = porDia[g.dataStr] || []).push(g); });
 
@@ -9656,7 +10124,8 @@ function abrirCronogramaGeral(ctxKey){
     document.getElementById('cgTot').textContent = `${filtrados.length} avaliação(ões) · ${grupos.length} talhão(ões)-dia neste mês`;
     document.getElementById('cgLeg').innerHTML = (ctx.projetos.length>1
       ? '<div class="cg-leg">'+ctx.projetos.map(k=>`<span><i style="background:${CG_PROJ[k].cor}"></i>${CG_PROJ[k].label} (${grupos.filter(g=>g.projeto===k).length})</span>`).join('')+'</div>' : '')
-      + (planejavel ? '<div class="cg-leg"><span><b style="color:#c62828">Letras vermelhas</b> = plantio em estimativa (no status do próprio projeto)</span></div>' : '');
+      + (planejavel ? '<div class="cg-leg"><span><b style="color:#c62828">Letras vermelhas</b> = plantio em estimativa (no status do próprio projeto)</span></div>' : '')
+      + (grupos.some(g=>g.exec) ? '<div class="cg-leg"><span><b style="color:#0f6e56">✓ Executado</b> = avaliação já feita, no dia da execução (sem data informada na tabela, fica na prevista)</span></div>' : '');
 
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const hojeStr = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
@@ -9680,7 +10149,7 @@ function abrirCronogramaGeral(ctxKey){
       lista.slice(0,visiveis).forEach(g=>{
         const p = CG_PROJ[g.projeto];
         const txt = (multi ? p.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
-        h += `<button type="button" class="cg-pill${emEst(g)?' est':''}" data-g="${g.idx}" style="${estiloPill(g,p)}" title="${p.label} — ${g.fazenda} ${g.talhao}${emEst(g)?' (plantio em estimativa)':''}">${txt}</button>`;
+        h += `<button type="button" class="cg-pill${g.exec?' ex':emEst(g)?' est':''}" data-g="${g.idx}" style="${estiloPill(g,p)}" title="${p.label} — ${g.fazenda} ${g.talhao}${g.exec?' (executado'+(g.execSemData?', sem data':' em '+dataBr(g.dataStr).slice(0,5))+')':emEst(g)?' (plantio em estimativa)':''}">${g.exec?'<span class="s">✓ Executado'+(g.execSemData?' · sem data':'')+'</span>':''}${txt}</button>`;
       });
       if(lista.length>visiveis) h += `<button type="button" class="cg-pill mais" data-dia="${ds}">+${lista.length-visiveis} mais</button>`;
       h += '</div>'; pos++;
@@ -9715,131 +10184,22 @@ function abrirCronogramaGeral(ctxKey){
     const n = semSel.size; bt.disabled = n===0; bt.textContent = '📋 Planejar' + (n ? ' ('+n+')' : '');
     const info = document.getElementById('cgSemInfo'); if(info) info.textContent = n ? n+(n===1?' semana marcada':' semanas marcadas') : 'Marque as semanas no quadradinho ao lado do calendário pra planejar';
   }
-  const escPlano = e=>{ if(e.key==='Escape') fecharPlano(); };
-  function fecharPlano(){ const o = document.getElementById('cgPlanOverlay'); if(o) o.remove(); document.removeEventListener('keydown', escPlano); }
+  function fecharPlano(){ cgFecharPlanejador(); }
   function abrirPlano(){
     if(!semSel.size) return;
-    fecharPlano();
-    const escH = s=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-    const NOMES = ['dom','seg','ter','qua','qui','sex','sáb'], UTEIS = ['Seg','Ter','Qua','Qui','Sex'];
-    const sete = dom=>{ const d0 = new Date(dom+'T00:00:00'); return Array.from({length:7},(_,i)=>{ const x = new Date(d0); x.setDate(x.getDate()+i); return isoLocal(x); }); };
-    const intervalos = [...semSel].sort().map(dom=>({ dom, dias:sete(dom) }));
-    const noIntervalo = ds=> intervalos.some(it=> it.dias[0]<=ds && ds<=it.dias[6]);
-    const multi = ctx.projetos.length>1;
+    const semanas = [...semSel].sort(), ints = semanas.map(cgSeteDias);
+    const noIntervalo = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
     const mapa = new Map();
     pontos.filter(p=> passa(p,null) && noIntervalo(p.dataStr)).forEach(p=>{   // mesmos filtros do calendário; só as semanas marcadas
       const chave = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|');
       if(!mapa.has(chave)) mapa.set(chave, { ...p, avaliacoes:[] });
-      const gg = mapa.get(chave); gg.avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio }); gg.faixa = Math.min(gg.faixa ?? 99, p.faixa ?? 4);   // a tolerância do pill é a mais apertada entre as avaliações dele
+      const gg = mapa.get(chave); gg.avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio, exec:p.exec, semData:p.execSemData }); gg.faixa = Math.min(gg.faixa ?? 99, p.faixa ?? 4);   // a tolerância do pill é a mais apertada entre as avaliações dele
     });
     const grupos = [...mapa.values()].sort((a,b)=> a.dataStr.localeCompare(b.dataStr) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));
-    grupos.forEach((g,i)=> g.id = i);
-    const colocado = {};   // id do pill -> dia (aaaa-mm-dd). Vive só aqui dentro: nada é gravado e tudo some ao fechar.
-    let motivos = {}, snapshot = null, resumoTxt = '';   // motivo de cada pill que ficou sem dia na distribuição; arranjo de antes dela (pra desfazer); linha de resumo
-    const diasUteis = intervalos.flatMap(it=> it.dias.slice(1,6));
-    const nDia = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
-    const ov = document.createElement('div'); ov.id = 'cgPlanOverlay'; ov.className = 'cp-overlay';
-    ov.innerHTML = `<style>
-      .cp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7000;display:flex;align-items:center;justify-content:center;padding:3vh 2vw;}
-      .cp-box{background:var(--paper,#fff);border-radius:14px;width:min(96vw,1500px);height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);}
-      .cp-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);}
-      .cp-tit{font-size:17px;font-weight:700;}
-      .cp-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:760px;}
-      .cp-acoes{display:flex;align-items:center;gap:8px;flex:none;}
-      .cp-cont{font-size:12.5px;color:var(--ink-soft);margin-right:4px;white-space:nowrap;}
-      .cp-corpo{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;padding:16px 20px;min-height:0;flex:1;}
-      .cp-pool{border:1.5px dashed var(--line);border-radius:12px;padding:10px;overflow-y:auto;background:var(--bg);min-height:0;}
-      .cp-pool.drop{border-color:#1d9e75;background:#eaf6f0;}
-      .cp-ptit{font-size:12px;font-weight:700;margin-bottom:8px;}
-      .cp-item{margin-bottom:8px;}
-      .cp-pill{cursor:grab;user-select:none;}
-      .cp-pill.arrastando{opacity:.4;}
-      .cp-leg{font-size:10.5px;color:var(--ink-soft);margin:2px 0 0 3px;}
-      .cp-vazio{font-size:12px;color:var(--ink-soft);padding:8px 2px;}
-      .cp-semanas{overflow:auto;min-width:0;min-height:0;}
-      .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;}
-      .cp-dias{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:20px;}
-      .cp-dia{border:1px solid var(--line);border-radius:10px;min-height:110px;padding:6px;background:#fff;min-width:0;}
-      .cp-dia.drop{border:2px dashed #1d9e75;background:#eaf6f0;padding:5px;}
-      .cp-dh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;}
-      .cp-dh b{color:#1a2019;}
-      .cp-aviso{color:#c62828;cursor:help;}
-      .cp-leg.cp-dev{color:#5f5e5a;}
-      .cp-leg.cp-dev.fora{color:#c62828;font-weight:700;}
-      .cp-mot{font-size:10.5px;color:#c62828;margin:2px 0 0 3px;line-height:1.3;}
-      .cp-resumo{font-size:12.5px;font-weight:700;color:#0f6e56;margin-top:5px;min-height:16px;}
-    </style>
-    <div class="cp-box" role="dialog" aria-modal="true" aria-label="Planejar semanas">
-      <div class="cp-topo">
-        <div><div class="cp-tit">📋 Planejar · ${intervalos.length} semana${intervalos.length===1?'':'s'}</div>
-        <div class="cp-sub">Arraste cada talhão pro dia que quiser (arrastar funciona no computador) ou use a Distribuição inteligente. Só visualização: nada é salvo nem exportado, e o quadro some ao fechar.</div>
-        <div class="cp-resumo" id="cpResumo"></div></div>
-        <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span><button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button><button type="button" class="btn ghost" id="cpDesfazer" disabled>Desfazer distribuição</button><button type="button" class="btn ghost" id="cpLimpar">Limpar</button><button type="button" class="btn ghost" id="cpFechar">Fechar</button></div>
-      </div>
-      <div class="cp-corpo"><div class="cp-pool" id="cpPool"></div><div class="cp-semanas" id="cpSemanas"></div></div>
-    </div>`;
-    document.body.appendChild(ov);
-    const pool = ov.querySelector('#cpPool'), semanasEl = ov.querySelector('#cpSemanas'), cont = ov.querySelector('#cpCont'), resumoEl = ov.querySelector('#cpResumo'), btnDist = ov.querySelector('#cpDistribuir'), btnDesf = ov.querySelector('#cpDesfazer');
-    const pillHtml = (g, comLegenda)=>{
-      const pj = CG_PROJ[g.projeto], txt = (multi ? pj.s+' · ' : '') + g.fazenda + ' ' + g.talhao;
-      const dt = new Date(g.dataStr+'T00:00:00');
-      const dia = colocado[g.id], dev = dia ? nDia(dia)-nDia(g.dataStr) : 0, fora = Math.abs(dev) > (g.faixa ?? 4);
-      const leg = comLegenda
-        ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${dataBr(g.dataStr).slice(0,5)}</div>` + (motivos[g.id] ? `<div class="cp-mot">sem dia possível: ${escH(motivos[g.id])}</div>` : '')
-        : (dia && dev!==0 ? `<div class="cp-leg cp-dev${fora?' fora':''}" title="tolerância deste estádio: ±${g.faixa ?? 4} dias">${dev>0?'+':'−'}${Math.abs(dev)}d · prev. ${dataBr(g.dataStr).slice(0,5)}${fora?' · fora da tolerância':''}</div>` : '');
-      const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+(emEst(g)?' (plantio em estimativa)':'')+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
-      return `<div class="cp-item"><div class="cg-pill cp-pill${emEst(g)?' est':''}" draggable="true" data-id="${g.id}" style="${estiloPill(g,pj)}" title="${escH(dica)}">${escH(txt)}</div>${leg}</div>`;
-    };
-    const desenhar = ()=>{
-      const naLista = grupos.filter(g=> !(g.id in colocado));
-      pool.innerHTML = `<div class="cp-ptit">A planejar (${naLista.length})</div>` + (naLista.length ? naLista.map(g=>pillHtml(g,true)).join('') : `<div class="cp-vazio">${grupos.length ? 'Tudo planejado ✓' : 'Nenhum talhão com avaliação nessas semanas'}</div>`);
-      semanasEl.innerHTML = intervalos.map(it=>{
-        const uteis = it.dias.slice(1,6);
-        return `<div class="cp-sem"><div class="cp-semtit">Semana ${dataBr(uteis[0]).slice(0,5)} – ${dataBr(uteis[4]).slice(0,5)}</div><div class="cp-dias">` + uteis.map((ds,i)=>{
-          const l = grupos.filter(g=> colocado[g.id]===ds);
-          const ufs = [...new Set(l.map(g=> String(g.estado||'—').toUpperCase()))], avisos = [];
-          if(CG_PLANO_UM_ESTADO_POR_DIA && ufs.length>1) avisos.push('mais de um estado no mesmo dia ('+ufs.join(', ')+')');
-          Object.keys(CG_PROJ).forEach(k=>{ const n = l.filter(g=>g.projeto===k).length; if(n>CG_PLANO_MAX_POR_PROJETO_DIA) avisos.push(n+' de '+CG_PROJ[k].label+' (o limite é '+CG_PLANO_MAX_POR_PROJETO_DIA+')'); });
-          return `<div class="cp-dia" data-dia="${ds}"><div class="cp-dh"><span>${UTEIS[i]} ${dataBr(ds).slice(0,5)}${ufs.length?' · <b>'+ufs.join('+')+'</b>':''}</span><span>${avisos.length?`<span class="cp-aviso" title="${escH(avisos.join('; '))}">⚠</span> `:''}${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}</div>`;
-        }).join('') + '</div></div>';
-      }).join('');
-      const usados = new Set(Object.values(colocado)).size;
-      cont.textContent = Object.keys(colocado).length+' de '+grupos.length+' planejados'+(usados ? ' · '+usados+(usados===1?' dia':' dias')+' de viagem' : '');
-      resumoEl.textContent = resumoTxt; btnDesf.disabled = !snapshot; btnDist.disabled = !grupos.length;
-    };
-    // arrastar e soltar (computador): da lista pro dia, de um dia pra outro, ou de volta pra lista
-    ov.addEventListener('dragstart', e=>{ const el = e.target.closest && e.target.closest('.cp-pill'); if(!el) return; e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('arrastando'); });
-    ov.addEventListener('dragend', ()=>{ ov.querySelectorAll('.arrastando,.drop').forEach(x=> x.classList.remove('arrastando','drop')); });
-    const alvo = e=> e.target.closest ? e.target.closest('.cp-dia, #cpPool') : null;
-    ov.addEventListener('dragover', e=>{ const al = alvo(e); if(!al) return; e.preventDefault(); al.classList.add('drop'); });
-    ov.addEventListener('dragleave', e=>{ const al = alvo(e); if(al && !al.contains(e.relatedTarget)) al.classList.remove('drop'); });
-    ov.addEventListener('drop', e=>{
-      const al = alvo(e); if(!al) return; e.preventDefault();
-      const id = Number(e.dataTransfer.getData('text/plain')); if(Number.isNaN(id) || !grupos[id]) return;
-      if(al.id==='cpPool') delete colocado[id]; else colocado[id] = al.dataset.dia;
-      delete motivos[id]; resumoTxt = '';   // mexeu à mão: o resumo da distribuição deixou de valer
-      desenhar();
-    });
-    ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecharPlano(); });
-    ov.querySelector('#cpFechar').addEventListener('click', fecharPlano);
-    ov.querySelector('#cpLimpar').addEventListener('click', ()=>{ Object.keys(colocado).forEach(k=> delete colocado[k]); motivos = {}; snapshot = null; resumoTxt = ''; desenhar(); });
-    btnDist.addEventListener('click', ()=>{
-      if(!grupos.length) return;
-      snapshot = { colocado:{...colocado}, motivos:{...motivos}, resumoTxt };          // guarda o arranjo de agora (inclusive o que você arrastou à mão)
-      const r = cgDistribuirPlano(grupos, diasUteis);
-      Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, r.colocado);
-      motivos = r.motivos;
-      resumoTxt = r.colocados+(r.colocados===1?' distribuído':' distribuídos')+' · '+r.semDia+' sem dia possível · '+r.diasUsados+(r.diasUsados===1?' dia':' dias')+' de viagem';
-      desenhar();
-    });
-    btnDesf.addEventListener('click', ()=>{
-      if(!snapshot) return;
-      Object.keys(colocado).forEach(k=> delete colocado[k]); Object.assign(colocado, snapshot.colocado);
-      motivos = snapshot.motivos; resumoTxt = snapshot.resumoTxt; snapshot = null; desenhar();
-    });
-    document.addEventListener('keydown', escPlano);
-    desenhar();
-    ov.querySelector('#cpFechar').focus();
+    grupos.forEach(g=>{ g.exec = g.avaliacoes.every(a=>a.exec); g.execSemData = g.exec && g.avaliacoes.every(a=>a.semData); });
+    const pendentes = grupos.filter(g=>!g.exec), executados = grupos.filter(g=>g.exec);   // executado fica no dia da execução, travado, fora da lista e da distribuição
+    pendentes.forEach((g,i)=> g.id = i); executados.forEach((g,i)=> g.id = 'x'+i);
+    cgAbrirPlanejador({ semanas, grupos:pendentes, executados });
   }
   const btnPlanejar = document.getElementById('cgPlanejarBtn');
   if(btnPlanejar) btnPlanejar.addEventListener('click', abrirPlano);
@@ -10224,7 +10584,7 @@ function renderLadroesMaximasMapa(){
       <div class="lm-card full-card" style="margin-top:12px;">
         <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
         <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
-        <div class="table-scroll" data-topscroll="1">
+        <div class="table-scroll" data-topscroll="sempre">
           <table data-colfilter="lm-acomp-${String(titulo).replace(/\s+/g,'-')}">
             <thead>
             <tr>
@@ -10260,7 +10620,7 @@ function renderLadroesMaximasMapa(){
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="status_plantio" style="background:${r.max_status_plantio==='Plantado'?'#c8e6c9':r.max_status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;"><option value="" ${!r.max_status_plantio?'selected':''}>—</option><option value="Plantado" ${r.max_status_plantio==='Plantado'?'selected':''}>Plantado</option><option value="Estimativa" ${r.max_status_plantio==='Estimativa'?'selected':''}>Estimativa</option></select></td>
-                  ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" data-prevista="${dataPrevistaStr(oc)}" value="${entry[oc.campoKey+'_data']||dataPrevistaStr(oc)}"></td>`).join('')}
+                  ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" data-prevista="${dataPrevistaStr(oc)}" value="${entry[oc.campoKey+'_data']||(entry[oc.campoKey]==='Executado'?'':dataPrevistaStr(oc))}"></td>`).join('')}
                   <td class="lm-freeze-right" style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
@@ -10299,14 +10659,15 @@ function renderLadroesMaximasMapa(){
       const key = decodeURIComponent(el.dataset.lmKey);
       const campo = el.dataset.lmCampo;
       const recLinha = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
-      const valor = lmNormalizarData(recLinha, campo, el.value);
+      const valor = lmNormalizarData(recLinha, campo, el.value, dataEhExecucao(el));
       if(!state.lmAcomp[key]){
         state.lmAcomp[key] = {};
         LM_OCORRENCIAS_TODAS.forEach(oc=>{ state.lmAcomp[key][oc.campoKey] = 'Pendente'; state.lmAcomp[key][oc.campoKey+'_data'] = null; });
       }
       if(campo==='status_plantio') el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff';
+      const eraExecLm = !/_data$/.test(campo) && campo!=='status_plantio' && getLmAcompEntry(key)[campo]==='Executado' && valor!=='Executado';   // voltou de Executado: a data de execução é limpa
       state.lmAcomp[key][campo] = valor;
-      if(!/_data$/.test(campo) && campo!=='status_plantio' && valor===STATUS_NAO_SE_APLICA) state.lmAcomp[key][campo+'_data'] = null;
+      if(!/_data$/.test(campo) && campo!=='status_plantio' && (valor===STATUS_NAO_SE_APLICA || eraExecLm)) state.lmAcomp[key][campo+'_data'] = null;
       salvarLmAcompCampo(key, campo, valor, el);
     });
   });
@@ -10325,7 +10686,7 @@ function renderLadroesMaximasMapa(){
       // Data igual à previsão (plantio + DAP) não é gravada: continua seguindo o plantio
       const entry = getLmAcompEntry(key);
       container.querySelectorAll(`.lm-acomp-input[data-lm-key="${btn.dataset.lmKey}"]`).forEach(el=>{
-        entry[el.dataset.lmCampo] = lmNormalizarData(rec, el.dataset.lmCampo, el.value || null);   // datas que são só previsão não são mais gravadas
+        entry[el.dataset.lmCampo] = lmNormalizarData(rec, el.dataset.lmCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
       });
       if(!state.lmAcomp[key]) state.lmAcomp[key] = {};
       Object.assign(state.lmAcomp[key], entry);
@@ -10842,7 +11203,7 @@ function renderVidaNoSolo(){
     <div class="vns-card full-card" style="margin-top:12px;">
       <h3>🗓️ Acompanhamento</h3>
       <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
-      <div class="table-scroll" data-topscroll="1">
+      <div class="table-scroll" data-topscroll="sempre">
         <table data-colfilter="vns-talhoes">
           <thead><tr>
             <th rowspan="2" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="2" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="2" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="2" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
@@ -10872,7 +11233,7 @@ function renderVidaNoSolo(){
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
                 <td><span style="color:${r.vns_status_compra==='Comprado'?'#2ecc71':r.vns_status_compra==='Não comprado'?'#e74c3c':r.vns_status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)'};font-weight:700;">${r.vns_status_compra||'—'}</span></td>
-                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${VNS_ETAPA_PRAZO[e.key].faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" data-cor-data="${e.key}" data-prevista="${vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap)}" value="${r['vns_'+e.key+'_data']||vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap)}"></td>`).join('')}
+                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${VNS_ETAPA_PRAZO[e.key].faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" data-cor-data="${e.key}" data-prevista="${vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap)}" value="${r['vns_'+e.key+'_data']||(r['vns_'+e.key]==='Executado'?'':vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap))}"></td>`).join('')}
                 <td class="lm-freeze-right" style="white-space:nowrap;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
@@ -10954,7 +11315,7 @@ function renderVidaNoSolo(){
     el.addEventListener('change', ()=>{
       if(el.dataset.vnsCampo==='status_plantio') el.style.background = el.value==='Plantado' ? '#c8e6c9' : el.value==='Estimativa' ? '#fff3b0' : '#fff';
       const recCampo = RECORDS.find(r=>r.id===el.dataset.vnsTalhaoId) || SEM_AREA.find(r=>r.id===el.dataset.vnsTalhaoId);
-      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null), el);
+      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el)), el);
     });
   });
   container.querySelectorAll('.vns-linha-save-btn').forEach(btn=>{
@@ -10965,7 +11326,7 @@ function renderVidaNoSolo(){
       // Status de compra não é mais editável aqui — só na Alimentação; aqui só reforça o valor que já está lá
       const entry = { status_compra: recLinha ? (recLinha.vns_status_compra || null) : null };
       container.querySelectorAll(`.vns-etapa-input[data-vns-talhao-id="${talhaoId}"]`).forEach(el=>{
-        entry[el.dataset.vnsCampo] = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null);   // datas que são só previsão não são mais gravadas
+        entry[el.dataset.vnsCampo] = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
       });
       const textoOriginal = btn.textContent;
       btn.disabled = true; btn.textContent = '⏳ Salvando…';
@@ -11738,6 +12099,9 @@ function renderVisaoGeral(){
   </div>
   `;
 
+  container.insertAdjacentHTML('beforeend','<div id="vgPlanosSalvos"></div>');   // planejamentos salvos (cards), abaixo da tabela
+  if(typeof cgRenderPlanosSalvos==='function') cgRenderPlanosSalvos();
+
   container.querySelectorAll('.vg-filtro-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.visaoGeralFiltro = btn.dataset.filtro;
@@ -12181,9 +12545,10 @@ function estrDataPrevistaBloco(rec, bloco){
 }
 // Só vale guardar uma data que a pessoa realmente escolheu. Se ela é igual à previsão, guarda vazio: a tabela continua mostrando plantio + DAP
 // e acompanha qualquer correção da data de plantio. Campos que não são de data passam direto.
-function estrNormalizarData(rec, campo, valor){
+function estrNormalizarData(rec, campo, valor, exec){
   const m = /^(.*)_mes$/.exec(campo || '');
   if(!m || !valor) return valor;
+  if(exec) return valor;   // Feito: é a data da execução e vale mesmo igual à prevista
   const et = ESTR_ETAPAS.find(x=> x.key===m[1]);
   return (et && valor===estrDataPrevistaBloco(rec, et.bloco)) ? null : valor;
 }
@@ -12197,10 +12562,12 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
   if(campoKey==='ciclo') dados.ciclo_acomp = valor;
   if(campoKey==='tipo_material') dados.tipo_material_acomp = valor;
   if(campoKey==='status_plantio') dados.status_plantio_acomp = valor;
+  const eraExec = /_exec$/.test(campoKey) && rec['estr_acomp_'+campoKey]==='Feito' && valor!=='Feito';   // voltou de Feito pra Pendente: a data de execução é limpa
   ESTR_ETAPAS.forEach(e=>{
     dados['acomp_'+e.key+'_mes'] = campoKey===(e.key+'_mes') ? valor : (rec['estr_acomp_'+e.key+'_mes'] ?? null);
     dados['acomp_'+e.key+'_exec'] = campoKey===(e.key+'_exec') ? valor : (rec['estr_acomp_'+e.key+'_exec'] ?? null);
     if(dados['acomp_'+e.key+'_exec']===STATUS_NAO_SE_APLICA) dados['acomp_'+e.key+'_mes'] = null;   // não se aplica: sem data
+    if(eraExec && campoKey===e.key+'_exec') dados['acomp_'+e.key+'_mes'] = null;
   });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -12213,7 +12580,7 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
     return;
   }
   rec['estr_acomp_'+campoKey] = valor;
-  if(/_exec$/.test(campoKey) && valor===STATUS_NAO_SE_APLICA) rec['estr_acomp_'+campoKey.replace(/_exec$/,'_mes')] = null;
+  if(/_exec$/.test(campoKey) && (valor===STATUS_NAO_SE_APLICA || eraExec)) rec['estr_acomp_'+campoKey.replace(/_exec$/,'_mes')] = null;
   invalidarVisaoGeral();
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
@@ -12361,7 +12728,8 @@ async function salvarVnsEtapaCampo(talhaoId, campo, valor, el){
   const dados = montarDadosVnsBase(rec);
   dados[campo] = valor;
   const naEtapa = valor===STATUS_NAO_SE_APLICA && VNS_ETAPAS.some(e=> e.key===campo);
-  if(naEtapa) dados[campo+'_data'] = null;   // não se aplica: sem data
+  const eraExec = VNS_ETAPAS.some(e=> e.key===campo) && rec['vns_'+campo]==='Executado' && valor!=='Executado';   // voltou de Executado pra Pendente: a data de execução é limpa
+  if(naEtapa || eraExec) dados[campo+'_data'] = null;   // não se aplica / voltou pra Pendente: sem data
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: talhaoId, projeto_id: projetosIds['vida-no-solo'], dados,
@@ -12373,7 +12741,7 @@ async function salvarVnsEtapaCampo(talhaoId, campo, valor, el){
     return;
   }
   rec['vns_'+campo] = valor;
-  if(naEtapa) rec['vns_'+campo+'_data'] = null;
+  if(naEtapa || eraExec) rec['vns_'+campo+'_data'] = null;
   invalidarVisaoGeral();
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
@@ -12432,10 +12800,11 @@ function lmDataPrevistaOc(rec, campoKey){
 }
 // Só vale guardar uma data que a pessoa realmente escolheu. Igual à previsão (ou apagada) = guarda vazio: a tabela continua mostrando
 // plantio + DAP e acompanha qualquer correção da data de plantio. Campos que não são de data (status) passam direto.
-function lmNormalizarData(rec, campo, valor){
+function lmNormalizarData(rec, campo, valor, exec){
   const m = /^(.*)_data$/.exec(campo || '');
   if(!m) return valor;
   if(!valor) return null;
+  if(exec) return valor;   // Executado: é a data da execução e vale mesmo igual à prevista
   return valor===lmDataPrevistaOc(rec, m[1]) ? null : valor;
 }
 async function salvarLmAcompCampo(key, campoKey, valor, el){
@@ -12446,10 +12815,12 @@ async function salvarLmAcompCampo(key, campoKey, valor, el){
   }
   const dados = montarDadosMaxBase(rec);
   if(campoKey==='status_plantio') dados.status_plantio = valor || null;   // Plantado / Estimativa (um campo por talhão no projeto Máximas/Ladrões)
+  const eraExec = campoKey!=='status_plantio' && !/_data$/.test(campoKey) && rec['max_aval_'+campoKey]==='Executado' && valor!=='Executado';   // voltou de Executado pra Pendente: a data de execução é limpa
   LM_OCORRENCIAS_TODAS.forEach(oc=>{
     dados['aval_'+oc.campoKey] = campoKey===oc.campoKey ? valor : (rec['max_aval_'+oc.campoKey] ?? null);
     dados['aval_'+oc.campoKey+'_data'] = campoKey===(oc.campoKey+'_data') ? valor : (rec['max_aval_'+oc.campoKey+'_data'] ?? null);
     if(dados['aval_'+oc.campoKey]===STATUS_NAO_SE_APLICA) dados['aval_'+oc.campoKey+'_data'] = null;   // não se aplica: sem data
+    if(eraExec && campoKey===oc.campoKey) dados['aval_'+oc.campoKey+'_data'] = null;
   });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -12464,7 +12835,7 @@ async function salvarLmAcompCampo(key, campoKey, valor, el){
   if(campoKey==='status_plantio'){ rec.max_status_plantio = valor || null; }
   else {
     rec['max_aval_'+campoKey] = valor;
-    if(valor===STATUS_NAO_SE_APLICA) rec['max_aval_'+campoKey+'_data'] = null;
+    if(valor===STATUS_NAO_SE_APLICA || eraExec) rec['max_aval_'+campoKey+'_data'] = null;
     invalidarVisaoGeral();
   }
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
