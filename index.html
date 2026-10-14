@@ -9596,7 +9596,7 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
   const itens = plano.itens || [], vivos = new Map();
   pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
   const comoSalvo = { grupos:[], colocado:{}, executados:[] }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[] };
-  let mudaram = 0;
+  let mudaram = 0, atrasados = 0, statusMud = 0, dataDentro = 0, novos = 0; const hojeISO = cgHojeISO();
   itens.forEach(it=>{
     const tudo = (vivos.get([it.projeto,it.cliente,it.fazenda,it.talhao].join('|')) || []).filter(p=> it.avaliacoes.some(a=> a.avaliacao===p.avaliacao && a.estagio===p.estagio));
     const rot = (CG_PROJ[it.projeto] ? CG_PROJ[it.projeto].s : it.projeto)+' · '+it.fazenda+' '+it.talhao;
@@ -9616,14 +9616,47 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     const pend = tudo.filter(p=>!p.exec);
     const novaData = pend.map(p=>p.dataStr).sort()[0], faixa = Math.min(...pend.map(p=> p.faixa ?? 4)), id = revisado.grupos.length;
     revisado.grupos.push({ id, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:pend[0].estado, consultor:pend[0].consultor, dataStr:novaData, faixa, statusPlantio:pend[0].statusPlantio, avaliacoes:pend.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio })) });
-    if(Math.abs(cgNumDia(it.dia)-cgNumDia(novaData)) <= faixa) revisado.colocado[id] = it.dia;
-    else { mudaram++; revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }
+    const dentro = Math.abs(cgNumDia(it.dia)-cgNumDia(novaData)) <= faixa, passou = it.dia < hojeISO;
+    if(dentro && !passou) revisado.colocado[id] = it.dia;   // continua no dia salvo (o pill já vem com o status de hoje)
+    if(!dentro){ mudaram++; revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }   // foi pra lista: a Distribuição inteligente reposiciona
+    else if(passou){ atrasados++; revisado.motivos[id] = 'o dia planejado ('+cgDataBr(it.dia).slice(0,5)+') já passou e ainda tem avaliação pendente'; }
+    else if((it.statusPlantio==='Estimativa') !== (pend[0].statusPlantio==='Estimativa')) statusMud++;   // estimativa ↔ plantado: avisa e atualiza a cor
+    else if(novaData !== it.dataPrev) dataDentro++;   // a data prevista mudou, mas o dia salvo continua dentro da tolerância: só avisa
   });
-  return { comoSalvo, revisado, mudaram, saiu:revisado.saiu.length };
+  // talhão novo nas semanas do planejamento (só dá pra saber se o planejamento guardou os filtros usados na hora de salvar)
+  if(plano.filtros){
+    const ints = (plano.semanas || []).map(cgSeteDias), noInt = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
+    const cobertos = new Set(); itens.forEach(it=> (it.avaliacoes||[]).forEach(a=> cobertos.add([it.projeto,it.cliente,it.fazenda,it.talhao,a.avaliacao,a.estagio].join('|'))));
+    const mapa = new Map();
+    pontos.forEach(p=>{
+      if(p.exec || !noInt(p.dataStr) || !cgPassaFiltros(p, plano.filtros) || cobertos.has([p.projeto,p.cliente,p.fazenda,p.talhao,p.avaliacao,p.estagio].join('|'))) return;
+      const k = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!mapa.has(k)) mapa.set(k,{ ...p, avaliacoes:[] });
+      const g = mapa.get(k); g.avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio }); g.faixa = Math.min(g.faixa ?? 99, p.faixa ?? 4);
+    });
+    [...mapa.values()].forEach(g=>{ const id = revisado.grupos.length; revisado.grupos.push({ id, projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado, consultor:g.consultor, dataStr:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:g.statusPlantio, avaliacoes:g.avaliacoes }); revisado.motivos[id] = 'novo nas semanas deste planejamento'; novos++; });
+  }
+  return { comoSalvo, revisado, mudaram, saiu:revisado.saiu.length, atrasados, status:statusMud, dataDentro, novos };
 }
-function cgTextoRevisao(mudaram, saiu){
+function cgPassaFiltros(p, f){   // os mesmos filtros do calendário (guardados no planejamento), aplicados aos pontos de hoje
+  return Object.keys(f || {}).every(k=>{ const s = f[k]; if(!s || !s.length) return true;
+    const v = k==='projeto' ? p.projeto : k==='status' ? (p.statusPlantio || '—') : k==='parceiro' ? (p.parceiro || 'Em aberto') : p[k];
+    return s.includes(v); });
+}
+function cgTemAvisos(x){ return !!(x && (x.mudaram || x.saiu || x.atrasados || x.status || x.dataDentro || x.novos)); }
+function cgExtrasPartes(x){   // frases do aviso amarelo para as situações novas (as de "mudou de data" e "saiu" seguem como antes)
+  const p = [], n = (k,a,b)=> x[k] ? p.push(x[k]+(x[k]===1?a:b)) : 0;
+  if(!x) return p;
+  n('atrasados',' talhão com o dia já passado',' talhões com o dia já passado'); n('status',' talhão mudou o status do plantio',' talhões mudaram o status do plantio');
+  n('dataDentro',' talhão com data prevista nova',' talhões com data prevista nova'); n('novos',' talhão novo nas semanas',' talhões novos nas semanas');
+  return p;
+}
+function cgTextoRevisao(mudaram, saiu, x){
   const p = [];
   if(mudaram) p.push(mudaram+(mudaram===1?' talhão foi pra lista':' talhões foram pra lista')+' (a data prevista mudou e o dia escolhido ficou fora da tolerância)');
+  if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão foi pra lista':' talhões foram pra lista')+' (o dia planejado já passou e ainda há avaliação pendente)');
+  if(x && x.novos) p.push(x.novos+(x.novos===1?' talhão novo nas semanas deste planejamento foi pra lista':' talhões novos nas semanas deste planejamento foram pra lista'));
+  if(x && x.status) p.push(x.status+(x.status===1?' talhão ficou no dia, com o status do plantio de hoje':' talhões ficaram no dia, com o status do plantio de hoje'));
+  if(x && x.dataDentro) p.push(x.dataDentro+(x.dataDentro===1?' talhão ficou no dia (a data prevista mudou, mas o dia continua dentro da tolerância)':' talhões ficaram no dia (a data prevista mudou, mas o dia continua dentro da tolerância)'));
   if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
   return p.length ? 'Revisão aplicada: '+p.join('. ')+'. Nada foi gravado ainda: use Atualizar planejamento pra salvar.' : '';
 }
@@ -9641,17 +9674,23 @@ async function cgPlanosCarregar(forcar){
   }catch(e){ st.lista = []; st.erro = e.message || String(e); }
   st.carregado = true; st.carregando = false;
 }
+let CG_FILTROS_COL = true;   // vira false se a tabela ainda não tem a coluna "filtros" (rode o planejamentos_filtros.sql): aí o planejamento é salvo sem ela
 async function cgPlanosSalvar(reg){
   const st = cgPlanosEstado(), agora = new Date().toISOString();
-  let q;
-  if(reg.id){   // atualizar: só manda o que veio
-    const dados = { atualizado_em:agora };
-    ['regiao','responsavel','subtitulo','semanas','itens'].forEach(k=>{ if(reg[k]!==undefined) dados[k] = reg[k]; });
-    q = sb.from('planejamentos').update(dados).eq('id',reg.id).select().single();
-  } else {
-    q = sb.from('planejamentos').insert({ regiao:reg.regiao, responsavel:reg.responsavel, subtitulo:reg.subtitulo, criado_em:reg.criado_em, semanas:reg.semanas, itens:reg.itens, atualizado_em:agora }).select().single();
-  }
-  const { data, error } = await q; if(error) throw error;
+  const montar = comFiltros=>{
+    if(reg.id){   // atualizar: só manda o que veio
+      const dados = { atualizado_em:agora };
+      ['regiao','responsavel','subtitulo','semanas','itens'].forEach(k=>{ if(reg[k]!==undefined) dados[k] = reg[k]; });
+      if(comFiltros && reg.filtros!==undefined) dados.filtros = reg.filtros;
+      return sb.from('planejamentos').update(dados).eq('id',reg.id).select().single();
+    }
+    const novo = { regiao:reg.regiao, responsavel:reg.responsavel, subtitulo:reg.subtitulo, criado_em:reg.criado_em, semanas:reg.semanas, itens:reg.itens, atualizado_em:agora };
+    if(comFiltros && reg.filtros!==undefined) novo.filtros = reg.filtros;
+    return sb.from('planejamentos').insert(novo).select().single();
+  };
+  let res = await montar(CG_FILTROS_COL);
+  if(res.error && CG_FILTROS_COL && /filtros/i.test(res.error.message || '')){ CG_FILTROS_COL = false; res = await montar(false); }
+  const { data, error } = res; if(error) throw error;
   const i = st.lista.findIndex(p=>p.id===data.id); if(i>=0) st.lista[i] = data; else st.lista.unshift(data);
   st.carregado = true; st.erro = null;
   cgRenderPlanosSalvos();
@@ -9815,8 +9854,8 @@ function cgAbrirPlanejador(cfg){
     let h = '';
     const disp = new Set(diasUteis), fora = executados.filter(g=> !disp.has(g.dataStr));
     if(fora.length) h += `<div class="cp-av inf"><span>Executado fora dos dias deste quadro: ${fora.map(g=> cgEscH(CG_PROJ[g.projeto].s+' · '+g.fazenda+' '+g.talhao)+' ('+cgDataBr(g.dataStr).slice(0,5)+')').join('; ')}.</span></div>`;
-    if(revisao && (revisao.mudaram || revisao.saiu.length)){
-      const partes = []; if(revisao.mudaram) partes.push(revisao.mudaram+(revisao.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); if(revisao.saiu.length) partes.push(revisao.saiu.length+(revisao.saiu.length===1?' saiu':' saíram'));
+    if(revisao && (revisao.mudaram || revisao.saiu.length || cgExtrasPartes(revisao.extras).length)){
+      const partes = []; if(revisao.mudaram) partes.push(revisao.mudaram+(revisao.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); partes.push(...cgExtrasPartes(revisao.extras)); if(revisao.saiu.length) partes.push(revisao.saiu.length+(revisao.saiu.length===1?' saiu':' saíram'));
       h += `<div class="cp-av am"><span>Há mudanças desde que você salvou: ${partes.join(' · ')}.</span><button type="button" class="btn ghost" id="cpRever">Rever mudanças</button></div>`;
     }
     if(info) h += `<div class="cp-av inf"><span>${cgEscH(info)}</span></div>`;
@@ -9889,7 +9928,7 @@ function cgAbrirPlanejador(cfg){
   const aplicarRevisao = ()=>{
     if(!revisao) return;
     grupos = revisao.grupos; aplicarResultado(revisao);
-    info = cgTextoRevisao(revisao.mudaram, revisao.saiu); revisao = null; snapshot = null; resumoTxt = ''; desenhar();
+    info = cgTextoRevisao(revisao.mudaram, revisao.saiu, revisao.extras); revisao = null; snapshot = null; resumoTxt = ''; desenhar();
   };
   // salvar / atualizar / salvar como novo: abre a caixinha
   const abrirSalvar = modo=>{
@@ -9904,7 +9943,7 @@ function cgAbrirPlanejador(cfg){
       resumo: { ...cgPlanoResumo(itens, cfg.semanas), semDia:naLista },
       textoOk: modo==='atualizar' ? 'Atualizar' : 'Salvar',
       onOk: async v=>{
-        plano = await cgPlanosSalvar({ id: modo==='atualizar' ? plano.id : null, regiao:v.regiao, responsavel:v.responsavel, subtitulo:v.subtitulo, criado_em:v.criado_em, semanas:cfg.semanas, itens });
+        plano = await cgPlanosSalvar({ id: modo==='atualizar' ? plano.id : null, regiao:v.regiao, responsavel:v.responsavel, subtitulo:v.subtitulo, criado_em:v.criado_em, semanas:cfg.semanas, itens, filtros:cfg.filtros });
         revisao = null; info = ''; resumoTxt = 'Planejamento salvo ✓'; desenhar();
       },
     });
@@ -9920,11 +9959,11 @@ function cgAbrirPlanejador(cfg){
 // ---------- cards na Visão Geral ----------
 function cgPlanosAbrir(id, revisar){
   const plano = cgPlanosEstado().lista.find(p=>p.id===id); if(!plano) return;
-  const rec = cgReconciliarPlano(plano, cgPontosVivos(), cgExisteTalhao), mudou = rec.mudaram || rec.saiu;
-  const cfg = { semanas:plano.semanas, plano };
+  const rec = cgReconciliarPlano(plano, cgPontosVivos(), cgExisteTalhao), mudou = cgTemAvisos(rec);
+  const cfg = { semanas:plano.semanas, plano, filtros:plano.filtros };
   cfg.executados = revisar ? rec.revisado.executados : rec.comoSalvo.executados;
-  if(revisar){ cfg.grupos = rec.revisado.grupos; cfg.colocado = rec.revisado.colocado; cfg.motivos = rec.revisado.motivos; cfg.info = cgTextoRevisao(rec.mudaram, rec.revisado.saiu); }
-  else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram } : null; }
+  if(revisar){ cfg.grupos = rec.revisado.grupos; cfg.colocado = rec.revisado.colocado; cfg.motivos = rec.revisado.motivos; cfg.info = cgTextoRevisao(rec.mudaram, rec.revisado.saiu, rec); }
+  else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram, extras:rec } : null; }
   cgAbrirPlanejador(cfg);
 }
 /* ===== EXPORTAÇÃO DO PLANEJAMENTO (PDF e Excel) =====
@@ -10193,7 +10232,7 @@ function cgRenderPlanosSalvos(){
   const iniciais = s=> (String(s||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()) || '—';
   const cards = lista.map(p=>{
     const itens = p.itens || [], res = cgPlanoResumo(itens, p.semanas), rec = cgReconciliarPlano(p, pontos, cgExisteTalhao);
-    const partes = []; if(rec.mudaram) partes.push(rec.mudaram+(rec.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); if(rec.saiu) partes.push(rec.saiu+(rec.saiu===1?' talhão saiu':' talhões saíram'));
+    const partes = []; if(rec.mudaram) partes.push(rec.mudaram+(rec.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); partes.push(...cgExtrasPartes(rec)); if(rec.saiu) partes.push(rec.saiu+(rec.saiu===1?' talhão saiu':' talhões saíram'));
     return `<div class="pl-card" data-id="${cgEscH(p.id)}">
       <div class="pl-topo"><div style="min-width:0"><div class="pl-reg">📍 ${cgEscH(p.regiao)}</div>${p.subtitulo?`<div class="pl-sub">${cgEscH(p.subtitulo)}</div>`:''}</div><span class="pl-data">${cgDataBr(p.criado_em)}</span></div>
       <div class="pl-resp"><span class="pl-av">${cgEscH(iniciais(p.responsavel))}</span>${cgEscH(p.responsavel||'—')}</div>
@@ -10463,7 +10502,7 @@ function abrirCronogramaGeral(ctxKey){
     grupos.forEach(g=>{ g.exec = g.avaliacoes.every(a=>a.exec); g.execSemData = g.exec && g.avaliacoes.every(a=>a.semData); });
     const pendentes = grupos.filter(g=>!g.exec), executados = grupos.filter(g=>g.exec);   // executado fica no dia da execução, travado, fora da lista e da distribuição
     pendentes.forEach((g,i)=> g.id = i); executados.forEach((g,i)=> g.id = 'x'+i);
-    cgAbrirPlanejador({ semanas, grupos:pendentes, executados });
+    cgAbrirPlanejador({ semanas, grupos:pendentes, executados, filtros:Object.fromEntries(FILTROS.map(f=> [f.k,[...F[f.k]]])) });   // os filtros usados ficam guardados no planejamento (pra avisar de talhão novo nas semanas)
   }
   const btnPlanejar = document.getElementById('cgPlanejarBtn');
   if(btnPlanejar) btnPlanejar.addEventListener('click', abrirPlano);
