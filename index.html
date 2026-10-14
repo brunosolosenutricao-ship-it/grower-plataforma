@@ -9809,7 +9809,7 @@ function cgAbrirPlanejador(cfg){
   const exHtml = g=>{
     const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
     const leg = g.planejadoPara && g.planejadoPara!==g.dataStr ? `<div class="cp-leg">planejado pra ${cgDataBr(g.planejadoPara).slice(0,5)}</div>` : '';
-    return `<div class="cp-item"><div class="cg-pill cp-lock ex" style="${cgEstiloPill(g,pj)}" title="${cgEscH(pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+'\nExecutado'+(g.execSemData?' (sem data: fica na prevista)':' em '+cgDataBr(g.dataStr))+'. Não dá pra mover.')}"><span class="s">✓ Executado${g.execSemData?' · sem data':''}</span>${cgEscH(txt)}</div>${leg}</div>`;
+    return `<div class="cp-item"><div class="cg-pill cp-lock ex" style="${cgEstiloPill(g,pj)}" title="${cgEscH(pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+'\nJá executado'+(g.execSemData?' (sem data: fica na prevista)':' em '+cgDataBr(g.dataStr))+'. Não dá pra mover.')}"><span class="s">✓ Já executado${g.execSemData?' · sem data':''}</span>${cgEscH(txt)}</div>${leg}</div>`;
   };
   const avisoHtml = ()=>{
     let h = '';
@@ -9894,7 +9894,8 @@ function cgAbrirPlanejador(cfg){
   // salvar / atualizar / salvar como novo: abre a caixinha
   const abrirSalvar = modo=>{
     const pendentes = itensAtuais();
-    const itens = [...pendentes, ...executados.map(g=>g.itemOriginal).filter(Boolean)].sort((a,b)=> a.dia.localeCompare(b.dia) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));   // os já executados continuam no planejamento salvo
+    const execNovos = executados.filter(g=>!g.itemOriginal).map(g=>({ dia:g.dataStr, projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado||'', consultor:g.consultor||'', dataPrev:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:'', avaliacoes:(g.avaliacoes||[]).map(a=>({ avaliacao:a.avaliacao, estagio:a.estagio })), jaExecutado:true }));   // já estava executado quando você salvou: entra no planejamento, no dia da execução
+    const itens = [...pendentes, ...executados.map(g=>g.itemOriginal).filter(Boolean), ...execNovos].sort((a,b)=> a.dia.localeCompare(b.dia) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));   // os já executados continuam no planejamento salvo
     if(!itens.length) return;
     const base = plano || {}, naLista = grupos.filter(g=> !(g.id in colocado)).length;
     cgDialogoPlano({
@@ -9928,8 +9929,8 @@ function cgPlanosAbrir(id, revisar){
 }
 /* ===== EXPORTAÇÃO DO PLANEJAMENTO (PDF e Excel) =====
    Sai do card do planejamento salvo (Visão Geral). Usa os DIAS que foram organizados no Planejar e salvos; a data prevista e a tolerância vêm do cronograma de hoje.
-   PDF: calendário só com as semanas que têm avaliação (com os links do mapa) e, depois, o cartão de cada talhão com a linha do tempo do "Resumo por fazenda" (todos os projetos do talhão) e o dia da visita marcado.
-   Excel: uma linha por talhão e projeto + aba de resumo. Datas planejadas fora da tolerância só aparecem marcadas quando isso realmente acontece. */
+   PDF: calendário só com as semanas que têm avaliação (com os links do mapa) e, depois, o cartão de cada talhão com a linha do tempo do "Resumo por fazenda" (todos os projetos do talhão), o estádio avaliado em destaque e a visita numa faixa própria.
+   Excel: uma linha por talhão e projeto + aba de resumo. */
 const EXP_DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const expISO = d=> d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const expData = iso=> new Date(iso+'T00:00:00');
@@ -9959,12 +9960,12 @@ function expPlanoDados(plano, pontos, recDe, stats){
     if(!tudo.length){ saiu.push({ ...base, rot:(it.fazenda||'')+' '+(it.talhao||'') }); return; }   // não há mais avaliação pendente (não se aplica ou saiu do projeto)
     if(tudo.every(p=>p.exec)){   // já foi feito: aparece no dia da execução (com o dia que estava planejado, se foi outro)
       const execDia = tudo.map(p=>p.dataStr).sort()[0];
-      itens.push({ ...base, estado:(tudo[0].estado || it.estado || '').toUpperCase(), exec:true, execSemData:tudo.every(p=>p.execSemData), dia:execDia, planejadoPara:it.dia, prevista:execDia, faixa:it.faixa||4, desvio:0, fora:false, statusPlantio:'', estagios:expUniq(tudo.map(p=>p.estagio)), avaliacoes:tudo.map(p=>p.avaliacao), jaFeitas:0 });
+      itens.push({ ...base, estado:(tudo[0].estado || it.estado || '').toUpperCase(), exec:true, execSemData:tudo.every(p=>p.execSemData), dia:execDia, planejadoPara:it.dia, prevista:execDia, faixa:it.faixa||4, desvio:0, statusPlantio:'', estagios:expUniq(tudo.map(p=>p.estagio)), avaliacoes:tudo.map(p=>p.avaliacao), jaFeitas:0 });
       return;
     }
     const pend = tudo.filter(p=>!p.exec), prevista = pend.map(p=>p.dataStr).sort()[0], faixa = Math.min(...pend.map(p=> p.faixa ?? 4));
     const desvio = expDif(it.dia, prevista);
-    itens.push({ ...base, estado:(pend[0].estado || it.estado || '').toUpperCase(), exec:false, execSemData:false, dia:it.dia, planejadoPara:it.dia, prevista, faixa, desvio, fora: Math.abs(desvio) > faixa, statusPlantio:pend[0].statusPlantio||'', estagios:expUniq(pend.map(p=>p.estagio)), avaliacoes:pend.map(p=>p.avaliacao), jaFeitas:tudo.length-pend.length });
+    itens.push({ ...base, estado:(pend[0].estado || it.estado || '').toUpperCase(), exec:false, execSemData:false, dia:it.dia, planejadoPara:it.dia, prevista, faixa, desvio, statusPlantio:pend[0].statusPlantio||'', estagios:expUniq(pend.map(p=>p.estagio)), avaliacoes:pend.map(p=>p.avaliacao), jaFeitas:tudo.length-pend.length });
   });
   itens.sort((a,b)=> a.dia.localeCompare(b.dia) || a.estado.localeCompare(b.estado) || a.fazenda.localeCompare(b.fazenda,'pt-BR') || a.talhao.localeCompare(b.talhao,'pt-BR',{numeric:true}) || a.projeto.localeCompare(b.projeto));
   // só as semanas que têm avaliação; sábado e domingo só aparecem se algum talhão cair neles
@@ -9982,7 +9983,8 @@ function expCartoes(dados){
   dados.itens.forEach(i=>{
     const k = [i.cliente,i.fazenda,i.talhao].join('|'); if(!grupos.has(k)) grupos.set(k,{ ref:i, visitas:[] });
     const g = grupos.get(k), v = g.visitas.find(x=> x.iso===i.dia && x.exec===i.exec);
-    if(v){ if(i.fora){ v.fora = true; v.desvio = i.desvio; } } else g.visitas.push({ iso:i.dia, exec:i.exec, fora:i.fora, desvio:i.desvio });
+    const alvo = { k:i.projeto, est:i.estagios.map(e=> e==='Colheita' ? 'Colh.' : e), prevista:i.prevista, faixa:i.faixa };   // estádio(s) avaliado(s) nesta visita e a janela de tolerância
+    if(v) v.alvos.push(alvo); else g.visitas.push({ iso:i.dia, exec:i.exec, alvos:[alvo] });
   });
   const lista = [...grupos.values()].map(g=>({ ...g, primeira:g.visitas.map(v=>v.iso).sort()[0] }));
   lista.sort((a,b)=> a.primeira.localeCompare(b.primeira) || a.ref.fazenda.localeCompare(b.ref.fazenda,'pt-BR') || a.ref.talhao.localeCompare(b.ref.talhao,'pt-BR',{numeric:true}));
@@ -10043,8 +10045,8 @@ function expGerarPdfPlano(dados){
   const agrupaFaz = itens=>{ const g = []; itens.forEach(i=>{ const k = i.cliente+'|'+i.fazenda; let x = g.find(q=>q.k===k); if(!x){ x = { k, fazenda:i.fazenda, cliente:i.cliente, itens:[] }; g.push(x); } x.itens.push(i); }); return g; };
   const sinais = i=>{   // o que vai na 2ª linha do talhão (só quando existe)
     const s = [];
-    if(i.exec) s.push({ t:'Executado'+(i.execSemData?' (sem data)':''), c:VERDE, check:true }, ...(i.planejadoPara && i.planejadoPara!==i.dia ? [{ t:'planejado pra '+expDM(i.planejadoPara), c:CINZA }] : []));
-    else { if(i.statusPlantio==='Estimativa') s.push({ t:'plantio em estimativa', c:VERM }); if(i.fora) s.push({ t:(i.desvio>0?'+':'')+i.desvio+'d fora da tolerância', c:VERM }); }
+    if(i.exec) s.push({ t:'Já executado'+(i.execSemData?' (sem data)':''), c:VERDE, check:true }, ...(i.planejadoPara && i.planejadoPara!==i.dia ? [{ t:'planejado pra '+expDM(i.planejadoPara), c:CINZA }] : []));
+    else { if(i.statusPlantio==='Estimativa') s.push({ t:'plantio em estimativa', c:VERM }); }
     return s;
   };
   const alturaDia = d=>{ let h = 0; agrupaFaz(d.itens).forEach(g=>{ h += 26; g.itens.forEach(i=>{ h += 22 + (sinais(i).length ? 15 : 0); }); h += 6; }); return h; };
@@ -10100,13 +10102,13 @@ function expGerarPdfPlano(dados){
 }
 
 // ---------------- Excel ----------------
-const EXP_COLS_XL = ['Dia','Data','UF','Cliente','Fazenda','Talhão','Projeto','Estádio','Avaliações','Área (ha)','Data prevista','Desvio (dias)','Fora da tolerância','Status do plantio','Situação','Georreferência','Google Maps','Waze'];
+const EXP_COLS_XL = ['Dia','Data','UF','Cliente','Fazenda','Talhão','Projeto','Estádio','Avaliações','Área (ha)','Data prevista','Desvio (dias)','Status do plantio','Situação','Georreferência','Google Maps','Waze'];
 const expDataXl = iso=> new Date(Date.UTC(+iso.slice(0,4), +iso.slice(5,7)-1, +iso.slice(8,10), 12));   // meio-dia UTC: o Excel não escorrega um dia por fuso
 function expPlanoLinhasXl(dados){
   const P = k=> (typeof CG_PROJ!=='undefined' && CG_PROJ[k]) ? CG_PROJ[k].label : k;
   return dados.itens.map(i=>[
     EXP_DOW[expData(i.dia).getDay()], expDataXl(i.dia), i.estado, i.cliente, i.fazenda, i.talhao, P(i.projeto), i.estagios.join(', '), i.avaliacoes.join('; '),
-    i.area, expDataXl(i.prevista), i.exec ? '' : i.desvio, i.fora ? 'Sim' : '', i.statusPlantio, i.exec ? 'Executado'+(i.execSemData?' (sem data)':'')+(i.planejadoPara && i.planejadoPara!==i.dia ? ' (planejado pra '+expDM(i.planejadoPara)+')' : '') : 'A fazer',
+    i.area, expDataXl(i.prevista), i.exec ? '' : i.desvio, i.statusPlantio, i.exec ? 'Já executado'+(i.execSemData?' (sem data)':'')+(i.planejadoPara && i.planejadoPara!==i.dia ? ' (planejado pra '+expDM(i.planejadoPara)+')' : '') : 'A fazer',
     i.links ? i.links.txt : '', i.links ? 'Abrir' : '', i.links ? 'Abrir' : ''
   ]);
 }
@@ -10118,11 +10120,11 @@ function expPlanoResumoXl(dados){
 function expGerarExcelPlano(dados){
   const XL = window.XLSX, linhas = expPlanoLinhasXl(dados);
   const ws = XL.utils.aoa_to_sheet([EXP_COLS_XL, ...linhas], { cellDates:true });
-  ws['!cols'] = [6,12,5,22,22,10,16,14,48,10,13,12,12,14,30,24,12,10].map(w=>({ wch:w }));
+  ws['!cols'] = [6,12,5,22,22,10,16,14,48,10,13,12,14,30,24,12,10].map(w=>({ wch:w }));
   ws['!freeze'] = { xSplit:0, ySplit:1 }; ws['!autofilter'] = { ref:'A1:'+String.fromCharCode(64+EXP_COLS_XL.length)+(linhas.length+1) };
   linhas.forEach((l,k)=>{ const r = k+2;
     ['B','K'].forEach(c=>{ if(ws[c+r]) ws[c+r].z = 'dd/mm/yyyy'; });
-    const i = dados.itens[k]; if(i.links){ if(ws['Q'+r]) ws['Q'+r].l = { Target:i.links.maps, Tooltip:'Abrir no Google Maps' }; if(ws['R'+r]) ws['R'+r].l = { Target:i.links.waze, Tooltip:'Abrir no Waze' }; }
+    const i = dados.itens[k]; if(i.links){ if(ws['P'+r]) ws['P'+r].l = { Target:i.links.maps, Tooltip:'Abrir no Google Maps' }; if(ws['Q'+r]) ws['Q'+r].l = { Target:i.links.waze, Tooltip:'Abrir no Waze' }; }
   });
   const ws2 = XL.utils.aoa_to_sheet(expPlanoResumoXl(dados)); ws2['!cols'] = [{ wch:20 },{ wch:30 },{ wch:8 },{ wch:10 }];
   const wb = XL.utils.book_new(); XL.utils.book_append_sheet(wb, ws, 'Roteiro'); XL.utils.book_append_sheet(wb, ws2, 'Resumo');
@@ -12079,10 +12081,6 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
     const tit = 'Talhão '+r.talhao; T(x,y0+12,tit,26*K,true);
     const info2 = `${fmt1(r.area||0)} ha · ${r.cultura||'—'}`; T(x+tw(tit,26*K,true)+10,y0+12+12*K,info2,12.5*K,true,'#888780');
     let cx = x, cy = y0+12+36*K;
-    if(extra){   // no planejamento os cartões são de fazendas diferentes: mostra a fazenda e o cliente embaixo do título
-      const ln = r.fazenda+' · '+r.cliente; let s = ln; while(s.length>4 && tw(s,12*K,true) > LEFT-26) s = s.slice(0,-2);
-      T(x,y0+12+33*K,s===ln ? s : s+'…',12*K,true,'#5f5e5a'); cy += 22*K;
-    }
     t.projs.forEach(k=>{
       const p = CG_PROJ[k], w = tw(p.label,11*K,true)+20;
       if(cx+w > M+LEFT-8){ cx = x; cy += 26*K; }
@@ -12110,11 +12108,6 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
       if(mm>=d0){ const xm = tx+Math.round((mm-d0)/86400000)*PXD; LN(xm,yt+18*K,xm,yl+n*LH,'#ececE6',1); T(xm+3,yt+2,RF_MESES[mm.getMonth()],11*K,true,'#888780'); }
       mm = new Date(mm.getFullYear(),mm.getMonth()+1,1);
     }
-    let yv = 0;   // espaço extra embaixo das linhas, pro rótulo das visitas
-    const visitas = (extra && t.visitas) || [];
-    const corVisita = v=> v.exec ? '#0f6e56' : (v.fora ? '#c62828' : '#1a2019');
-    const xVisita = v=> tx+Math.max(0,Math.min(HORIZ,Math.round((new Date(v.iso+'T00:00:00')-d0)/86400000)))*PXD;
-    visitas.forEach(v=>{ LN(xVisita(v),yt+18*K,xVisita(v),yl+n*LH,corVisita(v),1.5); CI(xVisita(v),yt+18*K,3.5,corVisita(v)); });   // a linha da visita fica atrás dos marcos
     const omitidos = {};   // projeto -> janelas "início – fim" que não couberam embaixo do marco (vão pra lista do cartão)
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], marcos = rfMarcos(r,k), ly = yl+i*LH;
@@ -12139,16 +12132,8 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
         else (omitidos[k] = omitidos[k] || []).push({ rot:m.rot, jan });                               // marco colado no anterior: a janela vai pra lista do cartão
       });
     });
-    if(visitas.length){   // rótulo de cada visita (vermelho = fora da tolerância, verde = executada)
-      let ultX = -1e9; yv = 24*K;
-      visitas.forEach(v=>{
-        const dv = new Date(v.iso+'T00:00:00'), lab = (v.exec ? 'executada ' : 'visita ')+dm(dv)+(v.fora ? ' · '+(v.desvio>0?'+':'')+v.desvio+'d fora' : '');
-        const w = tw(lab,10.5*K,true)+14; let lx = Math.max(tx, Math.min(xVisita(v)-w/2, tx+TLW-w)); if(lx < ultX+4) lx = ultX+4;
-        RR(lx,yl+n*LH+4,lx+w,yl+n*LH+4+17*K,8*K,corVisita(v)); T(lx+7,yl+n*LH+6*K,lab,10.5*K,true,'#ffffff'); ultX = lx+w;
-      });
-    }
     // principais avaliações — uma coluna por projeto
-    const yp0 = yl+n*LH+12*K+yv; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
+    const yp0 = yl+n*LH+12*K; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
     const colw = (RW-20)/n; let baseDir = yp0;
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], xc = RX+i*colw; let yp = yp0+2;
@@ -12163,10 +12148,93 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
     if(h>0) LN(M+LEFT,y0+12,M+LEFT,y0+h-12,'#ececE6',1);
     return Math.max(baseEsq,baseDir)+12-y0;
   }
-  const medir = t=>{ const g=D, g2=REAL; D = novo(); REAL=false; const h = cartao(t,0,0); D=g; REAL=g2; return h; };
+  // cartão do PLANEJAMENTO: sem o texto de resumo; o dia da visita fica numa faixa própria no topo (janela de tolerância + data prevista + visita) e o estádio avaliado vem em destaque
+  function cartaoPlano(t,y0,h){
+    const r = t.rec; RR(M,y0,W-M,y0+h,12,'#ffffff','#c9c7bd',1.3);
+    const x = M+16, LW = LEFT-26;
+    const info = `${fmt1(r.area||0)} ha · ${r.cultura||'—'}`; let tit = 'Talhão '+r.talhao; while(tit.length>6 && tw(tit,24*K,true)+8+tw(info,12*K,true) > LW) tit = tit.slice(0,-2).trimEnd()+'…';
+    T(x,y0+12,tit,24*K,true); T(x+tw(tit,24*K,true)+8,y0+12+10*K,info,12*K,true,'#888780');
+    { const ln = r.fazenda+' · '+r.cliente; let s = ln; while(s.length>4 && tw(s,12*K,true) > LW) s = s.slice(0,-2); T(x,y0+12+31*K,s===ln ? s : s+'…',12*K,true,'#5f5e5a'); }
+    let cx = x, cy = y0+12+52*K;
+    t.projs.forEach(k=>{ const p = CG_PROJ[k], w = tw(p.label,11*K,true)+20; if(cx+w > M+LEFT-8){ cx = x; cy += 26*K; } RR(cx,cy,cx+w,cy+22*K,11*K,p.cor); T(cx+10,cy+4*K,p.label,11*K,true,p.txt); cx += w+6; });
+    cy += 30*K;
+    T(x,cy+2*K,'PLANTIO',9.5*K,true,'#888780'); T(x+56*K,cy,dmy(new Date(r.data_plantio+'T00:00:00')),14*K,true); cy += 24*K;
+    let baseEsq = cy;
+    const mapa = rfLinkMapa(r);
+    if(mapa){
+      const bw = LEFT-26, by = cy+2*K;
+      RR(x,by,x+bw,by+30*K,15*K,'#1a73e8'); PIN(x+19,by+13*K,'#ffffff','#1a73e8',6); T(x+36,by+7*K,'Abrir no Google Maps',12.5*K,true,'#ffffff');
+      T(x,by+30*K+4,mapa.txt,9.5*K,false,'#1a73e8');
+      LINK(x,by,x+bw,by+30*K,mapa.url); LINK(x,by+30*K+2,x+tw(mapa.txt,9.5*K,false),by+30*K+17,mapa.url);
+      baseEsq = by+30*K+4+14;
+    }
+    const tx = RX+LAB+4, yt = y0+10, d0 = new Date(r.data_plantio+'T00:00:00'), fim = somaDias(d0,HORIZ), n = t.projs.length, LANE = ((t.visitas||[]).length>1 ? 64 : 40)*K, yz = yt+20*K, yl = yz+LANE, LH = 54*K;
+    const visitas = t.visitas || [];
+    const cv = v=> v.exec ? '#0f6e56' : '#1a2019';
+    const dapDe = iso=> Math.round((new Date(iso+'T00:00:00')-d0)/86400000);
+    const xDe = iso=> tx+Math.max(0,Math.min(HORIZ,dapDe(iso)))*PXD;
+    LN(tx,yt+18*K,tx+TLW,yt+18*K,'#d3d1c7',1);
+    let mm = new Date(d0.getFullYear(),d0.getMonth(),1);
+    while(mm<=fim){
+      if(mm>=d0){ const xm = tx+Math.round((mm-d0)/86400000)*PXD; LN(xm,yt+18*K,xm,yl+n*LH,'#ececE6',1); T(xm+3,yt+2,RF_MESES[mm.getMonth()],11*K,true,'#888780'); }
+      mm = new Date(mm.getFullYear(),mm.getMonth()+1,1);
+    }
+    // faixa da visita
+    RR(RX,yz,RX+RW,yz+LANE-4,7,'#f6f5ef'); const ymid = yz+(LANE-4)/2;
+    const corLabel = visitas.length===1 ? cv(visitas[0]) : '#1a2019';
+    RR(RX+6,ymid-12*K,RX+LAB-8,ymid+12*K,12*K,corLabel); T(RX+6+(LAB-14)/2-tw('Visita',12*K,true)/2,ymid-7*K,'Visita',12*K,true,'#ffffff');
+    let ultX = -1e9; const ultT = [-1e9,-1e9];   // onde terminou o último rótulo (um por andar, quando há mais de uma visita)
+    const varias = visitas.length>1;
+    visitas.forEach((v,iv)=>{
+      const a0 = (v.alvos||[])[0];
+      if(a0){   // janela de tolerância do estádio avaliado e a data prevista
+        const dp = dapDe(a0.prevista), xa = tx+Math.max(0,dp-a0.faixa)*PXD, xb = tx+Math.min(HORIZ,dp+a0.faixa)*PXD, pc = CG_PROJ[a0.k] ? CG_PROJ[a0.k].cor : '#777';
+        const hb = varias ? 3.5*K : 5*K; RR(xa,ymid-hb,xb,ymid+hb,Math.min(5,hb),rfMistura(v.exec ? '#0f6e56' : pc,0.3)); LN(tx+dp*PXD,ymid-(varias?8:11)*K,tx+dp*PXD,ymid+(varias?8:11)*K,'#1a2019',1.6);
+      }
+      const xv = xDe(v.iso); CI(xv,ymid,9.5*K,'#ffffff'); CI(xv,ymid,7*K,cv(v));
+      if(v.exec){ LN(xv-3.6*K,ymid+0.4*K,xv-1*K,ymid+3*K,'#ffffff',1.6); LN(xv-1*K,ymid+3*K,xv+4*K,ymid-3*K,'#ffffff',1.6); }
+      const lab = (v.exec ? 'já executado ' : 'visita ')+dm(new Date(v.iso+'T00:00:00')), lw = tw(lab,10.5*K,true)+10;
+      if(!varias){
+        let lx = xv+13*K; if(lx+lw > tx+TLW) lx = xv-13*K-lw; if(lx < ultX+4) lx = ultX+4;
+        RR(lx,ymid-8*K,lx+lw,ymid+8*K,5,'#f6f5ef'); T(lx+5,ymid-6*K,lab,10.5*K,true,cv(v)); ultX = lx+lw;
+      } else {   // várias visitas: os rótulos alternam (1ª em cima, 2ª embaixo, 3ª em cima...) e ficam centralizados no ponto
+        const alto = iv%2===0, tier = alto ? 0 : 1;
+        let lx = Math.max(tx, Math.min(xv-lw/2, tx+TLW-lw)); if(lx < ultT[tier]+4) lx = ultT[tier]+4;
+        const ry = alto ? ymid-30*K : ymid+14*K;
+        LN(xv,alto ? ymid-9.5*K : ymid+9.5*K,xv,alto ? ymid-14*K : ymid+14*K,cv(v),1.2);
+        RR(lx,ry,lx+lw,ry+16*K,5,'#ffffff',rfMistura(cv(v),0.45),1); T(lx+5,ry+3*K,lab,10.5*K,true,cv(v)); ultT[tier] = lx+lw;
+      }
+    });
+    const alvoDe = (k,rot)=> visitas.filter(v=> (v.alvos||[]).some(a=> a.k===k && (a.est||[]).includes(rot)));
+    t.projs.forEach((k,i)=>{
+      const p = CG_PROJ[k], marcos = rfMarcos(r,k), ly = yl+i*LH;
+      LN(tx,ly+20*K,tx+TLW,ly+20*K,'#e6e4dc',1);
+      RR(RX,ly+8*K,RX+LAB-8,ly+32*K,12*K,p.cor); let fl = 12*K; while(tw(p.label,fl,true) > LAB-8-18 && fl>8) fl -= 0.4; T(RX+10,ly+13*K+(12*K-fl)/2,p.label,fl,true,p.txt);
+      if(!marcos.length) T(tx+8,ly+13*K,'nenhuma avaliação deste projeto se aplica a este talhão',10.5*K,false,'#888780');
+      marcos.forEach(m=>{   // faixa de tolerância de cada estádio (a do avaliado, mais forte)
+        const xm = tx+m.dap*PXD, fx = m.faixa ?? RF_JANELA, al = alvoDe(k,m.rot), ex = al.some(v=>v.exec);
+        RR(xm-fx*PXD,ly+15*K,xm+fx*PXD,ly+25*K,5,al.length ? rfMistura(ex ? '#0f6e56' : p.cor,0.3) : [236,238,232]);
+      });
+      marcos.forEach(m=>{
+        const dd = somaDias(d0,m.dap), xm = tx+m.dap*PXD, al = alvoDe(k,m.rot), ex = al.some(v=>v.exec), w = tw(m.rot,(al.length?12:11)*K,true)+(al.length?20:14);
+        if(al.length){
+          const cp = ex ? '#0f6e56' : p.cor; RR(xm-w/2,ly+7*K,xm+w/2,ly+33*K,13*K,cp); T(xm-tw(m.rot,12*K,true)/2,ly+13*K,m.rot,12*K,true,ex ? '#ffffff' : p.txt);
+          const ds = dm(dd); T(xm-tw(ds,11*K,true)/2,ly+36*K,ds,11*K,true,'#1a2019');
+          const fxm = m.faixa ?? RF_JANELA, jan = dm(somaDias(d0,m.dap-fxm))+' – '+dm(somaDias(d0,m.dap+fxm)); T(xm-tw(jan,8.6*K,false)/2,ly+48*K,jan,8.6*K,false,'#7a7970');
+        } else {
+          RR(xm-w/2,ly+9*K,xm+w/2,ly+31*K,11*K,'#ffffff',rfMistura(p.cor,0.5),1.4); T(xm-tw(m.rot,11*K,true)/2,ly+14*K,m.rot,11*K,true,'#8a8984');
+          const ds = dm(dd); T(xm-tw(ds,9.5*K,false)/2,ly+35*K,ds,9.5*K,false,'#7a7970');
+        }
+      });
+    });
+    if(h>0) LN(M+LEFT,y0+12,M+LEFT,y0+h-12,'#ececE6',1);
+    return Math.max(baseEsq,yl+n*LH+6*K)+12-y0;
+  }
+  const cartaoDe = extra ? cartaoPlano : cartao;
+  const medir = t=>{ const g=D, g2=REAL; D = novo(); REAL=false; const h = cartaoDe(t,0,0); D=g; REAL=g2; return h; };
 
   // ---------- páginas ----------
-  const LIM = H-52, GAP = 12, Y_P1 = extra ? 98 : 154, Y_PN = 46;
+  const LIM = H-52, GAP = 12, Y_P1 = extra ? 84 : 154, Y_PN = 46;
   const paginas = [[]]; let y = Y_P1;
   comPlantio.forEach(t=>{
     const h = medir(t);
@@ -12220,10 +12288,16 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
     if(i>0 || extra) D.addPage();
     if(i===0 && !extra) cabecalhoPagina1(); else cabecalhoPaginaN();
     if(extra && i===0){   // legenda dos cartões + o que significa a marca da visita
-      legenda(46);
-      LN(M+8,68,M+8,84,'#1a2019',1.5); CI(M+8,68,3.5,'#1a2019'); T(M+24,69,'dia da visita no planejamento  (vermelho: fora da tolerância  ·  verde: já executada)',11.5,true,'#1a2019');
+      let lx = M; const ly = 52;
+      const item = (larg,desenho,txt)=>{ desenho(lx); lx += larg+8; T(lx,ly-1,txt,11.5,false,'#5f5e5a'); lx += tw(txt,11.5,false)+24; };
+      item(30,x0=>RR(x0,ly-3,x0+30,ly+15,9,'#2e6e76'),'estádio da visita');
+      item(30,x0=>RR(x0,ly-2,x0+30,ly+14,8,'#ffffff','#9cc2c6',1.4),'outros estádios');
+      item(30,x0=>RR(x0,ly+1,x0+30,ly+11,5,rfMistura('#2e6e76',0.3)),'tolerância');
+      item(4,x0=>LN(x0+2,ly-3,x0+2,ly+15,'#1a2019',1.6),'data prevista');
+      item(18,x0=>{ CI(x0+9,ly+6,8,'#1a2019'); },'visita');
+      item(18,x0=>{ CI(x0+9,ly+6,8,'#0f6e56'); },'já executado');
     }
-    pg.forEach(c=> cartao(c.t,c.y,c.h));
+    pg.forEach(c=> cartaoDe(c.t,c.y,c.h));
     if(notaSemPlantio && i===nPag-1){
       const yy = pg.length ? pg[pg.length-1].y+pg[pg.length-1].h+GAP : (i===0?Y_P1:Y_PN);
       wrapTk(notaSemPlantio.split(' ').map(w=>[w,11,false,'#5f5e5a']),CW).forEach((lin,j)=> runs(lin).forEach(u=> T(M+u.xo,yy+j*15,u.txt,u.px,u.b,u.c)));
