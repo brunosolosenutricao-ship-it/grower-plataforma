@@ -12152,13 +12152,19 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
   function cartaoPlano(t,y0,h){
     const r = t.rec; RR(M,y0,W-M,y0+h,12,'#ffffff','#c9c7bd',1.3);
     const x = M+16, LW = LEFT-26;
-    const info = `${fmt1(r.area||0)} ha · ${r.cultura||'—'}`; let tit = 'Talhão '+r.talhao; while(tit.length>6 && tw(tit,24*K,true)+8+tw(info,12*K,true) > LW) tit = tit.slice(0,-2).trimEnd()+'…';
-    T(x,y0+12,tit,24*K,true); T(x+tw(tit,24*K,true)+8,y0+12+10*K,info,12*K,true,'#888780');
-    { const ln = r.fazenda+' · '+r.cliente; let s = ln; while(s.length>4 && tw(s,12*K,true) > LW) s = s.slice(0,-2); T(x,y0+12+31*K,s===ln ? s : s+'…',12*K,true,'#5f5e5a'); }
-    let cx = x, cy = y0+12+52*K;
+    // nome do talhão inteiro, numa linha própria (sem "Talhão" repetido quando o nome já tem); área e cultura embaixo; fazenda e cliente só uma vez quando são o mesmo nome
+    const nomeT = /^(talh[aã]o|piv[oô]|gleba|[aá]rea|lote)(\s|$|[-–:.])/i.test(String(r.talhao).trim()) ? String(r.talhao).trim() : 'Talhão '+r.talhao;
+    let fs = 24*K; while(fs>15*K && tw(nomeT,fs,true) > LW) fs -= 0.5*K;
+    let tit = nomeT; while(tit.length>6 && tw(tit,fs,true) > LW) tit = tit.slice(0,-2).trimEnd()+'…';
+    const y1 = y0+10, y2 = y1+fs+2*K, y3 = y2+15*K;
+    T(x,y1,tit,fs,true); T(x,y2,`${fmt1(r.area||0)} ha · ${r.cultura||'—'}`,12*K,true,'#888780');
+    { const sem = s=> String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+      const ln = sem(r.fazenda)===sem(r.cliente) ? String(r.fazenda||'') : r.fazenda+' · '+r.cliente; let s = ln; while(s.length>4 && tw(s,12*K,true) > LW) s = s.slice(0,-2);
+      T(x,y3,s===ln ? s : s+'…',12*K,true,'#5f5e5a'); }
+    let cx = x, cy = y3+19*K;
     t.projs.forEach(k=>{ const p = CG_PROJ[k], w = tw(p.label,11*K,true)+20; if(cx+w > M+LEFT-8){ cx = x; cy += 26*K; } RR(cx,cy,cx+w,cy+22*K,11*K,p.cor); T(cx+10,cy+4*K,p.label,11*K,true,p.txt); cx += w+6; });
-    cy += 30*K;
-    T(x,cy+2*K,'PLANTIO',9.5*K,true,'#888780'); T(x+56*K,cy,dmy(new Date(r.data_plantio+'T00:00:00')),14*K,true); cy += 24*K;
+    cy += 28*K;
+    T(x,cy+2*K,'PLANTIO',9.5*K,true,'#888780'); T(x+56*K,cy,dmy(new Date(r.data_plantio+'T00:00:00')),14*K,true); cy += 22*K;
     let baseEsq = cy;
     const mapa = rfLinkMapa(r);
     if(mapa){
