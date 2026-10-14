@@ -213,6 +213,12 @@
   tbody .lm-freeze-right{background:#fff;}
   .lm-freeze-right > span{display:block;font-size:10px;white-space:normal;}
   .lm-freeze-span{position:sticky !important;left:0px;background:var(--paper);z-index:4;}
+.lm-acomp-save-col{width:196px;min-width:196px;max-width:196px;}   /* cabe o Salvar + o botão da imagem (só nesta tabela) */
+.lm-freeze-right > span.lm-img-slot{display:inline-block;font-size:inherit;white-space:nowrap;vertical-align:middle;margin-left:4px;}
+.lm-img-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 8px;font-size:14px;cursor:pointer;line-height:1.2;}
+.lm-img-btn:hover{background:var(--bg);}
+.lm-img-thumb{border:1px solid var(--line);background:#fff;border-radius:6px;padding:1px;cursor:pointer;line-height:0;vertical-align:middle;}
+.lm-img-thumb img{width:30px;height:30px;object-fit:cover;border-radius:4px;display:block;background:#eee;}
   .reg-freeze-r1{position:sticky !important;right:96px;background:var(--paper);z-index:2;width:140px;min-width:140px;max-width:140px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
   .reg-freeze-r2{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:96px;min-width:96px;max-width:96px;}
   thead .reg-freeze-r1, thead .reg-freeze-r2{z-index:4;}
@@ -3141,34 +3147,37 @@ function estiloStatusPorData(status, dataStr, usaData){
   return { bg:'rgb('+rgb.join(',')+')', fg: t>=0.55 ? '#fff' : '#4a1a1a' };
 }
 function corStatusPorData(status, dataStr, faixa){ return estiloStatusPorData(status, dataStr, faixa!==null).bg; }
-// a data desta linha é a "data de execução"? (o status da mesma avaliação está em Executado/Feito)
+// a data desta linha é a "data de execução"? (algum status ligado a ela está em Executado/Feito)
+// Normalmente é 1 status por data. No Vida no Solo, 3 status dividem a mesma data: basta um deles estar executado.
 function dataEhExecucao(el){
   const tr = el.closest ? el.closest('tr') : null; if(!tr || el.dataset.corData===undefined) return false;
-  const sel = tr.querySelector('[data-cor-status="'+el.dataset.corData+'"]');
-  return !!sel && (sel.value==='Executado' || sel.value==='Feito');
+  return [...tr.querySelectorAll('[data-cor-status="'+el.dataset.corData+'"]')].some(s=> s.value==='Executado' || s.value==='Feito');
 }
 function recolorirStatusData(el, mudouStatus){
   const tr = el.closest('tr'); if(!tr) return;
   const uid = el.dataset.corStatus !== undefined ? el.dataset.corStatus : el.dataset.corData;
-  const sel = tr.querySelector('[data-cor-status="'+uid+'"]');
-  if(!sel) return;
+  const sels = [...tr.querySelectorAll('select[data-cor-status="'+uid+'"]')];   // quase sempre 1; no Vida no Solo são 3 status dividindo a mesma data
+  if(!sels.length) return;
   const dt = tr.querySelector('[data-cor-data="'+uid+'"]');
-  const exec = (sel.value==='Executado' || sel.value==='Feito');
-  if(dt){   // "Não se aplica": a data some e o campo trava; ao voltar pra outro status, reaparece a previsão (plantio + DAP)
-    if(sel.value===STATUS_NAO_SE_APLICA){ dt.value = ''; dt.disabled = true; }
+  const ehExec = s=> s.value==='Executado' || s.value==='Feito', ehNA = s=> s.value===STATUS_NAO_SE_APLICA;
+  const algumExec = sels.some(ehExec), todosNA = sels.every(ehNA);
+  if(dt){   // "Não se aplica" em todos: a data some e o campo trava; ao voltar pra outro status, reaparece a previsão (plantio + DAP)
+    if(todosNA){ dt.value = ''; dt.disabled = true; }
     else {
-      if(dt.disabled){ dt.disabled = false; if(!dt.value) dt.value = exec ? '' : (dt.dataset.prevista || ''); }
-      if(mudouStatus){
-        if(exec){ if(dt.value && dt.value===dt.dataset.prevista) dt.value = ''; }   // Executado: a previsão automática não vale como data de execução; fica vazio e destacado (não inventa data)
-        else dt.value = dt.dataset.prevista || '';                                     // voltou pra Pendente: a data de execução é limpa e volta a previsão automática
+      if(dt.disabled){ dt.disabled = false; if(!dt.value) dt.value = algumExec ? '' : (dt.dataset.prevista || ''); }
+      if(mudouStatus && el.dataset.corStatus!==undefined){
+        if(ehExec(el)){ if(!sels.some(s=> s!==el && ehExec(s)) && dt.value && dt.value===dt.dataset.prevista) dt.value = ''; }   // 1ª executada: a previsão automática não vale como data de execução; fica vazio e destacado (não inventa data). Se outra do bloco já estava executada, a data já é de execução e fica
+        else if(!ehNA(el) && !algumExec) dt.value = dt.dataset.prevista || '';             // voltou pra Pendente e nenhum outro está executado: a data de execução é limpa e volta a previsão automática
       }
     }
-    const falta = exec && !dt.disabled && !dt.value;   // Executado sem a data real
+    const falta = algumExec && !dt.disabled && !dt.value;   // Executado sem a data real
     dt.classList.toggle('dt-exec-vazia', falta);
     dt.title = falta ? 'Executado sem data: informe a data real da execução' : '';
   }
-  const e = estiloStatusPorData(sel.value, dt ? dt.value : '', sel.dataset.corFaixa!==undefined);
-  sel.style.background = e.bg; sel.style.color = e.fg; sel.style.fontWeight = '700';
+  sels.forEach(sel=>{   // a data pode ter mudado: repinta todos os status que dependem dela
+    const e = estiloStatusPorData(sel.value, dt ? dt.value : '', sel.dataset.corFaixa!==undefined);
+    sel.style.background = e.bg; sel.style.color = e.fg; sel.style.fontWeight = '700';
+  });
 }
 
 /* ===== CAMPOS DE DATA SEMPRE EM dd/mm/aaaa =====
@@ -3465,20 +3474,40 @@ function getMicroAcompEntry(key){
 }
 
 // Estádios fenológicos da soja (ciclo ~125 dias) — DAP (dias após plantio) + janela de tolerância
-const VNS_ETAPAS = [
-  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1/R2)' },
-  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)' },
-  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)' },
-  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1/R2)' },
-  { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita' },
+const VNS_ETAPAS = [   // label = nome mostrado no app; labelExcel = nome de antes (o Excel da Visão Geral continua com ele por enquanto)
+  { key:'etapa21_nematoides', label:'Solo para nematoides', labelExcel:'Etapa 2.1 – Solo para nematoides', sub:'Solo para nematoides' },
+  { key:'etapa21_bioas', label:'Solo para análise biológica (BioAs)', labelExcel:'Etapa 2.1 – Solo para análise biológica (BioAs)', sub:'Solo para análise biológica (BioAs)' },
+  { key:'etapa21_metagenomica', label:'Solo para análise metagenômica', labelExcel:'Etapa 2.1 – Solo para análise metagenômica', sub:'Solo para análise metagenômica' },
+  { key:'etapa22_aval_aerea', label:'Avaliação fotográfica (Parte Aérea)', labelExcel:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)' },
+  { key:'etapa23_aval_raizes', label:'Avaliação fotográfica (Raízes)', labelExcel:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)' },
+  { key:'etapa3_analise_foliar', label:'Análise foliar', labelExcel:'Etapa 3 – Análise foliar (R1/R2)' },
+  { key:'etapa4_produtividade', label:'Produtividade (sc/ha) do talhão', labelExcel:'Etapa 4 – Produtividade (sc/ha) do talhão', sub:'Produtividade (sc/ha) do talhão' },
+  { key:'etapa4_analise_graos', label:'Análise de grãos', labelExcel:'Etapa 4 – Análise de grãos', sub:'Análise de grãos' },
+  { key:'etapa4_pmg', label:'PMG', labelExcel:'Etapa 4 – PMG', sub:'PMG' },
 ];
 const VNS_ETAPA_STATUS_OPTIONS = ['Pendente','Executado', STATUS_NAO_SE_APLICA];
 // prazo previsto de cada etapa: DAP (dias após o plantio) e janela de tolerância (± dias) — R1 padronizado em 45 DAP
 const VNS_ETAPA_PRAZO = {
-  etapa21_coleta_solo:{ dap:45, faixa:4 }, etapa22_aval_aerea:{ dap:45, faixa:4 },
-  etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
-  etapa4_pos_colheita:{ dap:130, faixa:5 },
+  etapa21_nematoides:{ dap:45, faixa:4 }, etapa21_bioas:{ dap:45, faixa:4 }, etapa21_metagenomica:{ dap:45, faixa:4 },
+  etapa22_aval_aerea:{ dap:45, faixa:4 }, etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
+  etapa4_produtividade:{ dap:130, faixa:5 }, etapa4_analise_graos:{ dap:130, faixa:5 }, etapa4_pmg:{ dap:130, faixa:5 },
 };
+// A Etapa 2.1 e a Etapa 4 se dividem em 3 avaliações cada: cada uma com o seu status, todas na MESMA data (uma coluna de data por bloco).
+// As demais etapas têm status e data próprios. A data de um bloco é gravada igual nas avaliações dele, então o resto do app lê cada uma como avaliação independente.
+// O cabeçalho da tabela tem o bloco do estádio (R1/R2, Colheita) em cima e, abaixo, o título de cada etapa. A Colheita não tem título de etapa (o nome do bloco já diz).
+const VNS_BLOCOS = [
+  { estagio:'R1/R2', titulo:'Coleta de solo', keys:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica'] },
+  { estagio:'R1/R2', keys:['etapa22_aval_aerea'] }, { estagio:'R1/R2', keys:['etapa23_aval_raizes'] }, { estagio:'R1/R2', keys:['etapa3_analise_foliar'] },
+  { estagio:'Colheita', keys:['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'] },
+];
+const VNS_BLOCO_COR = { 'R1/R2':'#8a4f7d', 'Colheita':'#6b7a3f' };   // cores do app: a do R1/R2 é a mesma do bloco R1/R2 da Estruturação
+// título da etapa na 2ª linha do cabeçalho: o do bloco, ou o nome da avaliação quando a etapa tem uma só; a Colheita (3 avaliações, sem título) não tem
+const vnsTituloBloco = b=> b.titulo || (b.keys.length===1 ? VNS_ETAPAS.find(e=>e.key===b.keys[0]).label : null);
+// blocos de etapas agrupados pelo estádio (R1/R2, Colheita) pra faixa de cima do cabeçalho
+const vnsCabEstagios = VNS_BLOCOS.reduce((gs,b)=>{ let g = gs[gs.length-1]; if(!g || g.estagio!==b.estagio){ g = { estagio:b.estagio, blocos:[], cols:0 }; gs.push(g); } g.blocos.push(b); g.cols += b.keys.length+1; return gs; }, []).map(g=> ({ ...g, semTitulo: g.blocos.every(b=> !vnsTituloBloco(b)) }));
+const VNS_COLUNAS_ETAPAS = VNS_BLOCOS.reduce((s,b)=> s+b.keys.length+1, 0);   // colunas das etapas na tabela: um status por avaliação + uma data por bloco
+// chaves de ANTES da divisão: o que já estava salvo nelas (status e data) vale pras 3 novas até o próximo Salvar da linha
+const VNS_LEGADO = { etapa21_nematoides:'etapa21_coleta_solo', etapa21_bioas:'etapa21_coleta_solo', etapa21_metagenomica:'etapa21_coleta_solo', etapa4_produtividade:'etapa4_pos_colheita', etapa4_analise_graos:'etapa4_pos_colheita', etapa4_pmg:'etapa4_pos_colheita' };
 // Só vale guardar uma data que a pessoa realmente escolheu. Igual à previsão (plantio + DAP) ou apagada = guarda vazio: a tabela continua
 // mostrando a previsão e acompanha qualquer correção da data de plantio. Campos que não são de data (status) passam direto.
 function vnsNormalizarData(rec, campo, valor, exec){
@@ -3526,7 +3555,7 @@ const LM_BLOCOS = [
     { key:'analise_foliar', label:'Análise foliar', estagios:['R1/R2'] },
   ]},
   { num:2, label:'Nodulação', itens:[
-    { key:'nodulacao', label:'Avaliações de nodulação', estagios:['V4','R4'] },
+    { key:'nodulacao', label:'Avaliações de nodulação', estagios:['V4','R1/R2'] },
   ]},
   { num:3, label:'Estande e monitoramento visual', itens:[
     { key:'estande', label:'Estande', estagios:['V4','R8'] },
@@ -4067,8 +4096,9 @@ async function carregarDadosDoSupabase(){
         rec['estr_acomp_'+e.key+'_exec'] = destr['acomp_'+e.key+'_exec'] ?? null;
       });
       VNS_ETAPAS.forEach(e=>{
-        rec['vns_'+e.key] = dvns[e.key] ?? null;
-        rec['vns_'+e.key+'_data'] = dvns[e.key+'_data'] ?? null;
+        const leg = VNS_LEGADO[e.key];   // etapa que foi dividida: se ainda não tem o valor novo, vale o que estava salvo na chave antiga
+        rec['vns_'+e.key] = dvns[e.key] ?? (leg ? dvns[leg] : null) ?? null;
+        rec['vns_'+e.key+'_data'] = dvns[e.key+'_data'] ?? (leg ? dvns[leg+'_data'] : null) ?? null;
       });
       LM_OCORRENCIAS_TODAS.forEach(oc=>{
         rec['max_aval_'+oc.campoKey] = dm['aval_'+oc.campoKey] ?? null;
@@ -4092,6 +4122,7 @@ async function carregarDadosDoSupabase(){
     });
 
     await carregarParceiros(records);
+    await carregarImagens([...records, ...semArea]);
     RECORDS = records; SEM_AREA = semArea;
     state.selectedCulturas = new Set();
     state.drillEstado = null; state.drillCliente = null;
@@ -9455,7 +9486,7 @@ function cgColetarPontos(projetos, ini, fim){
   // tolerância (± dias) do estádio do evento, a mesma das tabelas, dos modais e do PDF; Óxido e Coleta Foliar usam a do R1/R2 (mesmo dia, 45 DAP)
   const faixaDe = (proj, estagio)=>{
     const lm = (typeof LM_ESTAGIO_DAP!=='undefined') ? LM_ESTAGIO_DAP : {}, es = (typeof ESTR_BLOCO_DAP!=='undefined') ? ESTR_BLOCO_DAP : {}, vn = (typeof VNS_ETAPA_PRAZO!=='undefined') ? VNS_ETAPA_PRAZO : {};
-    const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pos_colheita : vn.etapa21_coleta_solo) : lm['R1/R2'];
+    const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pmg : vn.etapa21_nematoides) : lm['R1/R2'];
     return (f && f.faixa) || 4;
   };
   const add = (r, proj, dap, avaliacao, estagio, dataSalva, exec)=>{
@@ -9465,7 +9496,7 @@ function cgColetarPontos(projetos, ini, fim){
     out.push({
       dataStr:d.toISOString().slice(0,10), mesStr:d.toISOString().slice(0,7), projeto:proj,
       estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', cliente:r.cliente||'', fazenda:r.fazenda||'', talhao:r.talhao||'',
-      avaliacao, estagio, statusPlantio: statusDe(r, proj), faixa: faixaDe(proj, estagio),
+      avaliacao, estagio, statusPlantio: statusDe(r, proj), parceiro: r.responsavel_parceiro || '', faixa: faixaDe(proj, estagio),
       exec: !!exec, execSemData: !!exec && !(dataSalva && /^\d{4}-\d{2}-\d{2}$/.test(dataSalva)),   // executada: o evento fica na data da execução; sem data escolhida, fica na prevista
     });
   };
@@ -9478,8 +9509,8 @@ function cgColetarPontos(projetos, ini, fim){
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
       // a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
-      ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
-      if(r.vns_etapa4_pos_colheita!==STATUS_NAO_SE_APLICA) add(r,'vns',VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap,rot('etapa4_pos_colheita'),'Colheita', r['vns_etapa4_pos_colheita_data'], r['vns_etapa4_pos_colheita']==='Executado');
+      ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
+      ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'Colheita', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
       const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
@@ -9895,6 +9926,223 @@ function cgPlanosAbrir(id, revisar){
   else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram } : null; }
   cgAbrirPlanejador(cfg);
 }
+/* ===== EXPORTAÇÃO DO PLANEJAMENTO (PDF e Excel) =====
+   Sai do card do planejamento salvo (Visão Geral). Usa os DIAS que foram organizados no Planejar e salvos; a data prevista e a tolerância vêm do cronograma de hoje.
+   PDF: calendário só com as semanas que têm avaliação (com os links do mapa) e, depois, o cartão de cada talhão com a linha do tempo do "Resumo por fazenda" (todos os projetos do talhão) e o dia da visita marcado.
+   Excel: uma linha por talhão e projeto + aba de resumo. Datas planejadas fora da tolerância só aparecem marcadas quando isso realmente acontece. */
+const EXP_DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const expISO = d=> d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const expData = iso=> new Date(iso+'T00:00:00');
+const expSoma = (iso,n)=>{ const d = expData(iso); d.setDate(d.getDate()+n); return expISO(d); };
+const expDif = (a,b)=> Math.round((expData(a)-expData(b))/86400000);   // a − b, em dias
+const expDM = iso=> iso.slice(8,10)+'/'+iso.slice(5,7);
+const expDMY = iso=> expDM(iso)+'/'+iso.slice(0,4);
+const expSegunda = iso=>{ const d = expData(iso); d.setDate(d.getDate()-((d.getDay()+6)%7)); return expISO(d); };
+const expUniq = l=> [...new Set(l)];
+const expNomeArq = (pref,regiao,ext)=> (pref+'_'+(regiao||'')+'_'+expISO(new Date())).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w\-]+/g,'_')+ext;   // sem acento nem espaço: Planejamento_Sao_Paulo_2026-10-14.pdf
+// coordenadas do talhão → links do Google Maps e do Waze (mesma regra do PDF do resumo da fazenda: fora do Brasil = provável latitude e longitude trocadas)
+function expLinks(r){
+  if(!r) return null;
+  const lat = parseFloat(String(r.max_latitude).replace(',','.')), lon = parseFloat(String(r.max_longitude).replace(',','.'));
+  if(!isFinite(lat) || !isFinite(lon) || lat<-35 || lat>6 || lon<-75 || lon>-33) return null;
+  const a = lat.toFixed(6), b = lon.toFixed(6);
+  return { maps:`https://www.google.com/maps/search/?api=1&query=${a},${b}`, waze:`https://waze.com/ul?ll=${a},${b}&navigate=yes`, txt:`${a}, ${b}` };
+}
+// itens do planejamento + o que o cronograma diz hoje. plano.itens: { dia, projeto, cliente, fazenda, talhao, estado, avaliacoes:[{avaliacao,estagio}] }
+function expPlanoDados(plano, pontos, recDe, stats){
+  const vivos = new Map(); pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
+  const itens = [], saiu = [];
+  (plano.itens || []).forEach(it=>{
+    const tudo = (vivos.get([it.projeto,it.cliente,it.fazenda,it.talhao].join('|')) || []).filter(p=> (it.avaliacoes||[]).some(a=> a.avaliacao===p.avaliacao && a.estagio===p.estagio));
+    const rec = recDe ? recDe(it) : null;
+    const base = { projeto:it.projeto, cliente:it.cliente||'', fazenda:it.fazenda||'', talhao:it.talhao||'', consultor:it.consultor||'', area:(rec && rec.area!=null && rec.area!=='' && isFinite(Number(rec.area))) ? Number(rec.area) : null, links:expLinks(rec) };
+    if(!tudo.length){ saiu.push({ ...base, rot:(it.fazenda||'')+' '+(it.talhao||'') }); return; }   // não há mais avaliação pendente (não se aplica ou saiu do projeto)
+    if(tudo.every(p=>p.exec)){   // já foi feito: aparece no dia da execução (com o dia que estava planejado, se foi outro)
+      const execDia = tudo.map(p=>p.dataStr).sort()[0];
+      itens.push({ ...base, estado:(tudo[0].estado || it.estado || '').toUpperCase(), exec:true, execSemData:tudo.every(p=>p.execSemData), dia:execDia, planejadoPara:it.dia, prevista:execDia, faixa:it.faixa||4, desvio:0, fora:false, statusPlantio:'', estagios:expUniq(tudo.map(p=>p.estagio)), avaliacoes:tudo.map(p=>p.avaliacao), jaFeitas:0 });
+      return;
+    }
+    const pend = tudo.filter(p=>!p.exec), prevista = pend.map(p=>p.dataStr).sort()[0], faixa = Math.min(...pend.map(p=> p.faixa ?? 4));
+    const desvio = expDif(it.dia, prevista);
+    itens.push({ ...base, estado:(pend[0].estado || it.estado || '').toUpperCase(), exec:false, execSemData:false, dia:it.dia, planejadoPara:it.dia, prevista, faixa, desvio, fora: Math.abs(desvio) > faixa, statusPlantio:pend[0].statusPlantio||'', estagios:expUniq(pend.map(p=>p.estagio)), avaliacoes:pend.map(p=>p.avaliacao), jaFeitas:tudo.length-pend.length });
+  });
+  itens.sort((a,b)=> a.dia.localeCompare(b.dia) || a.estado.localeCompare(b.estado) || a.fazenda.localeCompare(b.fazenda,'pt-BR') || a.talhao.localeCompare(b.talhao,'pt-BR',{numeric:true}) || a.projeto.localeCompare(b.projeto));
+  // só as semanas que têm avaliação; sábado e domingo só aparecem se algum talhão cair neles
+  const fimDeSemana = itens.some(i=>{ const w = expData(i.dia).getDay(); return w===0 || w===6; }), nDias = fimDeSemana ? 7 : 5;
+  const semanas = expUniq(itens.map(i=>expSegunda(i.dia))).sort().map(seg=>({ seg, dias: Array.from({length:nDias},(_,k)=>{ const iso = expSoma(seg,k); const doDia = itens.filter(i=>i.dia===iso); return { iso, itens:doDia, ufs:expUniq(doDia.map(i=>i.estado).filter(Boolean)).sort() }; }) }));
+  const dias = expUniq(itens.map(i=>i.dia)).sort();
+  const proj = expUniq(itens.map(i=>i.projeto));
+  const s = stats || { talhoes:expUniq(itens.map(i=>[i.cliente,i.fazenda,i.talhao].join('|'))).length, produtores:expUniq(itens.map(i=>i.cliente)).length, dias:dias.length, projetos:proj };
+  return { regiao:plano.regiao||'', subtitulo:plano.subtitulo||'', responsavel:plano.responsavel||'', criadoEm:(plano.criado_em||'').slice(0,10), itens, saiu, semanas, nDias, dias, projetos:(s.projetos && s.projetos.length) ? s.projetos : proj, stats:s, ini:dias[0]||'', fim:dias[dias.length-1]||'' };
+}
+
+// cartões do "Resumo por fazenda" (todos os projetos do talhão), na ordem da viagem, cada um com o(s) dia(s) da visita
+function expCartoes(dados){
+  const grupos = new Map(), semLinha = [];
+  dados.itens.forEach(i=>{
+    const k = [i.cliente,i.fazenda,i.talhao].join('|'); if(!grupos.has(k)) grupos.set(k,{ ref:i, visitas:[] });
+    const g = grupos.get(k), v = g.visitas.find(x=> x.iso===i.dia && x.exec===i.exec);
+    if(v){ if(i.fora){ v.fora = true; v.desvio = i.desvio; } } else g.visitas.push({ iso:i.dia, exec:i.exec, fora:i.fora, desvio:i.desvio });
+  });
+  const lista = [...grupos.values()].map(g=>({ ...g, primeira:g.visitas.map(v=>v.iso).sort()[0] }));
+  lista.sort((a,b)=> a.primeira.localeCompare(b.primeira) || a.ref.fazenda.localeCompare(b.ref.fazenda,'pt-BR') || a.ref.talhao.localeCompare(b.ref.talhao,'pt-BR',{numeric:true}));
+  const talhoes = [];
+  lista.forEach(g=>{
+    const t = rfTalhoesDaFazenda(g.ref.cliente, g.ref.fazenda).find(x=> x.rec.talhao===g.ref.talhao);
+    if(!t || !t.projs.length){ semLinha.push(g.ref.fazenda+' '+g.ref.talhao+' ('+((typeof CG_PROJ!=='undefined' && CG_PROJ[g.ref.projeto]) ? CG_PROJ[g.ref.projeto].label : g.ref.projeto)+')'); return; }
+    talhoes.push({ ...t, visitas:g.visitas.sort((a,b)=> a.iso.localeCompare(b.iso)) });
+  });
+  return { talhoes, nota: semLinha.length ? 'Sem cartão de linha do tempo (projeto sem marcos no resumo por fazenda): '+semLinha.join('; ')+'.' : '' };
+}
+
+// ---------------- PDF ----------------
+function expGerarPdfPlano(dados){
+  const { jsPDF } = window.jspdf;
+  const W=1400, H=990, M=30, FOOT=34;
+  const doc = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' }); const sc = doc.internal.pageSize.getWidth()/W;
+  const cor = c=> Array.isArray(c) ? c : (()=>{ let x = String(c).replace('#',''); if(x.length===3) x = x.split('').map(q=>q+q).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; })();
+  const mist = (c,a)=>{ const [r,g,b] = cor(c); return [Math.round(255+(r-255)*a), Math.round(255+(g-255)*a), Math.round(255+(b-255)*a)]; };
+  const setF = (px,b)=>{ doc.setFont('helvetica', b?'bold':'normal'); doc.setFontSize(px*sc); };
+  const tw = (t,px,b)=>{ setF(px,b); return doc.getTextWidth(String(t))/sc; };
+  const ajusta = (t,px,b,max)=>{ t = String(t); if(tw(t,px,b)<=max) return t; while(t.length>1 && tw(t+'…',px,b)>max) t = t.slice(0,-1); return t+'…'; };
+  const T = (x,y,t,px,b,c)=>{ setF(px,b); doc.setTextColor(...cor(c||'#1a2019')); doc.text(String(t), x*sc, y*sc, { baseline:'top' }); };
+  const TR = (xd,y,t,px,b,c)=> T(xd-tw(t,px,b),y,t,px,b,c);   // alinhado à direita
+  const RR = (x0,y0,x1,y1,r,fill,line,lw)=>{ const rr = Math.min(r,(x1-x0)/2,(y1-y0)/2); if(fill) doc.setFillColor(...cor(fill)); if(line){ doc.setDrawColor(...cor(line)); doc.setLineWidth((lw||1)*sc); } doc.roundedRect(x0*sc,y0*sc,(x1-x0)*sc,(y1-y0)*sc,rr*sc,rr*sc, fill&&line?'FD':fill?'F':'S'); };
+  const LN = (x0,y0,x1,y1,c,lw)=>{ doc.setDrawColor(...cor(c)); doc.setLineWidth((lw||1)*sc); doc.line(x0*sc,y0*sc,x1*sc,y1*sc); };
+  const CI = (cx,cy,r,c)=>{ doc.setFillColor(...cor(c)); doc.circle(cx*sc,cy*sc,r*sc,'F'); };
+  const LINK = (x0,y0,x1,y1,url)=>{ if(url) doc.link(x0*sc,y0*sc,(x1-x0)*sc,(y1-y0)*sc,{ url }); };
+  const VERM = '#c62828', VERDE = '#0f6e56', CINZA = '#5f5e5a', LINHA = '#d3d1c7', AZUL = '#185fa5';
+  const P = k=> (typeof CG_PROJ!=='undefined' && CG_PROJ[k]) || { label:k, s:k, cor:'#777', txt:'#fff' };
+  const hojeISO = expISO(new Date());
+  let y = 0;
+
+  // cabeçalho: completo na 1ª página, enxuto nas outras
+  const cabecalho = (primeira)=>{
+    if(primeira){
+      T(M,M,'GROWER  ·  Consultoria Agronômica',12,true,'#6b7a3f');
+      T(M,M+18,dados.regiao||'Planejamento',30,true);
+      if(dados.subtitulo) T(M,M+56,dados.subtitulo,15,false,CINZA);
+      const dir = [ dados.responsavel ? 'Responsável: '+dados.responsavel : '', dados.ini ? (expDM(dados.ini)+' a '+expDM(dados.fim)+'  ·  '+dados.semanas.length+(dados.semanas.length===1?' semana':' semanas')) : '', dados.criadoEm ? 'Planejamento de '+expDMY(dados.criadoEm) : '' ].filter(Boolean);
+      dir.forEach((t,i)=> TR(W-M,M+2+i*20,t,i===0?14:13,i===0,i===0?'#1a2019':CINZA));
+      LN(M,M+84,W-M,M+84,'#1a2019',1.6); y = M+98;
+      // números do planejamento
+      const st = dados.stats, cx = [ [st.talhoes, st.talhoes===1?'talhão':'talhões'], [st.produtores, st.produtores===1?'produtor':'produtores'], [st.dias, st.dias===1?'dia de viagem':'dias de viagem'] ];
+      cx.forEach(([n,rot],i)=>{ const x0 = M+i*176; RR(x0,y,x0+164,y+52,8,'#f1efe8'); T(x0+12,y+6,n,26,true); T(x0+12+tw(n,26,true)+8,y+20,rot,12.5,false,CINZA); });
+      let x = M+3*176+14; T(x,y+6,'projetos',11.5,false,CINZA); x = M+3*176+14; let yy = y+24;
+      dados.projetos.forEach(k=>{ const p = P(k), w = tw(p.label,12,true)+18; if(x+w>W-M){ x = M+3*176+14; yy += 22; } RR(x,yy,x+w,yy+19,9.5,p.cor); T(x+9,yy+3,p.label,12,true,p.txt); x += w+6; });
+      y += 70;
+    } else {
+      T(M,M-4,dados.regiao||'Planejamento',16,true); TR(W-M,M-1,(dados.ini?expDM(dados.ini)+' a '+expDM(dados.fim):'')+'  ·  '+(dados.responsavel||''),12.5,false,CINZA);
+      LN(M,M+22,W-M,M+22,'#1a2019',1.2); y = M+36;
+    }
+  };
+  const novaPagina = ()=>{ doc.addPage(); cabecalho(false); };
+
+  // ---------- calendário: só as semanas com avaliação ----------
+  const nD = dados.nDias, CWD = (W-2*M)/nD, PAD = 7, LH = 19;
+  const agrupaFaz = itens=>{ const g = []; itens.forEach(i=>{ const k = i.cliente+'|'+i.fazenda; let x = g.find(q=>q.k===k); if(!x){ x = { k, fazenda:i.fazenda, cliente:i.cliente, itens:[] }; g.push(x); } x.itens.push(i); }); return g; };
+  const sinais = i=>{   // o que vai na 2ª linha do talhão (só quando existe)
+    const s = [];
+    if(i.exec) s.push({ t:'Executado'+(i.execSemData?' (sem data)':''), c:VERDE, check:true }, ...(i.planejadoPara && i.planejadoPara!==i.dia ? [{ t:'planejado pra '+expDM(i.planejadoPara), c:CINZA }] : []));
+    else { if(i.statusPlantio==='Estimativa') s.push({ t:'plantio em estimativa', c:VERM }); if(i.fora) s.push({ t:(i.desvio>0?'+':'')+i.desvio+'d fora da tolerância', c:VERM }); }
+    return s;
+  };
+  const alturaDia = d=>{ let h = 0; agrupaFaz(d.itens).forEach(g=>{ h += 26; g.itens.forEach(i=>{ h += 22 + (sinais(i).length ? 15 : 0); }); h += 6; }); return h; };
+  const pedacosTalhao = i=>{ const a = i.avaliacoes.length; return (i.estagios.join(' · ')) + (a>1 ? '  ('+a+')' : ''); };
+  const chipProj = (x,yy,k)=>{ const p = P(k); RR(x,yy,x+36,yy+16,5,p.cor); T(x+18-tw(p.s,10.5,true)/2,yy+2.5,p.s,10.5,true,p.txt); };
+  const desenhaDia = (d,x0,yTop,hCel)=>{
+    let yy = yTop+PAD; const maxW = CWD-2*PAD;
+    agrupaFaz(d.itens).forEach(g=>{
+      T(x0+PAD,yy,ajusta(g.fazenda,13,true,maxW),13,true); yy += 15; T(x0+PAD,yy,ajusta(g.cliente,11,false,maxW),11,false,CINZA); yy += 15;
+      g.itens.forEach(i=>{
+        chipProj(x0+PAD,yy,i.projeto);
+        const nome = ajusta(i.talhao,12.5,true,70); T(x0+PAD+42,yy+1,nome,12.5,true);
+        const ex = x0+PAD+42+tw(nome,12.5,true)+6, lk = i.links ? 66 : 0;
+        T(ex,yy+2,ajusta(pedacosTalhao(i),11,false,maxW-(ex-x0-PAD)-lk-6),11,false,CINZA);
+        if(i.links){   // links do mapa (clicáveis no PDF): Maps e Waze
+          const xm = x0+CWD-PAD-60; T(xm,yy+2,'Maps',11,true,AZUL); T(xm+34,yy+2,'Waze',11,true,AZUL);
+          LN(xm,yy+14,xm+29,yy+14,AZUL,.6); LN(xm+34,yy+14,xm+62,yy+14,AZUL,.6); LINK(xm,yy,xm+30,yy+16,i.links.maps); LINK(xm+34,yy,xm+64,yy+16,i.links.waze);
+        }
+        yy += 22;
+        const sn = sinais(i);
+        if(sn.length){ let xs = x0+PAD+42; sn.forEach(q=>{ if(q.check){ CI(xs+5,yy+6,5,VERDE); LN(xs+2.6,yy+6.2,xs+4.4,yy+8,'#ffffff',1.3); LN(xs+4.4,yy+8,xs+7.6,yy+3.8,'#ffffff',1.3); xs += 13; } T(xs,yy,q.t,10.5,true,q.c); xs += tw(q.t,10.5,true)+10; }); yy += 15; }
+      });
+      yy += 6;
+    });
+  };
+  cabecalho(true);
+  T(M,y,'Calendário',17,true); T(M+tw('Calendário',17,true)+10,y+4,'só as semanas com avaliação',12,false,CINZA); y += 28;
+  if(!dados.itens.length){ T(M,y+10,'Este planejamento não tem nenhum talhão com dia escolhido.',14,false,CINZA); y += 40; }
+  dados.semanas.forEach(sem=>{
+    const hDias = Math.max(70, ...sem.dias.map(alturaDia)), hTotal = 24+30+hDias+14;
+    if(y+hTotal > H-FOOT && y > M+120) novaPagina();
+    const fim = sem.dias[nD>5?6:4].iso;
+    T(M,y,'Semana de '+expDM(sem.seg)+' a '+expDM(fim),13.5,true,'#6b7a3f'); y += 22;
+    sem.dias.forEach((d,k)=>{
+      const x0 = M+k*CWD, tem = d.itens.length>0, w = expData(d.iso).getDay();
+      RR(x0,y,x0+CWD,y+30,0,tem?'#e9efdc':'#f1efe8'); doc.setDrawColor(...cor(LINHA)); doc.setLineWidth(.8*sc); doc.rect(x0*sc,y*sc,CWD*sc,(30+hDias)*sc,'S');
+      T(x0+PAD,y+7,EXP_DOW[w]+' '+expDM(d.iso),13,tem,tem?'#1a2019':'#8a8984');
+      let xu = x0+CWD-PAD; d.ufs.slice().reverse().forEach(u=>{ const ww = tw(u,11,true)+12; RR(xu-ww,y+6,xu,y+23,8,'#2d4a1f'); T(xu-ww+6,y+8.5,u,11,true,'#fff'); xu -= ww+4; });
+      if(tem) desenhaDia(d,x0,y+30,hDias);
+    });
+    y += 30+hDias+16;
+  });
+
+  // ---------- depois do calendário: o cartão de cada talhão, o mesmo do "Resumo por fazenda", com o dia da visita marcado ----------
+  const cartoes = expCartoes(dados);
+  if(cartoes.talhoes.length) rfGerarPdf(null,null,null,{ doc, talhoes:cartoes.talhoes, nota:cartoes.nota, tituloPagina:(dados.regiao||'Planejamento')+'  ·  linha do tempo por talhão', subtituloPagina:'Planejamento'+(dados.criadoEm?' de '+expDMY(dados.criadoEm):'') });
+  // rodapé em todas as páginas
+  const nPag = doc.internal.getNumberOfPages();
+  for(let p=1;p<=nPag;p++){ doc.setPage(p); LN(M,H-FOOT+6,W-M,H-FOOT+6,LINHA,.8); T(M,H-FOOT+12,'Gerado em '+expDMY(hojeISO)+'  ·  as datas previstas podem mudar',11,false,'#8a8984'); TR(W-M,H-FOOT+12,'Página '+p+' de '+nPag,11,false,'#8a8984'); }
+  doc.setProperties({ title:'Planejamento — '+(dados.regiao||''), author:'Grower Consultoria Agronômica', subject:dados.subtitulo||'' });
+  const nomeArq = expNomeArq('Planejamento',dados.regiao,'.pdf');
+  return { doc, nomeArq, nPag };
+}
+
+// ---------------- Excel ----------------
+const EXP_COLS_XL = ['Dia','Data','UF','Cliente','Fazenda','Talhão','Projeto','Estádio','Avaliações','Área (ha)','Data prevista','Desvio (dias)','Fora da tolerância','Status do plantio','Situação','Georreferência','Google Maps','Waze'];
+const expDataXl = iso=> new Date(Date.UTC(+iso.slice(0,4), +iso.slice(5,7)-1, +iso.slice(8,10), 12));   // meio-dia UTC: o Excel não escorrega um dia por fuso
+function expPlanoLinhasXl(dados){
+  const P = k=> (typeof CG_PROJ!=='undefined' && CG_PROJ[k]) ? CG_PROJ[k].label : k;
+  return dados.itens.map(i=>[
+    EXP_DOW[expData(i.dia).getDay()], expDataXl(i.dia), i.estado, i.cliente, i.fazenda, i.talhao, P(i.projeto), i.estagios.join(', '), i.avaliacoes.join('; '),
+    i.area, expDataXl(i.prevista), i.exec ? '' : i.desvio, i.fora ? 'Sim' : '', i.statusPlantio, i.exec ? 'Executado'+(i.execSemData?' (sem data)':'')+(i.planejadoPara && i.planejadoPara!==i.dia ? ' (planejado pra '+expDM(i.planejadoPara)+')' : '') : 'A fazer',
+    i.links ? i.links.txt : '', i.links ? 'Abrir' : '', i.links ? 'Abrir' : ''
+  ]);
+}
+function expPlanoResumoXl(dados){
+  const st = dados.stats, r = [ ['Região', dados.regiao], ['Subtítulo', dados.subtitulo], ['Responsável', dados.responsavel], ['Planejamento de', dados.criadoEm ? expDMY(dados.criadoEm) : ''], ['Período', dados.ini ? expDM(dados.ini)+' a '+expDM(dados.fim) : ''], ['Talhões', st.talhoes], ['Produtores', st.produtores], ['Dias de viagem', st.dias], [], ['Dia','Data','UF','Talhões'] ];
+  dados.dias.forEach(d=>{ const l = dados.itens.filter(i=>i.dia===d); r.push([EXP_DOW[expData(d).getDay()], expDMY(d), expUniq(l.map(i=>i.estado).filter(Boolean)).sort().join('+'), expUniq(l.map(i=>[i.cliente,i.fazenda,i.talhao].join('|'))).length]); });
+  return r;
+}
+function expGerarExcelPlano(dados){
+  const XL = window.XLSX, linhas = expPlanoLinhasXl(dados);
+  const ws = XL.utils.aoa_to_sheet([EXP_COLS_XL, ...linhas], { cellDates:true });
+  ws['!cols'] = [6,12,5,22,22,10,16,14,48,10,13,12,12,14,30,24,12,10].map(w=>({ wch:w }));
+  ws['!freeze'] = { xSplit:0, ySplit:1 }; ws['!autofilter'] = { ref:'A1:'+String.fromCharCode(64+EXP_COLS_XL.length)+(linhas.length+1) };
+  linhas.forEach((l,k)=>{ const r = k+2;
+    ['B','K'].forEach(c=>{ if(ws[c+r]) ws[c+r].z = 'dd/mm/yyyy'; });
+    const i = dados.itens[k]; if(i.links){ if(ws['Q'+r]) ws['Q'+r].l = { Target:i.links.maps, Tooltip:'Abrir no Google Maps' }; if(ws['R'+r]) ws['R'+r].l = { Target:i.links.waze, Tooltip:'Abrir no Waze' }; }
+  });
+  const ws2 = XL.utils.aoa_to_sheet(expPlanoResumoXl(dados)); ws2['!cols'] = [{ wch:20 },{ wch:30 },{ wch:8 },{ wch:10 }];
+  const wb = XL.utils.book_new(); XL.utils.book_append_sheet(wb, ws, 'Roteiro'); XL.utils.book_append_sheet(wb, ws2, 'Resumo');
+  const nomeArq = expNomeArq('Planejamento',dados.regiao,'.xlsx');
+  return { wb, nomeArq };
+}
+/* ===== FIM EXPORTAÇÃO DO PLANEJAMENTO ===== */
+// dados do planejamento + o cronograma de hoje + o cadastro dos talhões (área e coordenadas)
+const expPlanoDadosApp = plano=> expPlanoDados(plano, cgPontosVivos(), it=> RECORDS.find(r=> r.cliente===it.cliente && r.fazenda===it.fazenda && r.talhao===it.talhao), cgPlanoResumo(plano.itens || [], plano.semanas));
+function expPlanoPdf(plano){
+  if(!(window.jspdf && window.jspdf.jsPDF)){ alert('A biblioteca de PDF ainda não carregou. Recarregue a página e tente de novo.'); return; }
+  try{ const r = expGerarPdfPlano(expPlanoDadosApp(plano)); r.doc.save(r.nomeArq); }
+  catch(e){ console.error(e); alert('Não foi possível gerar o PDF do planejamento: '+(e.message||e)); }
+}
+function expPlanoExcel(plano){
+  if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
+  try{ const r = expGerarExcelPlano(expPlanoDadosApp(plano)); XLSX.writeFile(r.wb, r.nomeArq, { cellDates:true }); }
+  catch(e){ console.error(e); alert('Não foi possível gerar o Excel do planejamento: '+(e.message||e)); }
+}
+
 function cgRenderPlanosSalvos(){
   const el = document.getElementById('vgPlanosSalvos'); if(!el) return;
   const st = cgPlanosEstado();
@@ -9926,7 +10174,13 @@ function cgRenderPlanosSalvos(){
     .pl-acoes{display:flex;gap:6px;border-top:1px solid var(--line);padding-top:10px;}
     .pl-acoes button{flex:none;}
     .pl-acoes button[data-acao="abrir"]{flex:1;}
+    .pl-acoes{flex-wrap:wrap;}
     .pl-acoes button[data-acao="excluir"]{color:#c62828;}
+    .pl-exp{position:relative;display:inline-block;}
+    .pl-menu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:250px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;z-index:50;}
+    .pl-menu[hidden]{display:none;}
+    .pl-menu button{display:block;width:100%;text-align:left;border:0;background:#fff;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap;}
+    .pl-menu button:hover{background:var(--bg);}
     .pl-vazio{font-size:13px;color:var(--ink-soft);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:14px 16px;}
   </style>`;
   if(st.erro){ el.innerHTML = css+`<div class="pl-sec"><div class="pl-cab"><h3>Planejamentos salvos</h3></div><div class="pl-vazio">Os planejamentos salvos não estão disponíveis: ${cgEscH(st.erro)}. Confira se a tabela <b>planejamentos</b> foi criada no Supabase.</div></div>`; return; }
@@ -9945,16 +10199,22 @@ function cgRenderPlanosSalvos(){
       ${res.ini ? `<div class="pl-per">📅 ${cgDataBr(res.ini).slice(0,5)} a ${cgDataBr(res.fim).slice(0,5)} · ${res.semanas} ${res.semanas===1?'semana':'semanas'}</div>` : ''}
       ${partes.length ? `<button type="button" class="pl-aviso" data-acao="rever" title="Abre o planejamento com esses talhões na lista, pra você escolher um dia novo">⚠ ${partes.join(' · ')} desde que salvou. Rever</button>` : ''}
       <div class="pl-chips">${res.projetos.map(k=>`<span class="pl-chip" style="background:${CG_PROJ[k].cor};color:${CG_PROJ[k].txt}">${cgEscH(CG_PROJ[k].label)}</span>`).join('')}</div>
-      <div class="pl-acoes"><button type="button" class="btn ghost" data-acao="abrir">Abrir</button><button type="button" class="btn ghost" data-acao="editar">Editar</button><button type="button" class="btn ghost" data-acao="excluir">Excluir</button></div>
+      <div class="pl-acoes"><button type="button" class="btn ghost" data-acao="abrir">Abrir</button><button type="button" class="btn ghost" data-acao="editar">Editar</button><span class="pl-exp"><button type="button" class="btn ghost" data-acao="exportar" title="Baixar o planejamento salvo, com os dias que você organizou">⬇ Exportar ▾</button><div class="pl-menu" hidden><button type="button" data-acao="exp-pdf"><b>PDF</b> · calendário e linha do tempo</button><button type="button" data-acao="exp-xlsx"><b>Excel</b> · uma linha por talhão</button></div></span><button type="button" class="btn ghost" data-acao="excluir">Excluir</button></div>
     </div>`;
   }).join('');
   el.innerHTML = css+`<div class="pl-sec"><div class="pl-cab"><h3>Planejamentos salvos <span>· ${st.lista.length}</span></h3>
       ${st.lista.length>1 ? `<div class="pl-filtros"><select data-filtro="regiao"><option value="">Região: todas</option>${regioes.map(r=>`<option value="${cgEscH(r)}" ${f.regiao===r?'selected':''}>${cgEscH(r)}</option>`).join('')}</select><select data-filtro="responsavel"><option value="">Responsável: todos</option>${resps.map(r=>`<option value="${cgEscH(r)}" ${f.responsavel===r?'selected':''}>${cgEscH(r)}</option>`).join('')}</select></div>` : ''}</div>
     ${st.lista.length ? `<div class="pl-grade">${cards || '<div class="pl-vazio">Nenhum planejamento com esses filtros.</div>'}</div>` : '<div class="pl-vazio">Nenhum planejamento salvo ainda. No Cronograma, marque semanas, clique em Planejar e use Salvar planejamento.</div>'}</div>`;
+  if(!window.__plMenuDoc){ window.__plMenuDoc = true; document.addEventListener('click', e=>{ if(!(e.target.closest && e.target.closest('.pl-exp'))) document.querySelectorAll('.pl-menu').forEach(m=>{ m.hidden = true; }); }); }
   el.onclick = async e=>{
     const bt = e.target.closest && e.target.closest('button[data-acao]'); if(!bt) return;
     const card = bt.closest('.pl-card'), id = card && card.dataset.id, plano = st.lista.find(p=> String(p.id)===id); if(!plano) return;
     const acao = bt.dataset.acao;
+    const fechaMenus = ()=> el.querySelectorAll('.pl-menu').forEach(m=>{ m.hidden = true; });
+    if(acao==='exportar'){ const m = card.querySelector('.pl-menu'), abrir = m.hidden; fechaMenus(); m.hidden = !abrir; return; }
+    if(acao==='exp-pdf'){ fechaMenus(); expPlanoPdf(plano); return; }
+    if(acao==='exp-xlsx'){ fechaMenus(); expPlanoExcel(plano); return; }
+    fechaMenus();
     if(acao==='abrir') cgPlanosAbrir(plano.id, false);
     else if(acao==='rever') cgPlanosAbrir(plano.id, true);
     else if(acao==='editar'){
@@ -9978,7 +10238,7 @@ function abrirCronogramaGeral(ctxKey){
     ...(ctx.projetos.length>1 ? [{k:'projeto', label:'Projeto'}] : []),
     {k:'estado', label:'Estado'}, {k:'consultor', label:'Consultor'},
     {k:'cliente', label:'Cliente'}, {k:'fazenda', label:'Fazenda'}, {k:'talhao', label:'Talhão'},
-    ...(planejavel ? [{k:'status', label:'Status do plantio'}] : []),
+    ...(planejavel ? [{k:'status', label:'Status do plantio'}, {k:'parceiro', label:'Responsabilidade/Parceiro'}] : []),   // os filtros do calendário também valem pro Planejar e pra Distribuição inteligente
   ];
   FILTROS.forEach(f=>{ if(!F[f.k]) F[f.k] = new Set(); });
   const inicioRange = new Date(2026,8,1), fimRange = new Date(2027,4,0);
@@ -9986,15 +10246,17 @@ function abrirCronogramaGeral(ctxKey){
   const mesHoje = (()=>{ const h = new Date(); const k = h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); return CG_MESES.some(m=>m.key===k) ? k : CG_MESES[0].key; })();
   if(!state.cgMes[ctxKey]) state.cgMes[ctxKey] = mesHoje;
 
-  const valorDe = (p,k)=> k==='projeto' ? p.projeto : k==='status' ? (p.statusPlantio || '—') : p[k];
+  const valorDe = (p,k)=> k==='projeto' ? p.projeto : k==='status' ? (p.statusPlantio || '—') : k==='parceiro' ? (p.parceiro || 'Em aberto') : p[k];
   const rotuloDe = (k,v)=> k==='projeto' ? CG_PROJ[v].label : k==='status' ? (v==='—' ? 'Sem status' : v) : v;
   const passa = (p, ignorar)=> FILTROS.every(f=> f.k===ignorar || F[f.k].size===0 || F[f.k].has(valorDe(p,f.k)));
   const opcoesDe = k=>{
     const set = new Set(); pontos.forEach(p=>{ if(passa(p,k)) set.add(valorDe(p,k)); });
     F[k].forEach(v=>set.add(v));
-    if(k==='status'){   // ordem fixa, com quantos talhões cada opção tem (nos outros filtros já ligados)
+    if(k==='status' || k==='parceiro'){   // ordem fixa (a dos parceiros é a da Visão Geral), com quantos talhões cada opção tem (nos outros filtros já ligados)
       const quem = {}; pontos.forEach(p=>{ if(passa(p,k)){ const s = valorDe(p,k); (quem[s] = quem[s] || new Set()).add([p.cliente,p.fazenda,p.talhao].join('|')); } });
-      return ['Plantado','Estimativa','—'].filter(s=>set.has(s)).map(s=>({ v:s, l: rotuloDe(k,s)+' ('+(quem[s] ? quem[s].size : 0)+')' }));
+      const ordem = k==='status' ? ['Plantado','Estimativa','—'] : VG_PARCEIROS.map(x=>x.v);
+      const resto = k==='parceiro' ? [...set].filter(s=>!ordem.includes(s)).sort((a,b)=> a.localeCompare(b,'pt-BR')) : [];   // valor que não está mais na lista não some do filtro
+      return [...ordem.filter(s=>set.has(s)), ...resto].map(s=>({ v:s, l: rotuloDe(k,s)+' ('+(quem[s] ? quem[s].size : 0)+')' }));
     }
     return [...set].sort((a,b)=> a.localeCompare(b,'pt-BR',{numeric:true})).map(v=>({v, l:rotuloDe(k,v)}));
   };
@@ -10272,6 +10534,15 @@ function abrirModalLadroesMaximasTalhao(rec){
     .lm-hist-wrap{display:flex;gap:16px;align-items:flex-start;}
     .lm-hist-chart{flex:1;min-width:0;height:180px;position:relative;}
     .lm-hist-side{width:150px;flex-shrink:0;}
+    .lm-hist-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+    .lm-hist-badges > div{width:auto;margin-bottom:0;}
+    .lm-hist-img{flex:1;min-width:0;height:180px;position:relative;border:1px solid var(--line);border-radius:10px;padding:0;overflow:hidden;background:var(--bg);cursor:zoom-in;}
+    .lm-hist-img img{width:100%;height:100%;object-fit:cover;display:block;}
+    .lm-hist-img img:not([src]){display:none;}
+    .lm-hist-img-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-soft);}
+    .lm-hist-img.ok .lm-hist-img-txt{display:none;}
+    .lm-hist-img.ok::after{content:'🔍 ampliar';position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;padding:2px 8px;border-radius:999px;}
+    @media (max-width:640px){ .lm-hist-wrap{flex-direction:column;} .lm-hist-chart, .lm-hist-img{flex:none;width:100%;} }   /* celular: gráfico em cima e imagem embaixo */
     .lm-badge-sinaleiro{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;margin-bottom:8px;width:100%;box-sizing:border-box;}
     .lm-badge-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
     .lm-badge-aval{background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;width:100%;box-sizing:border-box;}
@@ -10328,12 +10599,13 @@ function abrirModalLadroesMaximasTalhao(rec){
 
       <div class="lm-modal-sec" style="animation-delay:.1s;">
         <h3>Histórico produtivo</h3>
+        <div class="lm-hist-badges">
+          <div class="lm-badge-sinaleiro"><span class="lm-badge-dot" style="background:${corSinaleiro};"></span> Sinaleiro: <b>${rec.max_sinaleiro ?? '—'}</b></div>
+          <div class="lm-badge-aval">Avaliação: <b>${rec.max_avaliacao || '—'}</b></div>
+        </div>
         <div class="lm-hist-wrap">
           <div class="lm-hist-chart"><canvas id="lmHistChart"></canvas></div>
-          <div class="lm-hist-side">
-            <div class="lm-badge-sinaleiro"><span class="lm-badge-dot" style="background:${corSinaleiro};"></span> Sinaleiro: <b>${rec.max_sinaleiro ?? '—'}</b></div>
-            <div class="lm-badge-aval">Avaliação: <b>${rec.max_avaliacao || '—'}</b></div>
-          </div>
+          ${rec.imagem_caminho ? `<button type="button" class="lm-hist-img" id="lmHistImg" title="Clique para ampliar"><img alt="Imagem do talhão"><span class="lm-hist-img-txt">Carregando imagem…</span></button>` : ''}
         </div>
       </div>
 
@@ -10403,7 +10675,151 @@ function abrirModalLadroesMaximasTalhao(rec){
       }
     });
   }
+  // imagem do talhão (metade direita do "Histórico produtivo"): link temporário do balde privado; clicar amplia (só ver; trocar e remover ficam na tabela)
+  const lmImgBox = document.getElementById('lmHistImg');
+  if(lmImgBox){
+    (async()=>{
+      const u = (await imgUrlsAssinadas([rec.imagem_caminho]))[rec.imagem_caminho], im = lmImgBox.querySelector('img'), tx = lmImgBox.querySelector('.lm-hist-img-txt');
+      if(u){ im.src = u; lmImgBox.classList.add('ok'); } else if(tx) tx.textContent = 'Imagem indisponível agora';
+    })();
+    lmImgBox.addEventListener('click', ()=> abrirImagemTalhao(rec, null, { somenteVer:true }));
+  }
 }
+/* ===== IMAGEM POR TALHÃO (tabelas Máximas e Ladrões) =====
+   Uma imagem por talhão. O arquivo fica no Supabase Storage (balde PRIVADO "talhao-imagens") e só o caminho vai pro cadastro (talhoes.imagem_caminho).
+   A foto é reduzida no navegador antes de enviar e é gravada NA HORA (não depende do botão Salvar da linha). Precisa rodar o anexos_imagens.sql no Supabase. */
+const IMG_BALDE = 'talhao-imagens', IMG_LADO_MAX = 1600, IMG_QUALIDADE = 0.82, IMG_MAX_BYTES = 25*1024*1024;
+// consulta separada de propósito: se a coluna ainda não existe no banco, nada mais quebra.
+async function carregarImagens(records){
+  try{
+    const { data, error } = await fetchAllPaginated('talhoes','id, imagem_caminho', q=> q.not('imagem_caminho','is',null));
+    if(error){ console.warn('Imagem por talhão indisponível (rode o anexos_imagens.sql no Supabase):', error.message); return; }
+    const mapa = new Map(data.map(x=> [x.id, x.imagem_caminho]));
+    records.forEach(r=>{ r.imagem_caminho = mapa.get(r.id) || null; });
+  }catch(e){ console.warn(e); }
+}
+const imgAttr = s=> String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const imgMsgErro = e=>{ const m = (e && e.message) || String(e); return /imagem_caminho|42703|PGRST204|bucket/i.test(m) ? 'Imagens ainda não configuradas no banco: rode o anexos_imagens.sql no Supabase.' : 'Erro com a imagem: '+m; };
+function imgSlotHtml(rec){
+  return rec && rec.imagem_caminho
+    ? `<button type="button" class="lm-img-thumb" data-img-acao="ver" title="Ver a imagem do talhão"><img alt="Imagem do talhão" data-img-path="${imgAttr(rec.imagem_caminho)}"></button>`
+    : `<button type="button" class="lm-img-btn" data-img-acao="anexar" title="Anexar imagem do talhão (JPG ou PNG). A foto é salva na hora, sem precisar do Salvar.">📎</button>`;
+}
+// links temporários (balde privado): pede todos de uma vez e guarda por ~50 min
+async function imgUrlsAssinadas(paths){
+  const cache = state.imgUrls = state.imgUrls || {}, pend = state.imgPend = state.imgPend || {}, agora = Date.now(), out = {};
+  const faltam = [...new Set(paths)].filter(p=> p && !(cache[p] && cache[p].ate > agora) && !pend[p]);
+  if(faltam.length){   // um pedido só pra todos os que faltam; quem pedir os mesmos enquanto ele não volta espera o mesmo pedido
+    const req = (async()=>{
+      try{
+        const { data, error } = await sb.storage.from(IMG_BALDE).createSignedUrls(faltam, 3600);
+        if(!error && data) data.forEach(d=>{ if(d && d.signedUrl) cache[d.path] = { url:d.signedUrl, ate:agora+50*60*1000 }; });
+      }catch(e){ console.warn(e); }
+      faltam.forEach(p=>{ delete pend[p]; });
+    })();
+    faltam.forEach(p=>{ pend[p] = req; });
+  }
+  await Promise.all([...new Set(paths.map(p=> pend[p]).filter(Boolean))]);
+  paths.forEach(p=>{ out[p] = cache[p] ? cache[p].url : null; });
+  return out;
+}
+async function imgPreencherMiniaturas(raiz){
+  const imgs = [...raiz.querySelectorAll('img[data-img-path]')]; if(!imgs.length) return;
+  const urls = await imgUrlsAssinadas(imgs.map(i=>i.dataset.imgPath));
+  imgs.forEach(i=>{ const u = urls[i.dataset.imgPath]; if(u) i.src = u; else i.alt = 'Imagem indisponível'; });
+}
+// reduz a foto (lado maior 1600 px, JPEG): alguns MB viram algumas centenas de KB
+function redimensionarImagem(file){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = ()=>{
+      try{
+        const k = Math.min(1, IMG_LADO_MAX/Math.max(img.naturalWidth, img.naturalHeight)), cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.naturalWidth*k)); cv.height = Math.max(1, Math.round(img.naturalHeight*k));
+        const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0,cv.width,cv.height);
+        cv.toBlob(b=>{ URL.revokeObjectURL(url); b ? res(b) : rej(new Error('não foi possível reduzir a imagem')); }, 'image/jpeg', IMG_QUALIDADE);
+      }catch(e){ URL.revokeObjectURL(url); rej(e); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('não foi possível ler a imagem')); };
+    img.src = url;
+  });
+}
+async function enviarImagemTalhao(rec, file){
+  if(!file || !/^image\/(jpeg|png)$/.test(file.type)) throw new Error('use uma imagem JPG ou PNG');
+  if(file.size > IMG_MAX_BYTES) throw new Error('a imagem é grande demais (máximo 25 MB)');
+  const blob = await (window.__imgRedim || redimensionarImagem)(file);
+  const caminho = rec.id+'/'+Date.now()+'.jpg', st = sb.storage.from(IMG_BALDE);
+  const up = await st.upload(caminho, blob, { contentType:'image/jpeg', upsert:false });
+  if(up.error) throw up.error;
+  const { data, error } = await sb.from('talhoes').update({ imagem_caminho:caminho }).eq('id', rec.id).select('id');
+  if(error || !data || !data.length){ try{ await st.remove([caminho]); }catch(e){} throw (error || new Error('o talhão não foi atualizado (sem permissão?)')); }
+  const antigo = rec.imagem_caminho; rec.imagem_caminho = caminho;
+  if(antigo){ try{ await st.remove([antigo]); }catch(e){} if(state.imgUrls) delete state.imgUrls[antigo]; }   // a imagem anterior sai do balde
+}
+async function removerImagemTalhao(rec){
+  const antigo = rec.imagem_caminho; if(!antigo) return;
+  const { data, error } = await sb.from('talhoes').update({ imagem_caminho:null }).eq('id', rec.id).select('id');
+  if(error || !data || !data.length) throw (error || new Error('o talhão não foi atualizado (sem permissão?)'));
+  rec.imagem_caminho = null;
+  try{ await sb.storage.from(IMG_BALDE).remove([antigo]); }catch(e){}
+  if(state.imgUrls) delete state.imgUrls[antigo];
+}
+function imgRecDoSlot(slot){ const key = decodeURIComponent(slot.dataset.lmImgKey); return RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key); }
+function imgRedesenharSlots(rec){
+  document.querySelectorAll('.lm-img-slot').forEach(slot=>{ const r = imgRecDoSlot(slot); if(r && r.id===rec.id){ slot.innerHTML = imgSlotHtml(rec); imgLigarSlot(slot); } });
+}
+function imgEscolherArquivo(rec, msgEl){
+  let inp = document.getElementById('imgTalhaoInput');
+  if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'imgTalhaoInput'; inp.accept = 'image/jpeg,image/png'; inp.hidden = true; document.body.appendChild(inp); }
+  inp.onchange = async ()=>{
+    const f = inp.files && inp.files[0]; inp.value = ''; if(!f) return;
+    const msg = (t, erro)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; } };
+    msg('⏳ Enviando foto…');
+    try{ await enviarImagemTalhao(rec, f); msg('✓ Foto salva'); setTimeout(()=>{ if(msgEl && msgEl.textContent==='✓ Foto salva') msg(''); }, 2500); }
+    catch(e){ msg(imgMsgErro(e), true); }
+    imgRedesenharSlots(rec);
+  };
+  inp.click();
+}
+async function abrirImagemTalhao(rec, msgEl, opts){
+  const antigo = document.getElementById('imgTalhaoViewer'); if(antigo) antigo.remove();
+  const url = (await imgUrlsAssinadas([rec.imagem_caminho]))[rec.imagem_caminho];
+  const ov = document.createElement('div'); ov.id = 'imgTalhaoViewer';
+  ov.innerHTML = `<style>
+      #imgTalhaoViewer{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:7200;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
+      #imgTalhaoViewer .iv-box{background:#fff;border-radius:14px;max-width:min(94vw,1100px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;}
+      #imgTalhaoViewer .iv-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;}
+      #imgTalhaoViewer .iv-img{background:#111;display:flex;align-items:center;justify-content:center;min-height:200px;overflow:auto;}
+      #imgTalhaoViewer .iv-img img{max-width:100%;max-height:72vh;object-fit:contain;display:block;}
+      #imgTalhaoViewer .iv-acoes{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line);}
+    </style>
+    <div class="iv-box" role="dialog" aria-modal="true" aria-label="Imagem do talhão">
+      <div class="iv-top"><b>${imgAttr(rec.cliente)} / ${imgAttr(rec.fazenda)} / ${imgAttr(rec.talhao)}</b></div>
+      <div class="iv-img">${url ? `<img alt="Imagem do talhão" src="${imgAttr(url)}">` : '<div style="color:#fff;padding:30px;font-size:13px;">Imagem indisponível agora.</div>'}</div>
+      <div class="iv-acoes">${opts && opts.somenteVer ? '' : '<button type="button" class="btn ghost" id="ivTrocar">Trocar</button><button type="button" class="btn ghost" id="ivRemover" style="color:#c62828;">Remover</button>'}<button type="button" class="btn btn-preto" id="ivFechar">Fechar</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  const fecha = ()=>{ ov.remove(); document.removeEventListener('keydown', esc); }, esc = e=>{ if(e.key==='Escape') fecha(); };
+  document.addEventListener('keydown', esc);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecha(); });
+  ov.querySelector('#ivFechar').addEventListener('click', fecha);
+  const bTrocar = ov.querySelector('#ivTrocar'), bRemover = ov.querySelector('#ivRemover');
+  if(bTrocar) bTrocar.addEventListener('click', ()=>{ fecha(); imgEscolherArquivo(rec, msgEl); });
+  if(bRemover) bRemover.addEventListener('click', async ()=>{
+    if(!confirm('Remover a imagem do talhão '+rec.fazenda+' / '+rec.talhao+'? Não dá pra desfazer.')) return;
+    fecha();
+    try{ await removerImagemTalhao(rec); if(msgEl){ msgEl.textContent = '✓ Imagem removida'; msgEl.style.color = ''; setTimeout(()=>{ if(msgEl.textContent==='✓ Imagem removida') msgEl.textContent=''; }, 2500); } }
+    catch(e){ if(msgEl){ msgEl.textContent = imgMsgErro(e); msgEl.style.color = '#c62828'; } }
+    imgRedesenharSlots(rec);
+  });
+}
+function imgLigarSlot(slot){
+  const rec = imgRecDoSlot(slot); if(!rec) return;
+  const msgEl = slot.closest('td') ? slot.closest('td').querySelector('.lm-acomp-msg') : null;
+  slot.querySelectorAll('button[data-img-acao]').forEach(b=> b.addEventListener('click', ()=>{ b.dataset.imgAcao==='anexar' ? imgEscolherArquivo(rec, msgEl) : abrirImagemTalhao(rec, msgEl); }));
+  imgPreencherMiniaturas(slot);
+}
+/* ===== FIM IMAGEM POR TALHÃO ===== */
 function renderLadroesMaximasMapa(){
   const container = document.getElementById('tab-ladroesmaximas-mapa');
   if(!container) return;
@@ -10590,7 +11006,7 @@ function renderLadroesMaximasMapa(){
             <tr>
               <th rowspan="4" class="lm-freeze lm-freeze-1">Cliente</th><th rowspan="4" class="lm-freeze lm-freeze-2">Fazenda</th><th rowspan="4" class="lm-freeze lm-freeze-3">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th><th rowspan="4">Status do Plantio</th>
               ${blocos.map(b=>`<th colspan="${b.itens.reduce((s,it)=>s+it.estagios.length,0)*2}" style="background:${LM_BLOCO_COR[b.num]};color:#fff;border-left:3px solid #fff;">Bloco ${b.num} — ${b.label}</th>`).join('')}
-              <th rowspan="4" class="lm-freeze-right">Salvar</th>
+              <th rowspan="4" class="lm-freeze-right lm-acomp-save-col">Salvar</th>
             </tr>
             <tr>
               ${blocos.flatMap(b=>b.itens.map((it,ii)=>`<th colspan="${it.estagios.length*2}" style="background:${lmHexRgba(LM_BLOCO_COR[b.num],.16)};${ii===0?`border-left:3px solid ${LM_BLOCO_COR[b.num]};`:''}">${it.label}</th>`)).join('')}
@@ -10621,8 +11037,8 @@ function renderLadroesMaximasMapa(){
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="status_plantio" style="background:${r.max_status_plantio==='Plantado'?'#c8e6c9':r.max_status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;"><option value="" ${!r.max_status_plantio?'selected':''}>—</option><option value="Plantado" ${r.max_status_plantio==='Plantado'?'selected':''}>Plantado</option><option value="Estimativa" ${r.max_status_plantio==='Estimativa'?'selected':''}>Estimativa</option></select></td>
                   ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" data-prevista="${dataPrevistaStr(oc)}" value="${entry[oc.campoKey+'_data']||(entry[oc.campoKey]==='Executado'?'':dataPrevistaStr(oc))}"></td>`).join('')}
-                  <td class="lm-freeze-right" style="white-space:nowrap;">
-                    <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>
+                  <td class="lm-freeze-right lm-acomp-save-col" style="white-space:nowrap;">
+                    <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button><span class="lm-img-slot" data-lm-img-key="${encodeURIComponent(key)}">${imgSlotHtml(r)}</span>
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
                   </td>
                 </tr>`;
@@ -10677,6 +11093,8 @@ function renderLadroesMaximasMapa(){
       salvarCicloLadroesMaximas(el.dataset.lmTalhaoId, valor, el);
     });
   });
+  container.querySelectorAll('.lm-img-slot').forEach(slot=>{ const rec = imgRecDoSlot(slot); if(rec){ const msgEl = slot.closest('td').querySelector('.lm-acomp-msg'); slot.querySelectorAll('button[data-img-acao]').forEach(b=> b.addEventListener('click', ()=>{ b.dataset.imgAcao==='anexar' ? imgEscolherArquivo(rec, msgEl) : abrirImagemTalhao(rec, msgEl); })); } });
+  imgPreencherMiniaturas(container);   // um pedido só pros links temporários de todas as miniaturas
   container.querySelectorAll('.lm-acomp-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const key = decodeURIComponent(btn.dataset.lmKey);
@@ -10810,8 +11228,8 @@ function abrirModalVidaNoSoloTalhao(rec){
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
   const hojeTl = new Date(); hojeTl.setHours(0,0,0,0);
   const VNS_ESTAGIOS = [
-    { estagio:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, etapas:['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
-    { estagio:'Colheita', dap:VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, faixa:VNS_ETAPA_PRAZO.etapa4_pos_colheita.faixa, etapas:['etapa4_pos_colheita'] },
+    { estagio:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_nematoides.dap, faixa:VNS_ETAPA_PRAZO.etapa21_nematoides.faixa, etapas:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
+    { estagio:'Colheita', dap:VNS_ETAPA_PRAZO.etapa4_pmg.dap, faixa:VNS_ETAPA_PRAZO.etapa4_pmg.faixa, etapas:['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'] },
   ];
   const gruposEstagio = VNS_ESTAGIOS.map(est=>{
     const esperada = dataPlantioObj ? (()=>{ const d = new Date(dataPlantioObj); d.setDate(d.getDate()+est.dap); return d; })() : null;
@@ -11206,14 +11624,17 @@ function renderVidaNoSolo(){
       <div class="table-scroll" data-topscroll="sempre">
         <table data-colfilter="vns-talhoes">
           <thead><tr>
-            <th rowspan="2" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="2" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="2" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="2" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
-            <th rowspan="2">Data de plantio</th><th rowspan="2">Status do Plantio</th>
-            <th rowspan="2">Presença de nematoides</th><th rowspan="2">Presença de doenças</th><th rowspan="2">Participação no projeto</th><th rowspan="2">Status de compra</th>
-            ${VNS_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-            <th rowspan="2" class="lm-freeze-right">Salvar</th>
+            <th rowspan="3" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="3" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="3" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="3" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
+            <th rowspan="3">Data de plantio</th><th rowspan="3">Status do Plantio</th>
+            <th rowspan="3">Presença de nematoides</th><th rowspan="3">Presença de doenças</th><th rowspan="3">Participação no projeto</th><th rowspan="3">Status de compra</th>
+            ${vnsCabEstagios.map(g=>`<th colspan="${g.cols}" ${g.semTitulo ? 'rowspan="2"' : ''} style="background:${VNS_BLOCO_COR[g.estagio]||'#6b7a3f'};color:#fff;">${g.estagio}</th>`).join('')}
+            <th rowspan="3" class="lm-freeze-right">Salvar</th>
           </tr>
           <tr>
-            ${VNS_ETAPAS.map(()=>`<th>Status</th><th>Data</th>`).join('')}
+            ${vnsCabEstagios.filter(g=>!g.semTitulo).map(g=> g.blocos.map(b=>`<th colspan="${b.keys.length+1}">${vnsTituloBloco(b)||''}</th>`).join('')).join('')}
+          </tr>
+          <tr>
+            ${VNS_BLOCOS.map(b=> b.keys.map(k=> b.keys.length>1 ? `<th>Status<br><span style="font-weight:400;font-size:10px;">${VNS_ETAPAS.find(e=>e.key===k).sub}</span></th>` : '<th>Status</th>').join('') + '<th>Data</th>').join('')}
           </tr></thead>
           <tbody>
             ${tabelaTalhoesVnsFiltrada.map(r=>{
@@ -11233,13 +11654,20 @@ function renderVidaNoSolo(){
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
                 <td><span style="color:${r.vns_status_compra==='Comprado'?'#2ecc71':r.vns_status_compra==='Não comprado'?'#e74c3c':r.vns_status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)'};font-weight:700;">${r.vns_status_compra||'—'}</span></td>
-                ${VNS_ETAPAS.map(e=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${VNS_ETAPA_PRAZO[e.key].faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+e.key]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${e.key}_data" data-cor-data="${e.key}" data-prevista="${vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap)}" value="${r['vns_'+e.key+'_data']||(r['vns_'+e.key]==='Executado'?'':vnsDataPrevista(r.data_plantio, VNS_ETAPA_PRAZO[e.key].dap))}"></td>`).join('')}
+                ${VNS_BLOCOS.map(b=>{
+                  const uid = b.keys[0], prazo = VNS_ETAPA_PRAZO[uid], prev = vnsDataPrevista(r.data_plantio, prazo.dap);
+                  const algumExec = b.keys.some(k=> r['vns_'+k]==='Executado');
+                  const dataSalva = b.keys.map(k=> r['vns_'+k+'_data']).find(Boolean) || '';
+                  // um status por avaliação e UMA data pro bloco (a mesma data vale pras avaliações dele)
+                  return b.keys.map(k=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${k}" data-cor-status="${uid}" data-cor-faixa="${prazo.faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+k]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
+                    + `<td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${uid}_data" data-vns-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" value="${dataSalva||(algumExec?'':prev)}"></td>`;
+                }).join('')}
                 <td class="lm-freeze-right" style="white-space:nowrap;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
                 </td>
               </tr>`;
-            }).join('') || `<tr><td colspan="${11+VNS_ETAPAS.length*2}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+            }).join('') || `<tr><td colspan="${11+VNS_COLUNAS_ETAPAS}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -11315,7 +11743,8 @@ function renderVidaNoSolo(){
     el.addEventListener('change', ()=>{
       if(el.dataset.vnsCampo==='status_plantio') el.style.background = el.value==='Plantado' ? '#c8e6c9' : el.value==='Estimativa' ? '#fff3b0' : '#fff';
       const recCampo = RECORDS.find(r=>r.id===el.dataset.vnsTalhaoId) || SEM_AREA.find(r=>r.id===el.dataset.vnsTalhaoId);
-      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsCampo, vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el)), el);
+      const valorEtapa = vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));
+      salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsGrupo ? el.dataset.vnsGrupo.split(',').map(k=>k+'_data') : el.dataset.vnsCampo, valorEtapa, el);   // data de bloco: grava a mesma nas avaliações dele
     });
   });
   container.querySelectorAll('.vns-linha-save-btn').forEach(btn=>{
@@ -11326,7 +11755,8 @@ function renderVidaNoSolo(){
       // Status de compra não é mais editável aqui — só na Alimentação; aqui só reforça o valor que já está lá
       const entry = { status_compra: recLinha ? (recLinha.vns_status_compra || null) : null };
       container.querySelectorAll(`.vns-etapa-input[data-vns-talhao-id="${talhaoId}"]`).forEach(el=>{
-        entry[el.dataset.vnsCampo] = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
+        const v = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
+        if(el.dataset.vnsGrupo) el.dataset.vnsGrupo.split(',').forEach(k=>{ entry[k+'_data'] = v; }); else entry[el.dataset.vnsCampo] = v;
       });
       const textoOriginal = btn.textContent;
       btn.disabled = true; btn.textContent = '⏳ Salvando…';
@@ -11476,7 +11906,7 @@ const VG_VISIVEIS = VG_PROJETOS.filter(p=> !VG_BLOQUEADOS.includes(p.key));
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
-  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' },
   { v:'Em aberto', cor:'#757575' },
 ];
 const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
@@ -11502,7 +11932,7 @@ const RF_PRINC = {
   maximas:[['Marcha de absorção','V4 a R8','planta inteira pra análise de nutrientes ao longo do ciclo'],['Análise foliar','R1/R2','folha diagnóstico pra teor de nutrientes'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos'],['+ estande, nodulação, fotos e componentes produtivos','','']],
   ladroes:[['Componentes produtivos','R6/R7','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
   estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Altura, fotos e ground cover','R1/R2','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, produtividade e PMG por planta']],
-  vns:[['Coleta de solo, fotos e análise foliar','R1/R2','etapas 2.1, 2.2, 2.3 e 3'],['Análises pós colheita','Colheita','etapa 4 do acompanhamento']],
+  vns:[['Coleta de solo (nematoides, BioAs e metagenômica), fotos e análise foliar','R1/R2','amostras de solo, fotos da parte aérea e das raízes e folhas pra análise'],['Produtividade, análise de grãos e PMG','Colheita','resultados do talhão na colheita']],
   oxc:[['Coleta foliar','45 DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
 };
 function rfHexRgb(h){ let x = String(h).replace('#',''); if(x.length===3) x = x.split('').map(c=>c+c).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; }
@@ -11554,10 +11984,11 @@ function rfMarcos(r,k){
     return { rot:b, faixa:ESTR_BLOCO_DAP[b].faixa, dap:rfDapEfetivo(r, ESTR_BLOCO_DAP[b].dap, l.map(e=> r['estr_acomp_'+e.key+'_mes'])), total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
   }).filter(Boolean);
   if(k==='vns'){
-    const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(x=>!rfEhNA(r,'vns',x));
+    const r1 = ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(x=>!rfEhNA(r,'vns',x));
+    const colh = ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].filter(x=>!rfEhNA(r,'vns',x));
     return [
-      r1.length ? { rot:'R1/R2', faixa:VNS_ETAPA_PRAZO.etapa21_coleta_solo.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length } : null,
-      rfEhNA(r,'vns','etapa4_pos_colheita') ? null : { rot:'Colh.', faixa:VNS_ETAPA_PRAZO.etapa4_pos_colheita.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pos_colheita.dap, [r.vns_etapa4_pos_colheita_data]), total:1, feitas: r.vns_etapa4_pos_colheita==='Executado' ? 1 : 0 },
+      r1.length ? { rot:'R1/R2', faixa:VNS_ETAPA_PRAZO.etapa21_nematoides.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_nematoides.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length } : null,
+      colh.length ? { rot:'Colh.', faixa:VNS_ETAPA_PRAZO.etapa4_pmg.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pmg.dap, colh.map(x=> r['vns_'+x+'_data'])), total:colh.length, feitas:colh.filter(x=> r['vns_'+x]==='Executado').length } : null,
     ].filter(Boolean);
   }
   if(k==='oxc') return [{ rot:'Coleta', faixa:LM_ESTAGIO_DAP['R1/R2'].faixa, dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
@@ -11580,18 +12011,19 @@ function rfPrincipais(r,k){
     return [ ap('V4') ? base[0] : null, ap('R1/R2') ? base[1] : null, ap('R6/R7') ? base[2] : null ].filter(Boolean);
   }
   if(k==='vns'){
-    const r1 = ['etapa21_coleta_solo','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].some(x=>!rfEhNA(r,'vns',x));
-    return [ r1 ? base[0] : null, rfEhNA(r,'vns','etapa4_pos_colheita') ? null : base[1] ].filter(Boolean);
+    const r1 = ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].some(x=>!rfEhNA(r,'vns',x));
+    const colh = ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].some(x=>!rfEhNA(r,'vns',x));
+    return [ r1 ? base[0] : null, colh ? base[1] : null ].filter(Boolean);
   }
   return base;
 }
 
-function rfGerarPdf(cliente, fazenda, projetosSel){
+function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no export do planejamento): { doc, talhoes:[{rec,projs,visitas}], nota, tituloPagina, subtituloPagina }
   const { jsPDF } = window.jspdf;
   const W=1400, H=990, M=28, K=1.1, LEFT=244, LAB=128, HORIZ=140;
   const CW=W-2*M, RX=M+LEFT+12, RW=CW-LEFT-28, TLW=RW-LAB-18, PXD=TLW/HORIZ;
   const novo = ()=> new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
-  const doc = novo(); const sc = doc.internal.pageSize.getWidth()/W;
+  const doc = (extra && extra.doc) || novo(); const sc = doc.internal.pageSize.getWidth()/W;
   let D = doc, REAL = false;
   const cor = c => Array.isArray(c) ? c : rfHexRgb(c);
   const setF = (px,b)=>{ D.setFont('helvetica', b?'bold':'normal'); D.setFontSize(px*sc); };
@@ -11612,7 +12044,7 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
   const somaDias = (d,n)=>{ const x = new Date(d); x.setDate(x.getDate()+n); return x; };
 
   // ---------- dados ----------
-  const todos = rfTalhoesDaFazenda(cliente,fazenda,projetosSel);
+  const todos = extra ? extra.talhoes : rfTalhoesDaFazenda(cliente,fazenda,projetosSel);
   const comPlantio = todos.filter(t=> t.rec.data_plantio);
   const semPlantio = todos.filter(t=> !t.rec.data_plantio);
   const recs = todos.map(t=>t.rec);
@@ -11647,6 +12079,10 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
     const tit = 'Talhão '+r.talhao; T(x,y0+12,tit,26*K,true);
     const info2 = `${fmt1(r.area||0)} ha · ${r.cultura||'—'}`; T(x+tw(tit,26*K,true)+10,y0+12+12*K,info2,12.5*K,true,'#888780');
     let cx = x, cy = y0+12+36*K;
+    if(extra){   // no planejamento os cartões são de fazendas diferentes: mostra a fazenda e o cliente embaixo do título
+      const ln = r.fazenda+' · '+r.cliente; let s = ln; while(s.length>4 && tw(s,12*K,true) > LEFT-26) s = s.slice(0,-2);
+      T(x,y0+12+33*K,s===ln ? s : s+'…',12*K,true,'#5f5e5a'); cy += 22*K;
+    }
     t.projs.forEach(k=>{
       const p = CG_PROJ[k], w = tw(p.label,11*K,true)+20;
       if(cx+w > M+LEFT-8){ cx = x; cy += 26*K; }
@@ -11674,6 +12110,11 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
       if(mm>=d0){ const xm = tx+Math.round((mm-d0)/86400000)*PXD; LN(xm,yt+18*K,xm,yl+n*LH,'#ececE6',1); T(xm+3,yt+2,RF_MESES[mm.getMonth()],11*K,true,'#888780'); }
       mm = new Date(mm.getFullYear(),mm.getMonth()+1,1);
     }
+    let yv = 0;   // espaço extra embaixo das linhas, pro rótulo das visitas
+    const visitas = (extra && t.visitas) || [];
+    const corVisita = v=> v.exec ? '#0f6e56' : (v.fora ? '#c62828' : '#1a2019');
+    const xVisita = v=> tx+Math.max(0,Math.min(HORIZ,Math.round((new Date(v.iso+'T00:00:00')-d0)/86400000)))*PXD;
+    visitas.forEach(v=>{ LN(xVisita(v),yt+18*K,xVisita(v),yl+n*LH,corVisita(v),1.5); CI(xVisita(v),yt+18*K,3.5,corVisita(v)); });   // a linha da visita fica atrás dos marcos
     const omitidos = {};   // projeto -> janelas "início – fim" que não couberam embaixo do marco (vão pra lista do cartão)
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], marcos = rfMarcos(r,k), ly = yl+i*LH;
@@ -11698,8 +12139,16 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
         else (omitidos[k] = omitidos[k] || []).push({ rot:m.rot, jan });                               // marco colado no anterior: a janela vai pra lista do cartão
       });
     });
+    if(visitas.length){   // rótulo de cada visita (vermelho = fora da tolerância, verde = executada)
+      let ultX = -1e9; yv = 24*K;
+      visitas.forEach(v=>{
+        const dv = new Date(v.iso+'T00:00:00'), lab = (v.exec ? 'executada ' : 'visita ')+dm(dv)+(v.fora ? ' · '+(v.desvio>0?'+':'')+v.desvio+'d fora' : '');
+        const w = tw(lab,10.5*K,true)+14; let lx = Math.max(tx, Math.min(xVisita(v)-w/2, tx+TLW-w)); if(lx < ultX+4) lx = ultX+4;
+        RR(lx,yl+n*LH+4,lx+w,yl+n*LH+4+17*K,8*K,corVisita(v)); T(lx+7,yl+n*LH+6*K,lab,10.5*K,true,'#ffffff'); ultX = lx+w;
+      });
+    }
     // principais avaliações — uma coluna por projeto
-    const yp0 = yl+n*LH+12*K; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
+    const yp0 = yl+n*LH+12*K+yv; LN(RX,yp0-4,RX+RW,yp0-4,'#ececE6',1);
     const colw = (RW-20)/n; let baseDir = yp0;
     t.projs.forEach((k,i)=>{
       const p = CG_PROJ[k], xc = RX+i*colw; let yp = yp0+2;
@@ -11717,7 +12166,7 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
   const medir = t=>{ const g=D, g2=REAL; D = novo(); REAL=false; const h = cartao(t,0,0); D=g; REAL=g2; return h; };
 
   // ---------- páginas ----------
-  const LIM = H-52, GAP = 12, Y_P1 = 154, Y_PN = 46;
+  const LIM = H-52, GAP = 12, Y_P1 = extra ? 98 : 154, Y_PN = 46;
   const paginas = [[]]; let y = Y_P1;
   comPlantio.forEach(t=>{
     const h = medir(t);
@@ -11728,8 +12177,9 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
   let notaSemPlantio = null;
   if(semPlantio.length){
     notaSemPlantio = 'Sem data de plantio (fora da linha do tempo): ' + semPlantio.map(t=> `${t.rec.talhao} (${t.projs.map(k=>CG_PROJ[k].label).join(', ')})`).join('; ') + '. Preencha a Data de plantio na Alimentação.';
-    if(fimUltima+36 > LIM){ paginas.push([]); }
   }
+  if(extra && extra.nota) notaSemPlantio = (notaSemPlantio ? notaSemPlantio+'  ' : '') + extra.nota;
+  if(notaSemPlantio && fimUltima+36 > LIM){ paginas.push([]); }
   const nPag = paginas.length;
 
   function cabecalhoPagina1(){
@@ -11744,16 +12194,20 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
       const lab = `${CG_PROJ[k].label} · ${n} talhão${n===1?'':'es'}`, w = tw(lab,11.5,true)+22;
       RR(cx,yb,cx+w,yb+26,13,CG_PROJ[k].cor); T(cx+11,yb+5,lab,11.5,true,CG_PROJ[k].txt); cx += w+8;
     });
-    const ly = 126; let lx = M;
+    legenda(126);
+  }
+  function legenda(ly){   // legenda dos cartões (a mesma no resumo e no planejamento); devolve onde terminou
+    let lx = M;
     RR(lx,ly+3,lx+28,ly+17,7,'#5f5e5a'); T(lx+34,ly+2,'todas as avaliações do estádio feitas',11.5,false,'#5f5e5a'); lx += 34+tw('todas as avaliações do estádio feitas',11.5,false)+22;
     RR(lx,ly+3,lx+28,ly+17,7,'#ffffff','#5f5e5a',1.6); T(lx+34,ly+2,'a fazer ou em andamento (n/total)',11.5,false,'#5f5e5a'); lx += 34+tw('a fazer ou em andamento (n/total)',11.5,false)+22;
     RR(lx,ly+6,lx+70,ly+14,4,rfMistura('#2e6e76',0.34)); [lx,lx+70].forEach(xc=> LN(xc,ly+1,xc,ly+19,'#2e6e76',2)); RR(lx+25,ly+3,lx+45,ly+17,7,'#ffffff','#2e6e76',1.6);
-    T(lx+80,ly+2,'faixa: início – data prevista (centro, em negrito) – fim, pela tolerância de cada estádio ('+rfTolTxt()+' dias)',11.5,true,'#2e6e76');
+    const fx = 'faixa: início – data prevista (centro, em negrito) – fim, pela tolerância de cada estádio ('+rfTolTxt()+' dias)';
+    T(lx+80,ly+2,fx,11.5,true,'#2e6e76'); return lx+80+tw(fx,11.5,true);
   }
   function cabecalhoPaginaN(){
     D.setFillColor(45,74,31); D.rect(0,0,W*sc,34*sc,'F');
-    T(M,9,`${fazenda}  ·  ${cliente}`,15,true,'#ffffff');
-    const dir = 'Resumo de avaliações  ·  '+dmy(hoje); T(W-M-tw(dir,11,false),12,dir,11,false,'#c9d3be');
+    T(M,9,extra ? extra.tituloPagina : `${fazenda}  ·  ${cliente}`,15,true,'#ffffff');
+    const dir = extra ? extra.subtituloPagina : 'Resumo de avaliações  ·  '+dmy(hoje); T(W-M-tw(dir,11,false),12,dir,11,false,'#c9d3be');
   }
   function rodape(p){
     const fy = H-44; LN(M,fy,W-M,fy,'#d3d1c7',1); PIN(M+7,fy+14,'#1a73e8','#ffffff',5);
@@ -11763,15 +12217,20 @@ function rfGerarPdf(cliente, fazenda, projetosSel){
   }
   REAL = true;
   paginas.forEach((pg,i)=>{
-    if(i>0) D.addPage();
-    if(i===0) cabecalhoPagina1(); else cabecalhoPaginaN();
+    if(i>0 || extra) D.addPage();
+    if(i===0 && !extra) cabecalhoPagina1(); else cabecalhoPaginaN();
+    if(extra && i===0){   // legenda dos cartões + o que significa a marca da visita
+      legenda(46);
+      LN(M+8,68,M+8,84,'#1a2019',1.5); CI(M+8,68,3.5,'#1a2019'); T(M+24,69,'dia da visita no planejamento  (vermelho: fora da tolerância  ·  verde: já executada)',11.5,true,'#1a2019');
+    }
     pg.forEach(c=> cartao(c.t,c.y,c.h));
     if(notaSemPlantio && i===nPag-1){
       const yy = pg.length ? pg[pg.length-1].y+pg[pg.length-1].h+GAP : (i===0?Y_P1:Y_PN);
       wrapTk(notaSemPlantio.split(' ').map(w=>[w,11,false,'#5f5e5a']),CW).forEach((lin,j)=> runs(lin).forEach(u=> T(M+u.xo,yy+j*15,u.txt,u.px,u.b,u.c)));
     }
-    rodape(i+1);
+    if(!extra) rodape(i+1);   // no planejamento o rodapé (com a numeração de todas as páginas) é do exportador
   });
+  if(extra) return { doc, nTalhoes:todos.length, nPag };
   doc.setProperties({ title:`Resumo de avaliações — ${fazenda}`, author:'Grower Consultoria Agronômica', subject:`Cliente ${cliente}` });
   // quando só alguns projetos foram escolhidos, o nome do arquivo diz quais (ex.: Resumo_Boa_Vista_maximas-estr_2026-10-09.pdf)
   const projsDaFazenda = new Set(rfTalhoesDaFazenda(cliente,fazenda).flatMap(t=>t.projs));
@@ -11906,7 +12365,7 @@ function renderVisaoGeral(){
   const MAPA_ESTAGIOS = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
   const agrupaOcs = ocs=> MAPA_ESTAGIOS.map(e=> [e, ocs.filter(o=>o.estagio===e).map(o=>o.avaliacaoLabel), ocs.filter(o=>o.estagio===e).map(o=>o.campoKey)]).filter(g=>g[1].length);
   const estrPorBloco = []; ESTR_ETAPAS.forEach(e=>{ let g = estrPorBloco.find(x=>x[0]===e.bloco); if(!g){ g = [e.bloco, [], []]; estrPorBloco.push(g); } g[1].push(e.label); g[2].push(e.key); });
-  const dapR1 = VNS_ETAPA_PRAZO.etapa21_coleta_solo.dap;
+  const dapR1 = VNS_ETAPA_PRAZO.etapa21_nematoides.dap;
   const textoSobre = hex=>{ const n = parseInt(hex.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255 > 0.55 ? '#1a2019' : '#ffffff'; };
   const esc = s=> String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   // tom de cada estádio dentro da cor do projeto (só no cabeçalho; as células continuam verdes): 2 ou 3 estádios vão do claro pro escuro;
@@ -11915,13 +12374,13 @@ function renderVisaoGeral(){
   const canaisTom = (hex, r)=>{ const m = parseInt(hex.slice(1),16), alvo = r>=0 ? 255 : 0, a = Math.abs(r); return [m>>16&255, m>>8&255, m&255].map(x=> Math.round(x+(alvo-x)*a)); };
   const estiloTom = (hex, i, n)=>{ const ch = canaisTom(hex, razaoTom(i,n)); return `background:rgb(${ch.join(',')});color:${(0.299*ch[0]+0.587*ch[1]+0.114*ch[2])/255 > 0.58 ? '#1a2019' : '#ffffff'};border-left:2px solid #fff;`; };
   const VG_MAPA = [
-    { k:'vns',  pk:'vns',     nome:'Vida no Solo', g:[ ['R1/R2', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.key)], ['Colheita', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.key)] ] },
+    { k:'vns',  pk:'vns',     nome:'Vida no Solo', g:[ ['R1/R2', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.key), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.labelExcel)], ['Colheita', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.key), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.labelExcel)] ] },
     { k:'estr', pk:'estr',    nome:'Estruturação', g:estrPorBloco },
     { k:'max',  pk:'maximas', nome:'Máximas',      g:agrupaOcs(LM_OCORRENCIAS_MAXIMAS) },
     { k:'lad',  pk:'ladroes', nome:'Ladrões',      g:agrupaOcs(LM_OCORRENCIAS_LADROES) },
   ].map(p=>{
     const cor = VG_PROJETOS.find(x=>x.key===p.pk).cor;
-    const dapDe = est=> p.pk==='vns' ? (est==='R1/R2' ? VNS_ETAPA_PRAZO.etapa21_coleta_solo : VNS_ETAPA_PRAZO.etapa4_pos_colheita) : p.pk==='estr' ? ESTR_BLOCO_DAP[est] : LM_ESTAGIO_DAP[est];
+    const dapDe = est=> p.pk==='vns' ? (est==='R1/R2' ? VNS_ETAPA_PRAZO.etapa21_nematoides : VNS_ETAPA_PRAZO.etapa4_pmg) : p.pk==='estr' ? ESTR_BLOCO_DAP[est] : LM_ESTAGIO_DAP[est];
     return { ...p, cor, txt:textoSobre(cor), n:p.g.reduce((s,g)=>s+g[1].length,0), dap:Object.fromEntries(p.g.map(([est])=> [est, dapDe(est)])) };
   });
   const nMapaVis = VG_MAPA.filter(p=>!state.vgOcultos[p.k]).reduce((s,p)=>s+p.n,0);
@@ -12290,7 +12749,7 @@ function renderVisaoGeral(){
   if(vgExp) vgExp.addEventListener('click', ()=>{
     if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
     const tabela = container.querySelector('.vg-table'); if(!tabela) return;
-    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro','Georreferência', ...VG_VISIVEIS.map(p=>p.label), ...VG_MAPA.flatMap(p=> p.g.flatMap(([est, ls])=> ls.map(l=> `${p.nome} · ${est} · ${l}`)))];
+    const cab = ['Cliente','Fazenda','Talhão','Estado','Responsabilidade/Parceiro','Georreferência', ...VG_VISIVEIS.map(p=>p.label), ...VG_MAPA.flatMap(p=> p.g.flatMap(([est, ls, , xl])=> (xl || ls).map(l=> `${p.nome} · ${est} · ${l}`)))];   // o Excel segue com os nomes de antes (xl) no Vida no Solo, por enquanto
     const georrefDe = r=>{
       if(!r || r.max_latitude==null || r.max_longitude==null || r.max_latitude==='' || r.max_longitude==='') return '';
       const lat = parseFloat(String(r.max_latitude).replace(',','.')), lon = parseFloat(String(r.max_longitude).replace(',','.'));
@@ -12726,10 +13185,13 @@ async function salvarVnsEtapaCampo(talhaoId, campo, valor, el){
     return;
   }
   const dados = montarDadosVnsBase(rec);
-  dados[campo] = valor;
-  const naEtapa = valor===STATUS_NAO_SE_APLICA && VNS_ETAPAS.some(e=> e.key===campo);
-  const eraExec = VNS_ETAPAS.some(e=> e.key===campo) && rec['vns_'+campo]==='Executado' && valor!=='Executado';   // voltou de Executado pra Pendente: a data de execução é limpa
-  if(naEtapa || eraExec) dados[campo+'_data'] = null;   // não se aplica / voltou pra Pendente: sem data
+  const lista = Array.isArray(campo) ? campo : [campo];   // data de bloco: o mesmo valor vai pras datas de todas as avaliações dele
+  lista.forEach(k=>{ dados[k] = valor; });
+  const bloco = Array.isArray(campo) ? null : VNS_BLOCOS.find(b=> b.keys.includes(campo)), outros = bloco ? bloco.keys.filter(k=> k!==campo) : [];
+  const naEtapa = !!bloco && valor===STATUS_NAO_SE_APLICA && outros.every(k=> rec['vns_'+k]===STATUS_NAO_SE_APLICA);   // todas as avaliações do bloco "não se aplica": sem data
+  const eraExec = !!bloco && rec['vns_'+campo]==='Executado' && valor!=='Executado' && !outros.some(k=> rec['vns_'+k]==='Executado');   // voltou de Executado e nenhuma outra do bloco está executada: a data de execução é limpa
+  const limpar = naEtapa || eraExec;
+  if(limpar) bloco.keys.forEach(k=>{ dados[k+'_data'] = null; });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: talhaoId, projeto_id: projetosIds['vida-no-solo'], dados,
@@ -12740,8 +13202,8 @@ async function salvarVnsEtapaCampo(talhaoId, campo, valor, el){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
     return;
   }
-  rec['vns_'+campo] = valor;
-  if(naEtapa || eraExec) rec['vns_'+campo+'_data'] = null;
+  lista.forEach(k=>{ rec['vns_'+k] = valor; });
+  if(limpar) bloco.keys.forEach(k=>{ rec['vns_'+k+'_data'] = null; });
   invalidarVisaoGeral();
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
