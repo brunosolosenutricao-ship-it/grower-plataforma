@@ -9595,8 +9595,9 @@ function cgPlanoResumo(itens, semanas){
 function cgReconciliarPlano(plano, pontos, existeTalhao){
   const itens = plano.itens || [], vivos = new Map();
   pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
+  const listas = { mudaram:[], atrasados:[], status:[], dataDentro:[] };   // quais talhões entraram em cada situação (pro texto do aviso)
   const comoSalvo = { grupos:[], colocado:{}, executados:[] }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[] };
-  let mudaram = 0, atrasados = 0, statusMud = 0, dataDentro = 0, novos = 0; const hojeISO = cgHojeISO();
+  let mudaram = 0, atrasados = 0, statusMud = 0, dataDentro = 0; const hojeISO = cgHojeISO();
   itens.forEach(it=>{
     const tudo = (vivos.get([it.projeto,it.cliente,it.fazenda,it.talhao].join('|')) || []).filter(p=> it.avaliacoes.some(a=> a.avaliacao===p.avaliacao && a.estagio===p.estagio));
     const rot = (CG_PROJ[it.projeto] ? CG_PROJ[it.projeto].s : it.projeto)+' · '+it.fazenda+' '+it.talhao;
@@ -9618,45 +9619,38 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     revisado.grupos.push({ id, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:pend[0].estado, consultor:pend[0].consultor, dataStr:novaData, faixa, statusPlantio:pend[0].statusPlantio, avaliacoes:pend.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio })) });
     const dentro = Math.abs(cgNumDia(it.dia)-cgNumDia(novaData)) <= faixa, passou = it.dia < hojeISO;
     if(dentro && !passou) revisado.colocado[id] = it.dia;   // continua no dia salvo (o pill já vem com o status de hoje)
-    if(!dentro){ mudaram++; revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }   // foi pra lista: a Distribuição inteligente reposiciona
-    else if(passou){ atrasados++; revisado.motivos[id] = 'o dia planejado ('+cgDataBr(it.dia).slice(0,5)+') já passou e ainda tem avaliação pendente'; }
-    else if((it.statusPlantio==='Estimativa') !== (pend[0].statusPlantio==='Estimativa')) statusMud++;   // estimativa ↔ plantado: avisa e atualiza a cor
-    else if(novaData !== it.dataPrev) dataDentro++;   // a data prevista mudou, mas o dia salvo continua dentro da tolerância: só avisa
+    if(!dentro){ mudaram++; listas.mudaram.push({ rot, dia:it.dia }); revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }   // foi pra lista: a Distribuição inteligente reposiciona
+    else if(passou){ atrasados++; listas.atrasados.push({ rot, dia:it.dia }); revisado.motivos[id] = 'o dia planejado ('+cgDataBr(it.dia).slice(0,5)+') já passou e ainda tem avaliação pendente'; }
+    else if((it.statusPlantio==='Estimativa') !== (pend[0].statusPlantio==='Estimativa')){ statusMud++; listas.status.push({ rot, dia:it.dia }); }   // estimativa ↔ plantado: avisa e atualiza a cor
+    else if(novaData !== it.dataPrev){ dataDentro++; listas.dataDentro.push({ rot, dia:it.dia }); }   // a data prevista mudou, mas o dia salvo continua dentro da tolerância: só avisa
   });
-  // talhão novo nas semanas do planejamento (só dá pra saber se o planejamento guardou os filtros usados na hora de salvar)
-  if(plano.filtros){
-    const ints = (plano.semanas || []).map(cgSeteDias), noInt = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
-    const cobertos = new Set(); itens.forEach(it=> (it.avaliacoes||[]).forEach(a=> cobertos.add([it.projeto,it.cliente,it.fazenda,it.talhao,a.avaliacao,a.estagio].join('|'))));
-    const mapa = new Map();
-    pontos.forEach(p=>{
-      if(p.exec || !noInt(p.dataStr) || !cgPassaFiltros(p, plano.filtros) || cobertos.has([p.projeto,p.cliente,p.fazenda,p.talhao,p.avaliacao,p.estagio].join('|'))) return;
-      const k = [p.dataStr,p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!mapa.has(k)) mapa.set(k,{ ...p, avaliacoes:[] });
-      const g = mapa.get(k); g.avaliacoes.push({ avaliacao:p.avaliacao, estagio:p.estagio }); g.faixa = Math.min(g.faixa ?? 99, p.faixa ?? 4);
-    });
-    [...mapa.values()].forEach(g=>{ const id = revisado.grupos.length; revisado.grupos.push({ id, projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado, consultor:g.consultor, dataStr:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:g.statusPlantio, avaliacoes:g.avaliacoes }); revisado.motivos[id] = 'novo nas semanas deste planejamento'; novos++; });
-  }
-  return { comoSalvo, revisado, mudaram, saiu:revisado.saiu.length, atrasados, status:statusMud, dataDentro, novos };
+  const por = k=> new Set(listas[k].map(x=>x.rot)).size;   // um talhão com mais de um pill (dias diferentes) conta uma vez só
+  return { comoSalvo, revisado, mudaram:por('mudaram'), saiu:revisado.saiu.length, atrasados:por('atrasados'), status:por('status'), dataDentro:por('dataDentro'), listas };
 }
-function cgPassaFiltros(p, f){   // os mesmos filtros do calendário (guardados no planejamento), aplicados aos pontos de hoje
-  return Object.keys(f || {}).every(k=>{ const s = f[k]; if(!s || !s.length) return true;
-    const v = k==='projeto' ? p.projeto : k==='status' ? (p.statusPlantio || '—') : k==='parceiro' ? (p.parceiro || 'Em aberto') : p[k];
-    return s.includes(v); });
+function cgDicaAvisos(x){   // texto da dica (passar o mouse) do aviso amarelo do card: quais talhões e em que situação
+  const ls = x.listas || {}, p = [];
+  [['mudaram','Mudaram de data (vão pra lista)'],['atrasados','Dia já passou (vão pra lista)'],['status','Status do plantio mudou (ficam no dia)'],['dataDentro','Data prevista nova, dentro da tolerância (ficam no dia)']].forEach(([k,t])=>{ if(ls[k] && ls[k].length) p.push(t+': '+cgListaNomes(ls[k])); });
+  if(x.revisado && x.revisado.saiu && x.revisado.saiu.length) p.push('Saíram: '+x.revisado.saiu.map(s=>s.rot).join('; '));
+  return (p.join('\n') || 'Abre o planejamento com os dados de hoje')+'\nClique pra rever e escolher um dia novo.';
 }
-function cgTemAvisos(x){ return !!(x && (x.mudaram || x.saiu || x.atrasados || x.status || x.dataDentro || x.novos)); }
+function cgTemAvisos(x){ return !!(x && (x.mudaram || x.saiu || x.atrasados || x.status || x.dataDentro)); }
 function cgExtrasPartes(x){   // frases do aviso amarelo para as situações novas (as de "mudou de data" e "saiu" seguem como antes)
   const p = [], n = (k,a,b)=> x[k] ? p.push(x[k]+(x[k]===1?a:b)) : 0;
   if(!x) return p;
   n('atrasados',' talhão com o dia já passado',' talhões com o dia já passado'); n('status',' talhão mudou o status do plantio',' talhões mudaram o status do plantio');
-  n('dataDentro',' talhão com data prevista nova',' talhões com data prevista nova'); n('novos',' talhão novo nas semanas',' talhões novos nas semanas');
+  n('dataDentro',' talhão com data prevista nova',' talhões com data prevista nova');
   return p;
 }
+function cgListaNomes(arr){   // [{rot,dia}] → "Est · Jacuba 19-CV (13/10 e 02/11); Máx · Alfa T2 (13/10)"
+  const g = new Map(); (arr||[]).forEach(o=>{ if(!g.has(o.rot)) g.set(o.rot,[]); const d = cgDataBr(o.dia).slice(0,5); if(!g.get(o.rot).includes(d)) g.get(o.rot).push(d); });
+  return [...g].map(([rot,ds])=> rot+' ('+ds.join(' e ')+')').join('; ');
+}
 function cgTextoRevisao(mudaram, saiu, x){
-  const p = [];
-  if(mudaram) p.push(mudaram+(mudaram===1?' talhão foi pra lista':' talhões foram pra lista')+' (a data prevista mudou e o dia escolhido ficou fora da tolerância)');
-  if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão foi pra lista':' talhões foram pra lista')+' (o dia planejado já passou e ainda há avaliação pendente)');
-  if(x && x.novos) p.push(x.novos+(x.novos===1?' talhão novo nas semanas deste planejamento foi pra lista':' talhões novos nas semanas deste planejamento foram pra lista'));
-  if(x && x.status) p.push(x.status+(x.status===1?' talhão ficou no dia, com o status do plantio de hoje':' talhões ficaram no dia, com o status do plantio de hoje'));
-  if(x && x.dataDentro) p.push(x.dataDentro+(x.dataDentro===1?' talhão ficou no dia (a data prevista mudou, mas o dia continua dentro da tolerância)':' talhões ficaram no dia (a data prevista mudou, mas o dia continua dentro da tolerância)'));
+  const p = [], ls = (x && x.listas) || {}, nm = k=> (ls[k] && ls[k].length) ? ': '+cgListaNomes(ls[k]) : '';   // ": Máx · Fazenda T1; Est · Fazenda T4"
+  if(mudaram) p.push(mudaram+(mudaram===1?' talhão foi pra lista':' talhões foram pra lista')+' (a data prevista mudou e o dia escolhido ficou fora da tolerância)'+nm('mudaram'));
+  if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão foi pra lista':' talhões foram pra lista')+' (o dia planejado já passou e ainda há avaliação pendente)'+nm('atrasados'));
+  if(x && x.status) p.push(x.status+(x.status===1?' talhão ficou no dia, com o status do plantio de hoje':' talhões ficaram no dia, com o status do plantio de hoje')+nm('status'));
+  if(x && x.dataDentro) p.push(x.dataDentro+(x.dataDentro===1?' talhão ficou no dia (a data prevista mudou, mas o dia continua dentro da tolerância)':' talhões ficaram no dia (a data prevista mudou, mas o dia continua dentro da tolerância)')+nm('dataDentro'));
   if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
   return p.length ? 'Revisão aplicada: '+p.join('. ')+'. Nada foi gravado ainda: use Atualizar planejamento pra salvar.' : '';
 }
@@ -10013,7 +10007,7 @@ function expPlanoDados(plano, pontos, recDe, stats){
   const dias = expUniq(itens.map(i=>i.dia)).sort();
   const proj = expUniq(itens.map(i=>i.projeto));
   const s = stats || { talhoes:expUniq(itens.map(i=>[i.cliente,i.fazenda,i.talhao].join('|'))).length, produtores:expUniq(itens.map(i=>i.cliente)).length, dias:dias.length, projetos:proj };
-  return { regiao:plano.regiao||'', subtitulo:plano.subtitulo||'', responsavel:plano.responsavel||'', criadoEm:(plano.criado_em||'').slice(0,10), itens, saiu, semanas, nDias, dias, projetos:(s.projetos && s.projetos.length) ? s.projetos : proj, stats:s, ini:dias[0]||'', fim:dias[dias.length-1]||'' };
+  return { regiao:plano.regiao||'', sufixoArq:plano.sufixoArq||'', subtitulo:plano.subtitulo||'', responsavel:plano.responsavel||'', criadoEm:(plano.criado_em||'').slice(0,10), itens, saiu, semanas, nDias, dias, projetos:(s.projetos && s.projetos.length) ? s.projetos : proj, stats:s, ini:dias[0]||'', fim:dias[dias.length-1]||'' };
 }
 
 // cartões do "Resumo por fazenda" (todos os projetos do talhão), na ordem da viagem, cada um com o(s) dia(s) da visita
@@ -10136,7 +10130,7 @@ function expGerarPdfPlano(dados){
   const nPag = doc.internal.getNumberOfPages();
   for(let p=1;p<=nPag;p++){ doc.setPage(p); LN(M,H-FOOT+6,W-M,H-FOOT+6,LINHA,.8); T(M,H-FOOT+12,'Gerado em '+expDMY(hojeISO)+'  ·  as datas previstas podem mudar',11,false,'#8a8984'); TR(W-M,H-FOOT+12,'Página '+p+' de '+nPag,11,false,'#8a8984'); }
   doc.setProperties({ title:'Planejamento — '+(dados.regiao||''), author:'Grower Consultoria Agronômica', subject:dados.subtitulo||'' });
-  const nomeArq = expNomeArq('Planejamento',dados.regiao,'.pdf');
+  const nomeArq = expNomeArq('Planejamento',dados.regiao+(dados.sufixoArq ? '_'+dados.sufixoArq : ''),'.pdf');
   return { doc, nomeArq, nPag };
 }
 
@@ -10167,21 +10161,93 @@ function expGerarExcelPlano(dados){
   });
   const ws2 = XL.utils.aoa_to_sheet(expPlanoResumoXl(dados)); ws2['!cols'] = [{ wch:20 },{ wch:30 },{ wch:8 },{ wch:10 }];
   const wb = XL.utils.book_new(); XL.utils.book_append_sheet(wb, ws, 'Roteiro'); XL.utils.book_append_sheet(wb, ws2, 'Resumo');
-  const nomeArq = expNomeArq('Planejamento',dados.regiao,'.xlsx');
+  const nomeArq = expNomeArq('Planejamento',dados.regiao+(dados.sufixoArq ? '_'+dados.sufixoArq : ''),'.xlsx');
   return { wb, nomeArq };
 }
 /* ===== FIM EXPORTAÇÃO DO PLANEJAMENTO ===== */
 // dados do planejamento + o cronograma de hoje + o cadastro dos talhões (área e coordenadas)
 const expPlanoDadosApp = plano=> expPlanoDados(plano, cgPontosVivos(), it=> RECORDS.find(r=> r.cliente===it.cliente && r.fazenda===it.fazenda && r.talhao===it.talhao), cgPlanoResumo(plano.itens || [], plano.semanas));
+// ---- filtro antes de exportar: Projeto, Cliente e Estado (caixinhas, com Todos e Limpar); precisa sobrar pelo menos um talhão
+const expUF = i=> String(i.estado||'').toUpperCase() || '—';
+function expOpcoesFiltro(plano){
+  const g = { projeto:new Map(), cliente:new Map(), estado:new Map() };
+  (plano.itens||[]).forEach(i=>{
+    const kt = i.cliente+'|'+i.fazenda+'|'+i.talhao;
+    [['projeto',i.projeto,CG_PROJ[i.projeto] ? CG_PROJ[i.projeto].label : i.projeto],['cliente',i.cliente,i.cliente],['estado',expUF(i),expUF(i)]].forEach(([k,v,t])=>{
+      if(!g[k].has(v)) g[k].set(v,{ v, t, ts:new Set() }); g[k].get(v).ts.add(kt); });
+  });
+  return Object.fromEntries(Object.keys(g).map(k=> [k,[...g[k].values()].map(o=>({ v:o.v, t:o.t, n:o.ts.size })).sort((a,b)=> a.t.localeCompare(b.t,'pt-BR',{numeric:true}))]));
+}
+const expFiltrarPlano = (plano,sel)=> ({ ...plano, itens:(plano.itens||[]).filter(i=> sel.projeto.has(i.projeto) && sel.cliente.has(i.cliente) && sel.estado.has(expUF(i))) });
+const expContagem = itens=> ({ talhoes:new Set(itens.map(i=> i.cliente+'|'+i.fazenda+'|'+i.talhao)).size, dias:new Set(itens.map(i=>i.dia)).size });
+function expSufixoArq(sel, op){   // só o que foi restringido entra no nome do arquivo (Estado, Cliente, Projeto)
+  const p = []; ['estado','cliente','projeto'].forEach(k=>{ if(sel[k].size < op[k].length) p.push(op[k].filter(o=>sel[k].has(o.v)).map(o=>o.t).join('-')); });
+  return p.join('_').slice(0,60);
+}
+function expPerguntarFiltro(plano, formato, aoGerar){
+  const op = expOpcoesFiltro(plano);
+  if(op.projeto.length<=1 && op.cliente.length<=1 && op.estado.length<=1){ aoGerar(plano); return; }   // só há uma opção em cada grupo: nada pra escolher
+  const antigo = document.getElementById('epfDlg'); if(antigo) antigo.remove();
+  const GR = [['projeto','Projeto'],['cliente','Cliente'],['estado','Estado']];
+  const dlg = document.createElement('div'); dlg.id = 'epfDlg'; dlg.className = 'epf-overlay';
+  dlg.innerHTML = `<style>
+    .epf-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:7100;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
+    .epf-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,520px);max-height:92vh;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+    .epf-tit{font-size:16px;font-weight:700;margin-bottom:12px;}
+    .epf-g{margin-bottom:12px;}
+    .epf-gh{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px;}
+    .epf-lk{background:none;border:0;color:#1a73e8;font:inherit;font-size:12.5px;cursor:pointer;padding:2px 6px;}
+    .epf-ops{display:flex;flex-wrap:wrap;gap:4px 14px;max-height:132px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+    .epf-op{font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
+    .epf-op i{font-style:normal;color:var(--ink-soft);font-size:11.5px;}
+    .epf-cont{font-size:13px;margin:6px 0 2px;min-height:18px;} .epf-cont.epf-vazio{color:#c62828;}
+    .epf-acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
+  </style>
+  <div class="epf-box" role="dialog" aria-modal="true" aria-label="Exportar ${formato}">
+    <div class="epf-tit">Exportar ${formato}: o que entra?</div>
+    ${GR.map(([k,t])=>`<div class="epf-g"><div class="epf-gh"><b>${t}</b><span><button type="button" class="epf-lk" data-todos="${k}">Todos</button><button type="button" class="epf-lk" data-limpar="${k}">Limpar</button></span></div>
+      <div class="epf-ops">${op[k].map(o=>`<label class="epf-op"><input type="checkbox" data-k="${k}" value="${cgEscH(o.v)}" checked> ${cgEscH(o.t)} <i>${o.n}</i></label>`).join('')}</div></div>`).join('')}
+    <div class="epf-cont" id="epfCont" role="status"></div>
+    <div class="epf-acoes"><button type="button" class="btn ghost" id="epfCancelar">Cancelar</button><button type="button" class="btn btn-preto" id="epfGerar">Gerar ${formato}</button></div>
+  </div>`;
+  document.body.appendChild(dlg);
+  const cont = dlg.querySelector('#epfCont'), gerar = dlg.querySelector('#epfGerar');
+  const ler = ()=>{ const s = { projeto:new Set(), cliente:new Set(), estado:new Set() }; dlg.querySelectorAll('input[data-k]:checked').forEach(ch=> s[ch.dataset.k].add(ch.value)); return s; };
+  const atualizar = ()=>{
+    const c = expContagem(expFiltrarPlano(plano,ler()).itens);
+    cont.textContent = c.talhoes ? `${c.talhoes} ${c.talhoes===1?'talhão':'talhões'} · ${c.dias} ${c.dias===1?'dia':'dias'} de viagem` : 'Marque pelo menos uma opção em cada grupo.';
+    cont.classList.toggle('epf-vazio', !c.talhoes); gerar.disabled = !c.talhoes;
+  };
+  const fechar = ()=>{ dlg.remove(); document.removeEventListener('keydown', esc); };
+  const esc = e=>{ if(e.key==='Escape') fechar(); };
+  document.addEventListener('keydown', esc);
+  dlg.addEventListener('change', atualizar);
+  dlg.addEventListener('click', e=>{
+    if(e.target===dlg){ fechar(); return; }
+    const b = e.target.closest && e.target.closest('button'); if(!b) return;
+    const k = b.dataset.todos || b.dataset.limpar;
+    if(k){ dlg.querySelectorAll(`input[data-k="${k}"]`).forEach(ch=>{ ch.checked = !!b.dataset.todos; }); atualizar(); }
+  });
+  dlg.querySelector('#epfCancelar').addEventListener('click', fechar);
+  gerar.addEventListener('click', ()=>{
+    const s = ler(), pf = expFiltrarPlano(plano,s); if(!pf.itens.length) return;
+    pf.sufixoArq = expSufixoArq(s, op); fechar(); aoGerar(pf);
+  });
+  atualizar();
+}
 function expPlanoPdf(plano){
   if(!(window.jspdf && window.jspdf.jsPDF)){ alert('A biblioteca de PDF ainda não carregou. Recarregue a página e tente de novo.'); return; }
-  try{ const r = expGerarPdfPlano(expPlanoDadosApp(plano)); r.doc.save(r.nomeArq); }
-  catch(e){ console.error(e); alert('Não foi possível gerar o PDF do planejamento: '+(e.message||e)); }
+  expPerguntarFiltro(plano,'PDF',pl=>{
+    try{ const r = expGerarPdfPlano(expPlanoDadosApp(pl)); r.doc.save(r.nomeArq); }
+    catch(e){ console.error(e); alert('Não foi possível gerar o PDF do planejamento: '+(e.message||e)); }
+  });
 }
 function expPlanoExcel(plano){
   if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
-  try{ const r = expGerarExcelPlano(expPlanoDadosApp(plano)); XLSX.writeFile(r.wb, r.nomeArq, { cellDates:true }); }
-  catch(e){ console.error(e); alert('Não foi possível gerar o Excel do planejamento: '+(e.message||e)); }
+  expPerguntarFiltro(plano,'Excel',pl=>{
+    try{ const r = expGerarExcelPlano(expPlanoDadosApp(pl)); XLSX.writeFile(r.wb, r.nomeArq, { cellDates:true }); }
+    catch(e){ console.error(e); alert('Não foi possível gerar o Excel do planejamento: '+(e.message||e)); }
+  });
 }
 
 function cgRenderPlanosSalvos(){
@@ -10238,7 +10304,7 @@ function cgRenderPlanosSalvos(){
       <div class="pl-resp"><span class="pl-av">${cgEscH(iniciais(p.responsavel))}</span>${cgEscH(p.responsavel||'—')}</div>
       <div class="pl-stats"><div><b>${res.talhoes}</b><span>${res.talhoes===1?'talhão':'talhões'}</span></div><div><b>${res.produtores}</b><span>${res.produtores===1?'produtor':'produtores'}</span></div><div><b>${res.dias}</b><span>${res.dias===1?'dia':'dias'} de viagem</span></div></div>
       ${res.ini ? `<div class="pl-per">📅 ${cgDataBr(res.ini).slice(0,5)} a ${cgDataBr(res.fim).slice(0,5)} · ${res.semanas} ${res.semanas===1?'semana':'semanas'}</div>` : ''}
-      ${partes.length ? `<button type="button" class="pl-aviso" data-acao="rever" title="Abre o planejamento com esses talhões na lista, pra você escolher um dia novo">⚠ ${partes.join(' · ')} desde que salvou. Rever</button>` : ''}
+      ${partes.length ? `<button type="button" class="pl-aviso" data-acao="rever" title="${cgEscH(cgDicaAvisos(rec))}">⚠ ${partes.join(' · ')} desde que salvou. Rever</button>` : ''}
       <div class="pl-chips">${res.projetos.map(k=>`<span class="pl-chip" style="background:${CG_PROJ[k].cor};color:${CG_PROJ[k].txt}">${cgEscH(CG_PROJ[k].label)}</span>`).join('')}</div>
       <div class="pl-acoes"><button type="button" class="btn ghost" data-acao="abrir">Abrir</button><button type="button" class="btn ghost" data-acao="editar">Editar</button><span class="pl-exp"><button type="button" class="btn ghost" data-acao="exportar" title="Baixar o planejamento salvo, com os dias que você organizou">⬇ Exportar ▾</button><div class="pl-menu" hidden><button type="button" data-acao="exp-pdf"><b>PDF</b> · calendário e linha do tempo</button><button type="button" data-acao="exp-xlsx"><b>Excel</b> · uma linha por talhão</button></div></span><button type="button" class="btn ghost" data-acao="excluir">Excluir</button></div>
     </div>`;
