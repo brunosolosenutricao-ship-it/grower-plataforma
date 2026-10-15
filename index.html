@@ -3380,6 +3380,7 @@ const ESTR_ETAPAS = [
   { key:'altura_r1r2', label:'Altura R1/R2', bloco:'R1/R2' },
   { key:'foto_r1r2', label:'Fotos R1/R2', bloco:'R1/R2' },
   { key:'ground_cover_r1r2', label:'Ground Cover R1/R2', bloco:'R1/R2' },
+  { key:'foto_r6r7', label:'Foto da planta inteira (pano azul)', bloco:'R6/R7' },
   { key:'vagens_planta', label:'Número de vagens p/ planta', bloco:'R6/R7' },
   { key:'hastes_planta', label:'N de hastes p/ planta', bloco:'R6/R7' },
   { key:'nos_hastes', label:'N de nós (haste prin. e lateral)', bloco:'R6/R7' },
@@ -3560,7 +3561,7 @@ const LM_BLOCOS = [
   { num:3, label:'Estande e monitoramento visual', itens:[
     { key:'estande', label:'Estande', estagios:['V4','R8'] },
     { key:'fotos_aereas', label:'Fotos aéreas do talhão', estagios:['R1/R2','R8'] },
-    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1/R2','R4','R5.4','R8'] },
+    { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['V4','R1/R2','R4','R5.4','R6/R7','R8'] },
     { key:'ground_cover', label:'Ground cover', estagios:['V4','R1/R2','R4'] },
   ]},
   { num:4, label:'Componentes produtivos', itens:[
@@ -3590,8 +3591,13 @@ function lmOcorrencias(blocos){
   });
   return out;
 }
-const LM_OCORRENCIAS_MAXIMAS = lmOcorrencias(LM_BLOCOS); // 30 ocorrências (todos os 4 blocos)
-const LM_OCORRENCIAS_LADROES = lmOcorrencias(LM_BLOCOS.filter(b=>b.num===4)); // 7 ocorrências (só Componentes produtivos)
+// Ladrões: bloco 3 mínimo (só a foto da planta inteira, no R6/R7) + bloco 4 (Componentes produtivos)
+const LM_BLOCOS_LADROES = [
+  { num:3, label:'Estande e monitoramento visual', itens:[ { key:'foto_planta_inteira', label:'Foto da planta inteira (pano azul)', estagios:['R6/R7'] } ] },
+  ...LM_BLOCOS.filter(b=>b.num===4),
+];
+const LM_OCORRENCIAS_MAXIMAS = lmOcorrencias(LM_BLOCOS); // 31 ocorrências (todos os 4 blocos)
+const LM_OCORRENCIAS_LADROES = lmOcorrencias(LM_BLOCOS_LADROES); // 8 ocorrências (foto da planta inteira no R6/R7 + Componentes produtivos)
 const LM_OCORRENCIAS_TODAS = LM_OCORRENCIAS_MAXIMAS; // usada pra popular o rec/state (superconjunto — cobre os dois)
 const LM_AVAL_OPTIONS = ['Pendente','Executado', STATUS_NAO_SE_APLICA];
 function getLmAcompEntry(key){
@@ -11155,7 +11161,7 @@ function renderLadroesMaximasMapa(){
         </div>
       </div>`;
     }
-    return montarTabelaAcompLm('Máximas', '#2e6e76', linhasMaximas, LM_BLOCOS) + montarTabelaAcompLm('Ladrões', '#b8352a', linhasLadroes, LM_BLOCOS.filter(b=>b.num===4));
+    return montarTabelaAcompLm('Máximas', '#2e6e76', linhasMaximas, LM_BLOCOS) + montarTabelaAcompLm('Ladrões', '#b8352a', linhasLadroes, LM_BLOCOS_LADROES);
   })()}
   `;
 
