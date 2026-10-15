@@ -299,6 +299,10 @@
 </style>
 <style>
 /* ===== Estilos do Dashboard Óxido de Magnésio (isolados, ids/classes já conferidos sem colisão real) ===== */
+  .oxc-pdf, .lm-freeze-right > span.oxc-pdf{display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle;font-size:inherit;white-space:nowrap;}   /* a regra ".lm-freeze-right > span" faz todo span da célula virar bloco: aqui ele fica ao lado do Salvar */
+  .oxc-pdf-chip{display:inline-block;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;vertical-align:middle;}
+  .oxc-pdf-ic{padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;line-height:1;font-family:inherit;}
+  .oxc-pdf-msg{display:block;font-size:10.5px;}
 
 .chart-zoom-btn{position:absolute;top:2px;right:2px;z-index:6;width:22px;height:22px;border-radius:6px;border:1px solid var(--line,#d8dccb);background:rgba(255,255,255,.9);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .chart-zoom-btn:hover{background:#fff;transform:scale(1.08);}
@@ -3314,6 +3318,7 @@ const PARTICIPACAO_OPTIONS = ['Pendente','Vai participar','Negado'];
 
 // Acompanhamento próprio da aba Óxido de Magnésio — opções e cores por etapa (independente do Cronograma acima)
 const OXC_PARTICIPACAO_OPTIONS = ['Vai participar','Pendente','Negado'];
+const OXC_MODO_APLICACAO_OPTIONS = [['','-'],['Taxa fixa','Taxa fixa'],['Taxa variável','Taxa variável'],['Experimento','Experimento']];   // valor gravado, texto na lista ('-' = vazio)
 const OXC_ETAPA_OPCOES = {
   etapa1: ['Pendente','Coletado','No laboratório','Laudo recebido','Não necessário, laudo já 2026','Análise antiga recebida'],
   etapa2: ['Pendente','Aplicado','Não vai aplicar'],
@@ -3987,6 +3992,8 @@ async function carregarDadosDoSupabase(){
         oxc_acomp_etapa2: d.oxc_acomp_etapa2 ?? null,
         oxc_acomp_etapa3: d.oxc_acomp_etapa3 ?? null,
         oxc_acomp_etapa4: d.oxc_acomp_etapa4 ?? null,
+        oxc_acomp_modo_aplicacao: d.oxc_acomp_modo_aplicacao ?? null,
+        oxc_acomp_pdf: d.oxc_acomp_pdf ?? null,
         // campos do Máximas Produtividades / Ladrões — histórico produtivo mora no Geral (t),
         // só Sistema e IPI continuam no jsonb próprio do projeto
         max_sistema: dm.sistema ?? null,
@@ -4198,7 +4205,7 @@ async function carregarDadosDoSupabase(){
     });
     state.oxcAcomp = {};
     RECORDS.forEach(r=>{
-      const temAlgo = r.oxc_acomp_participacao!=null || r.oxc_acomp_etapa1!=null || r.oxc_acomp_etapa2!=null || r.oxc_acomp_etapa3!=null || r.oxc_acomp_etapa4!=null;
+      const temAlgo = r.oxc_acomp_participacao!=null || r.oxc_acomp_etapa1!=null || r.oxc_acomp_etapa2!=null || r.oxc_acomp_etapa3!=null || r.oxc_acomp_etapa4!=null || r.oxc_acomp_modo_aplicacao!=null;
       if(!temAlgo) return;
       const key = cronogramaKey(r);
       state.oxcAcomp[key] = {
@@ -4207,6 +4214,7 @@ async function carregarDadosDoSupabase(){
         etapa2: r.oxc_acomp_etapa2 || 'Pendente',
         etapa3: r.oxc_acomp_etapa3 || 'Pendente',
         etapa4: r.oxc_acomp_etapa4 || 'Pendente',
+        modo_aplicacao: r.oxc_acomp_modo_aplicacao || '',
       };
     });
     state.cfAcomp = {};
@@ -8711,9 +8719,9 @@ function renderOxidoConsumo(){
     <div class="table-scroll" data-topscroll="1">
       <table data-colfilter="oxc-acomp">
         <thead><tr>
-          <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th>
+          <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th><th>Modo de aplicação</th>
           ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
-          <th class="lm-freeze-right">Salvar</th>
+          <th class="lm-freeze-right" style="width:340px;min-width:340px;max-width:340px;">Salvar</th>
         </tr></thead>
         <tbody>
           ${paginaAtual.map(r=>{
@@ -8728,16 +8736,18 @@ function renderOxidoConsumo(){
               <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="participacao" style="background:${oxcCorFundo('participacao',entry.participacao)};font-weight:700;">${OXC_PARTICIPACAO_OPTIONS.map(o=>`<option value="${o}" ${entry.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
               <td>${fmtData(dataPlantio)}</td>
               <td>${fmtData(dataColeta)}</td>
+              <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="modo_aplicacao">${OXC_MODO_APLICACAO_OPTIONS.map(([v,t])=>`<option value="${v}" ${(entry.modo_aplicacao||'')===v?'selected':''}>${t}</option>`).join('')}</select></td>
               ${ETAPA_KEYS.map(k=> k==='etapa2'
                 ? `<td style="background:${oxcCorFundo('etapa2', r.status)};font-weight:700;text-align:center;">${r.status||'—'}</td>`
                 : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`
               ).join('')}
-              <td class="lm-freeze-right" style="white-space:nowrap;">
-                <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>
+              <td class="lm-freeze-right" style="white-space:nowrap;width:340px;min-width:340px;max-width:340px;">
+                <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button><span class="oxc-pdf" data-oxc-pdf-slot="${encodeURIComponent(key)}">${oxcPdfHtml(r)}</span>
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
+                <span class="oxc-pdf-msg" data-oxc-pdf-msg="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${9+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
+          }).join('') || `<tr><td colspan="${10+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -8773,9 +8783,9 @@ function renderOxidoConsumo(){
       const key = decodeURIComponent(el.dataset.oxcKey);
       const campo = el.dataset.oxcCampo;
       const valor = el.value;
-      if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente' };
+      if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente', modo_aplicacao:'' };
       state.oxcAcomp[key][campo] = valor;
-      el.style.background = oxcCorFundo(campo, valor);
+      if(campo!=='modo_aplicacao') el.style.background = oxcCorFundo(campo, valor);
       salvarOxcAcompCampo(key, campo, valor, el);
     });
   });
@@ -8801,6 +8811,7 @@ function renderOxidoConsumo(){
       }
     });
   });
+  container.querySelectorAll('.oxc-pdf').forEach(oxcPdfSlotLigar);
   container.querySelectorAll('.oxc-status-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const s = decodeURIComponent(btn.dataset.status);
@@ -13009,6 +13020,8 @@ function montarDadosOxidoBase(rec){
     oxc_acomp_etapa2: rec.oxc_acomp_etapa2 ?? null,
     oxc_acomp_etapa3: rec.oxc_acomp_etapa3 ?? null,
     oxc_acomp_etapa4: rec.oxc_acomp_etapa4 ?? null,
+    oxc_acomp_modo_aplicacao: rec.oxc_acomp_modo_aplicacao ?? null,
+    oxc_acomp_pdf: rec.oxc_acomp_pdf ?? null,
   };
 }
 async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
@@ -13064,7 +13077,7 @@ async function salvarCronogramaEntradaCompleta(rec, entry, user){
 
 // Acompanhamento próprio da aba Óxido de Magnésio — desvinculado do Cronograma (campos oxc_acomp_*)
 function getOxcAcompEntry(key){
-  const defaults = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente' };
+  const defaults = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente', modo_aplicacao:'' };
   const found = state.oxcAcomp[key];
   return found ? {...defaults, ...found} : defaults;
 }
@@ -13075,7 +13088,7 @@ async function salvarOxcAcompCampo(key, campoKey, valor, el){
     return;
   }
   const dados = montarDadosOxidoBase(rec);
-  dados['oxc_acomp_'+campoKey] = valor;
+  dados['oxc_acomp_'+campoKey] = valor || null;
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
@@ -13086,7 +13099,7 @@ async function salvarOxcAcompCampo(key, campoKey, valor, el){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
     return;
   }
-  rec['oxc_acomp_'+campoKey] = valor;
+  rec['oxc_acomp_'+campoKey] = valor || null;
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
 async function salvarOxcAcompEntradaCompleta(rec, entry, user){
@@ -13097,6 +13110,7 @@ async function salvarOxcAcompEntradaCompleta(rec, entry, user){
   dados.oxc_acomp_etapa2 = entry.etapa2 ?? null;
   dados.oxc_acomp_etapa3 = entry.etapa3 ?? null;
   dados.oxc_acomp_etapa4 = entry.etapa4 ?? null;
+  dados.oxc_acomp_modo_aplicacao = entry.modo_aplicacao || null;
   const { error } = await sb.from('dados_projeto').upsert({
     talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
     updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
@@ -13107,9 +13121,87 @@ async function salvarOxcAcompEntradaCompleta(rec, entry, user){
     rec.oxc_acomp_etapa2 = entry.etapa2 ?? null;
     rec.oxc_acomp_etapa3 = entry.etapa3 ?? null;
     rec.oxc_acomp_etapa4 = entry.etapa4 ?? null;
+    rec.oxc_acomp_modo_aplicacao = entry.modo_aplicacao || null;
   }
   return { error };
 }
+// ---- PDF por talhão na tabela Acompanhamento do Óxido: um por talhão. O arquivo fica no balde PRIVADO "oxido-pdfs" e o registro
+// (caminho, nome, tamanho, data) no JSON do talhão no projeto Óxido (oxc_acomp_pdf). Anexa, troca, baixa e exclui na hora, sem o Salvar.
+const OXC_PDF_BALDE = 'oxido-pdfs', OXC_PDF_MAX = 10*1024*1024;
+const oxcPdfMsgErro = e=>{ const m = (e && e.message) || String(e); return /bucket|not found|row-level|violates|policy/i.test(m) ? 'PDF ainda não configurado no banco: rode o anexos_oxido_pdf.sql no Supabase.' : 'Erro com o PDF: '+m; };
+const oxcPdfTamanho = n=> n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(n/1024))+' KB';
+function oxcPdfHtml(rec){
+  const reg = rec && rec.oxc_acomp_pdf;
+  if(!reg) return `<button type="button" class="row-save oxc-pdf-ac" data-oxc-pdf="anexar" title="Anexar um PDF a este talhão (até 10 MB). Ele é salvo na hora, sem precisar do Salvar.">📎 PDF</button>`;
+  const dt = reg.em ? new Date(reg.em).toLocaleDateString('pt-BR') : '';
+  return `<span class="oxc-pdf-chip" title="${imgAttr(reg.nome+' · '+oxcPdfTamanho(reg.tamanho||0)+(dt?' · '+dt:''))}">📄 ${imgAttr(reg.nome)}</span>`
+    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="baixar" title="Baixar o PDF">⬇</button>`
+    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="trocar" title="Trocar o PDF">🔄</button>`
+    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="excluir" title="Excluir o PDF" style="color:#c62828;">🗑</button>`;
+}
+async function oxcPdfGravarRegistro(rec, registro){
+  const dados = montarDadosOxidoBase(rec); dados.oxc_acomp_pdf = registro;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('dados_projeto').upsert({
+    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
+    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
+  }, { onConflict: 'talhao_id,projeto_id' });
+  return error;
+}
+async function oxcPdfAnexar(rec, file){
+  if(!rec || !projetosIds['oxido-magnesio']) throw new Error('talhão ou projeto não encontrado');
+  if(!file || !(file.type==='application/pdf' || /\.pdf$/i.test(file.name||''))) throw new Error('use um arquivo PDF');
+  if(file.size > OXC_PDF_MAX) throw new Error('o PDF é grande demais (máximo 10 MB)');
+  const caminho = rec.id+'/'+Date.now()+'.pdf', st = sb.storage.from(OXC_PDF_BALDE);
+  const up = await st.upload(caminho, file, { contentType:'application/pdf', upsert:false });
+  if(up.error) throw up.error;
+  const registro = { caminho, nome:file.name, tamanho:file.size, em:new Date().toISOString() };
+  const erro = await oxcPdfGravarRegistro(rec, registro);
+  if(erro){ try{ await st.remove([caminho]); }catch(e){} throw erro; }   // não deixa arquivo solto se o registro não gravou
+  const antigo = rec.oxc_acomp_pdf && rec.oxc_acomp_pdf.caminho; rec.oxc_acomp_pdf = registro;
+  if(antigo){ try{ await st.remove([antigo]); }catch(e){} }   // o PDF anterior sai do balde
+}
+async function oxcPdfExcluir(rec){
+  const reg = rec && rec.oxc_acomp_pdf; if(!reg) return;
+  const rm = await sb.storage.from(OXC_PDF_BALDE).remove([reg.caminho]);
+  if(rm.error) throw rm.error;   // se o arquivo não saiu, o registro fica (a referência não se perde)
+  const erro = await oxcPdfGravarRegistro(rec, null); if(erro) throw erro;
+  rec.oxc_acomp_pdf = null;
+}
+async function oxcPdfBaixar(rec){
+  const reg = rec && rec.oxc_acomp_pdf; if(!reg) return;
+  const { data, error } = await sb.storage.from(OXC_PDF_BALDE).createSignedUrl(reg.caminho, 120, { download: reg.nome });
+  if(error || !data || !data.signedUrl) throw (error || new Error('não foi possível gerar o link do PDF'));
+  const a = document.createElement('a'); a.href = data.signedUrl; a.download = reg.nome; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+}
+function oxcPdfEscolher(aoEscolher){
+  let inp = document.getElementById('oxcPdfInput');
+  if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'oxcPdfInput'; inp.accept = 'application/pdf,.pdf'; inp.hidden = true; document.body.appendChild(inp); }
+  inp.onchange = ()=>{ const f = inp.files && inp.files[0]; inp.value = ''; if(f) aoEscolher(f); };
+  inp.click();
+}
+function oxcPdfSlotLigar(slot){ slot.querySelectorAll('[data-oxc-pdf]').forEach(b=> b.addEventListener('click', ()=> oxcPdfAcao(b.dataset.oxcPdf, slot))); }
+async function oxcPdfAcao(acao, slot){
+  const chave = slot.dataset.oxcPdfSlot, key = decodeURIComponent(chave);
+  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key); if(!rec) return;
+  const msgEl = document.querySelector(`.oxc-pdf-msg[data-oxc-pdf-msg="${chave}"]`);
+  const msg = (t, erro, some)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; if(some) setTimeout(()=>{ if(msgEl.textContent===t) msgEl.textContent = ''; }, 2500); } };
+  const redesenhar = ()=>{ slot.innerHTML = oxcPdfHtml(rec); oxcPdfSlotLigar(slot); };
+  try{
+    if(acao==='anexar' || acao==='trocar'){
+      oxcPdfEscolher(async f=>{
+        msg('⏳ Enviando PDF…');
+        try{ await oxcPdfAnexar(rec, f); msg('✓ PDF salvo', false, true); }catch(e){ msg(oxcPdfMsgErro(e), true); }
+        redesenhar();
+      });
+    } else if(acao==='baixar'){ msg('⏳ Gerando o link…'); await oxcPdfBaixar(rec); msg(''); }
+    else if(acao==='excluir'){
+      if(!confirm('Excluir o PDF "'+rec.oxc_acomp_pdf.nome+'" do talhão '+rec.fazenda+' / '+rec.talhao+'? Não dá pra desfazer.')) return;
+      msg('⏳ Excluindo…'); await oxcPdfExcluir(rec); msg('✓ PDF excluído', false, true); redesenhar();
+    }
+  }catch(e){ msg(oxcPdfMsgErro(e), true); }
+}
+
 
 // Acompanhamento do Condicionador — mesmo padrão do Cronograma do Óxido, mas dentro do próprio projeto Condicionador.
 // Importante: reconstrói TODOS os campos já existentes do Condicionador (área/tipo teste/dose/produto),
