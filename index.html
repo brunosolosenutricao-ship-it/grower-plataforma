@@ -3487,6 +3487,9 @@ const VNS_ETAPAS = [   // label = nome mostrado no app; labelExcel = nome de ant
   { key:'etapa22_aval_aerea', label:'Avaliação fotográfica (Parte Aérea)', labelExcel:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)' },
   { key:'etapa23_aval_raizes', label:'Avaliação fotográfica (Raízes)', labelExcel:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)' },
   { key:'etapa3_analise_foliar', label:'Análise foliar', labelExcel:'Etapa 3 – Análise foliar (R1/R2)' },
+  { key:'etapa_r67_foto_planta', label:'Foto da planta inteira (pano azul)', labelExcel:'Foto da planta inteira (pano azul)', sub:'Foto da planta inteira (pano azul)' },
+  { key:'etapa_r67_produtividade', label:'Produtividade por planta', labelExcel:'Produtividade por planta', sub:'Produtividade por planta' },
+  { key:'etapa_r67_pmg', label:'PMG por planta', labelExcel:'PMG por planta', sub:'PMG por planta' },
   { key:'etapa4_produtividade', label:'Produtividade (sc/ha) do talhão', labelExcel:'Etapa 4 – Produtividade (sc/ha) do talhão', sub:'Produtividade (sc/ha) do talhão' },
   { key:'etapa4_analise_graos', label:'Análise de grãos', labelExcel:'Etapa 4 – Análise de grãos', sub:'Análise de grãos' },
   { key:'etapa4_pmg', label:'PMG', labelExcel:'Etapa 4 – PMG', sub:'PMG' },
@@ -3496,6 +3499,7 @@ const VNS_ETAPA_STATUS_OPTIONS = ['Pendente','Executado', STATUS_NAO_SE_APLICA];
 const VNS_ETAPA_PRAZO = {
   etapa21_nematoides:{ dap:45, faixa:4 }, etapa21_bioas:{ dap:45, faixa:4 }, etapa21_metagenomica:{ dap:45, faixa:4 },
   etapa22_aval_aerea:{ dap:45, faixa:4 }, etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
+  etapa_r67_foto_planta:{ dap:105, faixa:5 }, etapa_r67_produtividade:{ dap:105, faixa:5 }, etapa_r67_pmg:{ dap:105, faixa:5 },
   etapa4_produtividade:{ dap:130, faixa:5 }, etapa4_analise_graos:{ dap:130, faixa:5 }, etapa4_pmg:{ dap:130, faixa:5 },
 };
 // A Etapa 2.1 e a Etapa 4 se dividem em 3 avaliações cada: cada uma com o seu status, todas na MESMA data (uma coluna de data por bloco).
@@ -3504,13 +3508,15 @@ const VNS_ETAPA_PRAZO = {
 const VNS_BLOCOS = [
   { estagio:'R1/R2', titulo:'Coleta de solo', keys:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica'] },
   { estagio:'R1/R2', keys:['etapa22_aval_aerea'] }, { estagio:'R1/R2', keys:['etapa23_aval_raizes'] }, { estagio:'R1/R2', keys:['etapa3_analise_foliar'] },
+  { estagio:'R6/R7', keys:['etapa_r67_foto_planta','etapa_r67_produtividade','etapa_r67_pmg'] },   // 3 avaliações, uma data pro bloco (sem título, como a Colheita)
   { estagio:'Colheita', keys:['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'] },
 ];
-const VNS_BLOCO_COR = { 'R1/R2':'#8a4f7d', 'Colheita':'#6b7a3f' };   // cores do app: a do R1/R2 é a mesma do bloco R1/R2 da Estruturação
+const VNS_BLOCO_COR = { 'R1/R2':'#8a4f7d', 'R6/R7':'#8a5a2b', 'Colheita':'#6b7a3f' };   // cores do app: a do R1/R2 é a mesma do bloco R1/R2 da Estruturação
 // título da etapa na 2ª linha do cabeçalho: o do bloco, ou o nome da avaliação quando a etapa tem uma só; a Colheita (3 avaliações, sem título) não tem
 const vnsTituloBloco = b=> b.titulo || (b.keys.length===1 ? VNS_ETAPAS.find(e=>e.key===b.keys[0]).label : null);
 // blocos de etapas agrupados pelo estádio (R1/R2, Colheita) pra faixa de cima do cabeçalho
 const vnsCabEstagios = VNS_BLOCOS.reduce((gs,b)=>{ let g = gs[gs.length-1]; if(!g || g.estagio!==b.estagio){ g = { estagio:b.estagio, blocos:[], cols:0 }; gs.push(g); } g.blocos.push(b); g.cols += b.keys.length+1; return gs; }, []).map(g=> ({ ...g, semTitulo: g.blocos.every(b=> !vnsTituloBloco(b)) }));
+const vnsKeysEstagio = est=> VNS_BLOCOS.filter(b=>b.estagio===est).flatMap(b=>b.keys);   // avaliações de um estádio (R1/R2, R6/R7, Colheita), na ordem da tabela
 const VNS_COLUNAS_ETAPAS = VNS_BLOCOS.reduce((s,b)=> s+b.keys.length+1, 0);   // colunas das etapas na tabela: um status por avaliação + uma data por bloco
 // chaves de ANTES da divisão: o que já estava salvo nelas (status e data) vale pras 3 novas até o próximo Salvar da linha
 const VNS_LEGADO = { etapa21_nematoides:'etapa21_coleta_solo', etapa21_bioas:'etapa21_coleta_solo', etapa21_metagenomica:'etapa21_coleta_solo', etapa4_produtividade:'etapa4_pos_colheita', etapa4_analise_graos:'etapa4_pos_colheita', etapa4_pmg:'etapa4_pos_colheita' };
@@ -9503,7 +9509,7 @@ function cgColetarPontos(projetos, ini, fim){
   // tolerância (± dias) do estádio do evento, a mesma das tabelas, dos modais e do PDF; Óxido e Coleta Foliar usam a do R1/R2 (mesmo dia, 45 DAP)
   const faixaDe = (proj, estagio)=>{
     const lm = (typeof LM_ESTAGIO_DAP!=='undefined') ? LM_ESTAGIO_DAP : {}, es = (typeof ESTR_BLOCO_DAP!=='undefined') ? ESTR_BLOCO_DAP : {}, vn = (typeof VNS_ETAPA_PRAZO!=='undefined') ? VNS_ETAPA_PRAZO : {};
-    const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pmg : vn.etapa21_nematoides) : lm['R1/R2'];
+    const f = (proj==='maximas' || proj==='ladroes') ? lm[estagio] : proj==='estr' ? es[estagio] : proj==='vns' ? (estagio==='Colheita' ? vn.etapa4_pmg : estagio==='R6/R7' ? vn.etapa_r67_foto_planta : vn.etapa21_nematoides) : lm['R1/R2'];
     return (f && f.faixa) || 4;
   };
   const add = (r, proj, dap, avaliacao, estagio, dataSalva, exec)=>{
@@ -9526,8 +9532,7 @@ function cgColetarPontos(projetos, ini, fim){
     if(projetos.includes('vns') && r.vns_area_projeto!=null && Number(r.vns_area_projeto)>0){
       const rot = k=> (VNS_ETAPAS.find(e=>e.key===k)||{label:k}).label;
       // a data escolhida na tabela de acompanhamento (mesma fonte da tabela) vale também no calendário; sem ela, plantio + DAP
-      ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'R1/R2', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
-      ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),'Colheita', r['vns_'+k+'_data'], r['vns_'+k]==='Executado'));
+      ['R1/R2','R6/R7','Colheita'].forEach(est=> vnsKeysEstagio(est).filter(k=> r['vns_'+k]!==STATUS_NAO_SE_APLICA).forEach(k=> add(r,'vns',VNS_ETAPA_PRAZO[k].dap,rot(k),est, r['vns_'+k+'_data'], r['vns_'+k]==='Executado')));
     }
     if(projetos.includes('estr') && r.estr_area_projeto!=null && Number(r.estr_area_projeto)>0){
       const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
@@ -11351,10 +11356,7 @@ function abrirModalVidaNoSoloTalhao(rec){
   // vermelha = tem etapa atrasada · verde = tudo feito no prazo · cinza = ainda só previsão
   const dataPlantioObj = rec.data_plantio ? new Date(rec.data_plantio+'T00:00:00') : null;
   const hojeTl = new Date(); hojeTl.setHours(0,0,0,0);
-  const VNS_ESTAGIOS = [
-    { estagio:'R1/R2', dap:VNS_ETAPA_PRAZO.etapa21_nematoides.dap, faixa:VNS_ETAPA_PRAZO.etapa21_nematoides.faixa, etapas:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },
-    { estagio:'Colheita', dap:VNS_ETAPA_PRAZO.etapa4_pmg.dap, faixa:VNS_ETAPA_PRAZO.etapa4_pmg.faixa, etapas:['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'] },
-  ];
+  const VNS_ESTAGIOS = ['R1/R2','R6/R7','Colheita'].map(est=>{ const ks = vnsKeysEstagio(est); return { estagio:est, dap:VNS_ETAPA_PRAZO[ks[0]].dap, faixa:VNS_ETAPA_PRAZO[ks[0]].faixa, etapas:ks }; });
   const gruposEstagio = VNS_ESTAGIOS.map(est=>{
     const esperada = dataPlantioObj ? (()=>{ const d = new Date(dataPlantioObj); d.setDate(d.getDate()+est.dap); return d; })() : null;
     const detalhes = est.etapas.map(key=>{
@@ -12056,7 +12058,7 @@ const RF_PRINC = {
   maximas:[['Marcha de absorção','V4 a R8','planta inteira pra análise de nutrientes ao longo do ciclo'],['Análise foliar','R1/R2','folha diagnóstico pra teor de nutrientes'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos'],['+ estande, nodulação, fotos e componentes produtivos','','']],
   ladroes:[['Componentes produtivos','R6/R7','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
   estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Altura, fotos e ground cover','R1/R2','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, produtividade e PMG por planta']],
-  vns:[['Coleta de solo (nematoides, BioAs e metagenômica), fotos e análise foliar','R1/R2','amostras de solo, fotos da parte aérea e das raízes e folhas pra análise'],['Produtividade, análise de grãos e PMG','Colheita','resultados do talhão na colheita']],
+  vns:[['Coleta de solo (nematoides, BioAs e metagenômica), fotos e análise foliar','R1/R2','amostras de solo, fotos da parte aérea e das raízes e folhas pra análise'],['Foto, produtividade e PMG por planta','R6/R7','registro da planta inteira e resultado por planta'],['Produtividade, análise de grãos e PMG','Colheita','resultados do talhão na colheita']],
   oxc:[['Coleta foliar','45 DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
 };
 function rfHexRgb(h){ let x = String(h).replace('#',''); if(x.length===3) x = x.split('').map(c=>c+c).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; }
@@ -12108,12 +12110,11 @@ function rfMarcos(r,k){
     return { rot:b, faixa:ESTR_BLOCO_DAP[b].faixa, dap:rfDapEfetivo(r, ESTR_BLOCO_DAP[b].dap, l.map(e=> r['estr_acomp_'+e.key+'_mes'])), total:l.length, feitas:l.filter(e=> r['estr_acomp_'+e.key+'_exec']==='Feito').length };
   }).filter(Boolean);
   if(k==='vns'){
-    const r1 = ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].filter(x=>!rfEhNA(r,'vns',x));
-    const colh = ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].filter(x=>!rfEhNA(r,'vns',x));
-    return [
-      r1.length ? { rot:'R1/R2', faixa:VNS_ETAPA_PRAZO.etapa21_nematoides.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa21_nematoides.dap, r1.map(x=> r['vns_'+x+'_data'])), total:r1.length, feitas:r1.filter(x=> r['vns_'+x]==='Executado').length } : null,
-      colh.length ? { rot:'Colh.', faixa:VNS_ETAPA_PRAZO.etapa4_pmg.faixa, dap:rfDapEfetivo(r, VNS_ETAPA_PRAZO.etapa4_pmg.dap, colh.map(x=> r['vns_'+x+'_data'])), total:colh.length, feitas:colh.filter(x=> r['vns_'+x]==='Executado').length } : null,
-    ].filter(Boolean);
+    return ['R1/R2','R6/R7','Colheita'].map(est=>{
+      const l = vnsKeysEstagio(est).filter(x=>!rfEhNA(r,'vns',x)); if(!l.length) return null;
+      const pz = VNS_ETAPA_PRAZO[l[0]];
+      return { rot: est==='Colheita' ? 'Colh.' : est, faixa:pz.faixa, dap:rfDapEfetivo(r, pz.dap, l.map(x=> r['vns_'+x+'_data'])), total:l.length, feitas:l.filter(x=> r['vns_'+x]==='Executado').length };
+    }).filter(Boolean);
   }
   if(k==='oxc') return [{ rot:'Coleta', faixa:LM_ESTAGIO_DAP['R1/R2'].faixa, dap:RF_OXC_DAP, total:1, feitas: RF_OXC_FEITO.includes(r.oxc_acomp_etapa3) ? 1 : 0 }];
   return [];
@@ -12135,9 +12136,8 @@ function rfPrincipais(r,k){
     return [ ap('V4') ? base[0] : null, ap('R1/R2') ? base[1] : null, ap('R6/R7') ? base[2] : null ].filter(Boolean);
   }
   if(k==='vns'){
-    const r1 = ['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'].some(x=>!rfEhNA(r,'vns',x));
-    const colh = ['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'].some(x=>!rfEhNA(r,'vns',x));
-    return [ r1 ? base[0] : null, colh ? base[1] : null ].filter(Boolean);
+    const ap = est=> vnsKeysEstagio(est).some(x=>!rfEhNA(r,'vns',x));
+    return [ ap('R1/R2') ? base[0] : null, ap('R6/R7') ? base[1] : null, ap('Colheita') ? base[2] : null ].filter(Boolean);
   }
   return base;
 }
@@ -12567,7 +12567,6 @@ function renderVisaoGeral(){
   const MAPA_ESTAGIOS = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
   const agrupaOcs = ocs=> MAPA_ESTAGIOS.map(e=> [e, ocs.filter(o=>o.estagio===e).map(o=>o.avaliacaoLabel), ocs.filter(o=>o.estagio===e).map(o=>o.campoKey)]).filter(g=>g[1].length);
   const estrPorBloco = []; ESTR_ETAPAS.forEach(e=>{ let g = estrPorBloco.find(x=>x[0]===e.bloco); if(!g){ g = [e.bloco, [], []]; estrPorBloco.push(g); } g[1].push(e.label); g[2].push(e.key); });
-  const dapR1 = VNS_ETAPA_PRAZO.etapa21_nematoides.dap;
   const textoSobre = hex=>{ const n = parseInt(hex.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255 > 0.55 ? '#1a2019' : '#ffffff'; };
   const esc = s=> String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   // tom de cada estádio dentro da cor do projeto (só no cabeçalho; as células continuam verdes): 2 ou 3 estádios vão do claro pro escuro;
@@ -12576,13 +12575,13 @@ function renderVisaoGeral(){
   const canaisTom = (hex, r)=>{ const m = parseInt(hex.slice(1),16), alvo = r>=0 ? 255 : 0, a = Math.abs(r); return [m>>16&255, m>>8&255, m&255].map(x=> Math.round(x+(alvo-x)*a)); };
   const estiloTom = (hex, i, n)=>{ const ch = canaisTom(hex, razaoTom(i,n)); return `background:rgb(${ch.join(',')});color:${(0.299*ch[0]+0.587*ch[1]+0.114*ch[2])/255 > 0.58 ? '#1a2019' : '#ffffff'};border-left:2px solid #fff;`; };
   const VG_MAPA = [
-    { k:'vns',  pk:'vns',     nome:'Vida no Solo', g:[ ['R1/R2', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.key), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap===dapR1).map(e=>e.labelExcel)], ['Colheita', VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.label), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.key), VNS_ETAPAS.filter(e=>VNS_ETAPA_PRAZO[e.key].dap!==dapR1).map(e=>e.labelExcel)] ] },
+    { k:'vns',  pk:'vns',     nome:'Vida no Solo', g:['R1/R2','R6/R7','Colheita'].map(est=>{ const ks = vnsKeysEstagio(est), es = ks.map(k=> VNS_ETAPAS.find(e=>e.key===k)); return [est, es.map(e=>e.label), ks, es.map(e=>e.labelExcel)]; }) },
     { k:'estr', pk:'estr',    nome:'Estruturação', g:estrPorBloco },
     { k:'max',  pk:'maximas', nome:'Máximas',      g:agrupaOcs(LM_OCORRENCIAS_MAXIMAS) },
     { k:'lad',  pk:'ladroes', nome:'Ladrões',      g:agrupaOcs(LM_OCORRENCIAS_LADROES) },
   ].map(p=>{
     const cor = VG_PROJETOS.find(x=>x.key===p.pk).cor;
-    const dapDe = est=> p.pk==='vns' ? (est==='R1/R2' ? VNS_ETAPA_PRAZO.etapa21_nematoides : VNS_ETAPA_PRAZO.etapa4_pmg) : p.pk==='estr' ? ESTR_BLOCO_DAP[est] : LM_ESTAGIO_DAP[est];
+    const dapDe = est=> p.pk==='vns' ? VNS_ETAPA_PRAZO[vnsKeysEstagio(est)[0]] : p.pk==='estr' ? ESTR_BLOCO_DAP[est] : LM_ESTAGIO_DAP[est];
     return { ...p, cor, txt:textoSobre(cor), n:p.g.reduce((s,g)=>s+g[1].length,0), dap:Object.fromEntries(p.g.map(([est])=> [est, dapDe(est)])) };
   });
   const nMapaVis = VG_MAPA.filter(p=>!state.vgOcultos[p.k]).reduce((s,p)=>s+p.n,0);
