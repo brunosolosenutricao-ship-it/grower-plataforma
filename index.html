@@ -974,7 +974,7 @@
           <h2>🌍 Visão Geral de Projetos</h2>
           <p class="sub">Mapa de pontos (Latitude/Longitude) de todos os 7 projetos, cada um com sua cor, e tabela de participação por talhão.</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('geral')">📅 Cronograma Geral</button><button class="btn btn-preto" onclick="window.abrirResumoFazenda()">📄 Resumo da fazenda</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
+        <div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-preto" onclick="window.abrirCronogramaGeral('geral')">📅 Cronograma Geral</button><button class="btn btn-preto" id="btnResumoFazenda" onclick="window.abrirResumoFazenda()">📄 Resumo da fazenda</button><button class="atualizar-dash-btn" onclick="atualizarTodosDashboards(this)">🔄 Atualizar</button></div>
       </div>
       <div class="empty-wrap" id="visaoGeralLoading" style="display:flex;">
         <div class="dropzone" style="text-align:center;">
@@ -12360,7 +12360,18 @@ function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no ex
   return { doc, nomeArq, nTalhoes:todos.length, nSemPlantio:semPlantio.length, nSemCoord: comPlantio.filter(t=>!rfLinkMapa(t.rec)).length, nPag };
 }
 
+// CHAVE DO BLOQUEIO TEMPORÁRIO: true = o botão "Resumo da fazenda" da Visão Geral fica bloqueado (cinza, com cadeado); false = libera de novo. Só o botão e o diálogo: o PDF do planejamento não é afetado.
+const RESUMO_FAZENDA_BLOQUEADO = true;
+function aplicarBloqueioResumoFazenda(){
+  if(typeof document==='undefined') return;
+  const b = document.getElementById('btnResumoFazenda'); if(!b) return;
+  b.disabled = RESUMO_FAZENDA_BLOQUEADO;
+  b.title = RESUMO_FAZENDA_BLOQUEADO ? 'Temporariamente indisponível' : '';
+  b.textContent = (RESUMO_FAZENDA_BLOQUEADO ? '🔒' : '📄')+' Resumo da fazenda';
+}
+aplicarBloqueioResumoFazenda();
 function abrirResumoFazenda(){
+  if(RESUMO_FAZENDA_BLOQUEADO) return;
   if(!(window.jspdf && window.jspdf.jsPDF)){ alert('A biblioteca de PDF ainda não carregou. Recarregue a página e tente de novo.'); return; }
   const modalRoot = document.getElementById('modalRoot');
   const comProjeto = RECORDS.filter(r=> RF_PROJ_ORDEM.some(k=>rfParticipa(r,k)));
