@@ -213,12 +213,7 @@
   tbody .lm-freeze-right{background:#fff;}
   .lm-freeze-right > span{display:block;font-size:10px;white-space:normal;}
   .lm-freeze-span{position:sticky !important;left:0px;background:var(--paper);z-index:4;}
-.lm-acomp-save-col{width:196px;min-width:196px;max-width:196px;}   /* cabe o Salvar + o botão da imagem (só nesta tabela) */
-.lm-freeze-right > span.lm-img-slot{display:inline-block;font-size:inherit;white-space:nowrap;vertical-align:middle;margin-left:4px;}
-.lm-img-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 8px;font-size:14px;cursor:pointer;line-height:1.2;}
-.lm-img-btn:hover{background:var(--bg);}
-.lm-img-thumb{border:1px solid var(--line);background:#fff;border-radius:6px;padding:1px;cursor:pointer;line-height:0;vertical-align:middle;}
-.lm-img-thumb img{width:30px;height:30px;object-fit:cover;border-radius:4px;display:block;background:#eee;}
+.lm-acomp-save-col{width:230px;min-width:230px;max-width:230px;}   /* cabe o Salvar + o Anexo + a Ficha (só nesta tabela) */
   .reg-freeze-r1{position:sticky !important;right:96px;background:var(--paper);z-index:2;width:140px;min-width:140px;max-width:140px;box-shadow:-2px 0 4px rgba(0,0,0,.08);}
   .reg-freeze-r2{position:sticky !important;right:0px;background:var(--paper);z-index:2;width:96px;min-width:96px;max-width:96px;}
   thead .reg-freeze-r1, thead .reg-freeze-r2{z-index:4;}
@@ -299,10 +294,6 @@
 </style>
 <style>
 /* ===== Estilos do Dashboard Óxido de Magnésio (isolados, ids/classes já conferidos sem colisão real) ===== */
-  .oxc-pdf, .anexo-pdf, .lm-freeze-right > span.oxc-pdf, .lm-freeze-right > span.anexo-pdf{display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle;font-size:inherit;white-space:nowrap;}   /* a regra ".lm-freeze-right > span" faz todo span da célula virar bloco: aqui ele fica ao lado do Salvar */
-  .oxc-pdf-chip, .anexo-pdf-chip{display:inline-block;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;vertical-align:middle;}
-  .oxc-pdf-ic, .anexo-pdf-ic{padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;line-height:1;font-family:inherit;}
-  .oxc-pdf-msg, .anexo-pdf-msg{display:block;font-size:10.5px;}
   .anx{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;}
   .lm-freeze-right > span.anx{display:inline-flex;margin-left:6px;font-size:inherit;white-space:nowrap;}
   .anx-ic{position:relative;width:30px;height:30px;padding:0;font-size:15px;line-height:1;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;}
@@ -4015,7 +4006,6 @@ async function carregarDadosDoSupabase(){
         oxc_acomp_etapa3: d.oxc_acomp_etapa3 ?? null,
         oxc_acomp_etapa4: d.oxc_acomp_etapa4 ?? null,
         oxc_acomp_modo_aplicacao: d.oxc_acomp_modo_aplicacao ?? null,
-        oxc_acomp_pdf: d.oxc_acomp_pdf ?? null,
         // campos do Máximas Produtividades / Ladrões — histórico produtivo mora no Geral (t),
         // só Sistema e IPI continuam no jsonb próprio do projeto
         max_sistema: dm.sistema ?? null,
@@ -4067,7 +4057,6 @@ async function carregarDadosDoSupabase(){
         estr_acomp_ciclo: destr.ciclo_acomp ?? null,
         estr_acomp_tipo_material: destr.tipo_material_acomp ?? null,
         estr_acomp_status_plantio: destr.status_plantio_acomp ?? null,
-        estr_acomp_pdf: destr.pdf_acomp_estr ?? null,
         estr_acomp_altura_v4_mes: destr.acomp_altura_v4_mes ?? null,
         estr_acomp_altura_v4_exec: destr.acomp_altura_v4_exec ?? null,
         estr_acomp_foto_v4_mes: destr.acomp_foto_v4_mes ?? null,
@@ -4158,8 +4147,7 @@ async function carregarDadosDoSupabase(){
     });
 
     await carregarParceiros(records);
-    await carregarImagens([...records, ...semArea]);
-    RECORDS = records; SEM_AREA = semArea;
+        RECORDS = records; SEM_AREA = semArea;
     state.selectedCulturas = new Set();
     state.drillEstado = null; state.drillCliente = null;
     state.statusNegSel = null; state.statusNegConsultor = 'Todos'; state.statusNegResumoOpen = false;
@@ -8225,7 +8213,7 @@ function renderEstruturacao(){
   </div>
 
   <div class="estr-card full-card" style="margin-top:12px;animation-delay:.34s;">
-    <h3>🗓️ Acompanhamento</h3>
+    <div class="anx-barra"><h3>🗓️ Acompanhamento</h3>${anxBarra(ANX_ESTR)}</div>
     <p class="sub-sm">Talhões com Área do projeto (Estruturação) &gt; 0 · ${acompRowsEstr.length} no total. Esses campos moram só aqui, não aparecem na Alimentação.</p>
     <div class="table-scroll" data-topscroll="sempre">
       <table data-colfilter="estr-acomp">
@@ -8241,17 +8229,17 @@ function renderEstruturacao(){
             });
             return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:${ESTR_BLOCO_COR[g.bloco]||'#6b7a3f'};color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
           })()}
-          <th class="lm-freeze-right" style="width:340px;min-width:340px;max-width:340px;"></th>
+          <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;"></th>
         </tr></thead>
         <thead><tr>
           <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Cultivar</th><th>Data de Plantio</th><th>Status do Plantio</th><th>Ciclo</th><th>Tipo de material</th>
           ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-          <th class="lm-freeze-right" style="width:340px;min-width:340px;max-width:340px;">Salvar</th>
+          <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
         </tr></thead>
         <thead><tr>
           <th class="lm-freeze lm-freeze-1"></th><th class="lm-freeze lm-freeze-2"></th><th class="lm-freeze lm-freeze-3"></th><th></th><th></th><th></th><th></th><th></th>
           ${ESTR_ETAPAS.map(()=>`<th>Data</th><th>Execução</th>`).join('')}
-          <th class="lm-freeze-right" style="width:340px;min-width:340px;max-width:340px;"></th>
+          <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;"></th>
         </tr></thead>
         <tbody>
           ${acompRowsEstr.map(r=>{
@@ -8279,10 +8267,9 @@ function renderEstruturacao(){
                 <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" data-prevista="${dataPrevistaEstrStr(e.bloco)}" value="${entry[e.key+'_mes']||(entry[e.key+'_exec']==='Feito'?'':dataPrevistaEstrStr(e.bloco))}"></td>
                 <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${e.key}" data-cor-faixa="${(ESTR_BLOCO_DAP[e.bloco]||{}).faixa||0}">${EXECUCAO_OPTIONS_ESTR.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
               `).join('')}
-              <td class="lm-freeze-right" style="white-space:nowrap;width:340px;min-width:340px;max-width:340px;">
-                <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button><span class="anexo-pdf" data-anexo-pdf-slot="${encodeURIComponent(key)}">${ESTR_PDF.html(r)}</span>
+              <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
+                <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(ANX_ESTR, r.id)}
                 <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
-                <span class="anexo-pdf-msg" data-anexo-pdf-msg="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
           }).join('') || `<tr><td colspan="${8+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
@@ -8338,7 +8325,7 @@ function renderEstruturacao(){
       salvarEstrAcompCampo(key, campo, valor, el);
     });
   });
-  container.querySelectorAll('.anexo-pdf').forEach(ESTR_PDF.ligar);
+  anxLigar(container, ANX_ESTR);
   container.querySelectorAll('.estr-acomp-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const key = decodeURIComponent(btn.dataset.estrKey);
@@ -8728,7 +8715,7 @@ function renderOxidoConsumo(){
   </div>
 
   <div class="oxc-card full-card" style="margin-top:12px;animation-delay:.3s;">
-    <h3>🗓️ Acompanhamento</h3>
+    <div class="anx-barra"><h3>🗓️ Acompanhamento</h3>${anxBarra(ANX_OXC)}</div>
     <p class="sub-sm">Mesmos talhões dos cards acima (Dose Óxido &gt; 0, respeitando o filtro de Status) — Status e Dose vêm da Alimentação (só leitura); Participação e as 4 etapas são só desta aba, não compartilham dado com a aba separada "Cronograma".</p>
     <input type="text" class="oxc-acomp-busca" id="oxcAcompBusca" placeholder="Buscar por cliente, fazenda ou talhão…" value="${state.oxidoConsumoBusca}">
     <div class="oxc-acomp-filtros">
@@ -8746,7 +8733,7 @@ function renderOxidoConsumo(){
         <thead><tr>
           <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th><th>Modo de aplicação</th>
           ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
-          <th class="lm-freeze-right" style="width:340px;min-width:340px;max-width:340px;">Salvar</th>
+          <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
         </tr></thead>
         <tbody>
           ${paginaAtual.map(r=>{
@@ -8766,10 +8753,9 @@ function renderOxidoConsumo(){
                 ? `<td style="background:${oxcCorFundo('etapa2', r.status)};font-weight:700;text-align:center;">${r.status||'—'}</td>`
                 : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`
               ).join('')}
-              <td class="lm-freeze-right" style="white-space:nowrap;width:340px;min-width:340px;max-width:340px;">
-                <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button><span class="oxc-pdf" data-oxc-pdf-slot="${encodeURIComponent(key)}">${oxcPdfHtml(r)}</span>
+              <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
+                <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(ANX_OXC, r.id)}
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
-                <span class="oxc-pdf-msg" data-oxc-pdf-msg="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
           }).join('') || `<tr><td colspan="${10+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
@@ -8836,7 +8822,7 @@ function renderOxidoConsumo(){
       }
     });
   });
-  container.querySelectorAll('.oxc-pdf').forEach(oxcPdfSlotLigar);
+  anxLigar(container, ANX_OXC);
   container.querySelectorAll('.oxc-status-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const s = decodeURIComponent(btn.dataset.status);
@@ -10690,7 +10676,9 @@ function abrirModalLadroesMaximasTalhao(rec){
     .lm-hist-img-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-soft);}
     .lm-hist-img.ok .lm-hist-img-txt{display:none;}
     .lm-hist-img.ok::after{content:'🔍 ampliar';position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;padding:2px 8px;border-radius:999px;}
-    @media (max-width:640px){ .lm-hist-wrap{flex-direction:column;} .lm-hist-chart, .lm-hist-img{flex:none;width:100%;} }   /* celular: gráfico em cima e imagem embaixo */
+    .lm-hist-pdf{flex:1;min-width:0;height:180px;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;font-size:12px;background:var(--bg);}
+    .lm-hist-pdf-n{word-break:break-all;color:var(--ink-soft);font-size:11px;}
+    @media (max-width:640px){ .lm-hist-wrap{flex-direction:column;} .lm-hist-chart, .lm-hist-img, .lm-hist-pdf{flex:none;width:100%;} }   /* celular: gráfico em cima e imagem embaixo */
     .lm-badge-sinaleiro{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;margin-bottom:8px;width:100%;box-sizing:border-box;}
     .lm-badge-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
     .lm-badge-aval{background:var(--bg);border-radius:9px;padding:8px 10px;font-size:11px;width:100%;box-sizing:border-box;}
@@ -10753,7 +10741,6 @@ function abrirModalLadroesMaximasTalhao(rec){
         </div>
         <div class="lm-hist-wrap">
           <div class="lm-hist-chart"><canvas id="lmHistChart"></canvas></div>
-          ${rec.imagem_caminho ? `<button type="button" class="lm-hist-img" id="lmHistImg" title="Clique para ampliar"><img alt="Imagem do talhão"><span class="lm-hist-img-txt">Carregando imagem…</span></button>` : ''}
         </div>
       </div>
 
@@ -10823,59 +10810,24 @@ function abrirModalLadroesMaximasTalhao(rec){
       }
     });
   }
-  // imagem do talhão (metade direita do "Histórico produtivo"): link temporário do balde privado; clicar amplia (só ver; trocar e remover ficam na tabela)
-  const lmImgBox = document.getElementById('lmHistImg');
-  if(lmImgBox){
-    (async()=>{
-      const u = (await imgUrlsAssinadas([rec.imagem_caminho]))[rec.imagem_caminho], im = lmImgBox.querySelector('img'), tx = lmImgBox.querySelector('.lm-hist-img-txt');
-      if(u){ im.src = u; lmImgBox.classList.add('ok'); } else if(tx) tx.textContent = 'Imagem indisponível agora';
-    })();
-    lmImgBox.addEventListener('click', ()=> abrirImagemTalhao(rec, null, { somenteVer:true }));
-  }
+  // anexo do talhão (foto ou PDF) na metade direita do "Histórico produtivo": vem do molde de anexos. Foto: abre ampliada (só ver). PDF: mostra o nome e o botão de baixar.
+  (async()=>{
+    const anx = rec.max_selecao==='Ladrões' ? ANX_LAD : ANX_MAX, wrap = document.querySelector('.lm-hist-wrap');
+    await anx.carregar(); const r = anx.reg.get('anexo|'+rec.id); if(!r || !wrap || !wrap.isConnected) return;
+    if(r.mime==='application/pdf'){
+      wrap.insertAdjacentHTML('beforeend', `<div class="lm-hist-pdf" id="lmHistPdf"><div style="font-size:26px;">📎</div><b>PDF anexado</b><div class="lm-hist-pdf-n">${imgAttr(r.nome)}</div><button type="button" class="btn ghost" id="lmHistPdfBaixar">⬇ Baixar</button></div>`);
+      document.getElementById('lmHistPdfBaixar').addEventListener('click', ()=>{ anx.baixar('anexo', String(rec.id)).catch(e=> console.error(e)); });
+      return;
+    }
+    wrap.insertAdjacentHTML('beforeend', `<button type="button" class="lm-hist-img" id="lmHistImg" title="Clique para ampliar"><img alt="Foto do talhão"><span class="lm-hist-img-txt">Carregando imagem…</span></button>`);
+    const box = document.getElementById('lmHistImg'), u = await anx.url('anexo', String(rec.id), 3600), im = box.querySelector('img'), tx = box.querySelector('.lm-hist-img-txt');
+    if(u){ im.src = u; box.classList.add('ok'); box.addEventListener('click', ()=> abrirImagemUrl(u, rec.cliente+' / '+rec.fazenda+' / '+rec.talhao)); } else if(tx) tx.textContent = 'Imagem indisponível agora';
+  })();
 }
-/* ===== IMAGEM POR TALHÃO (tabelas Máximas e Ladrões) =====
-   Uma imagem por talhão. O arquivo fica no Supabase Storage (balde PRIVADO "talhao-imagens") e só o caminho vai pro cadastro (talhoes.imagem_caminho).
-   A foto é reduzida no navegador antes de enviar e é gravada NA HORA (não depende do botão Salvar da linha). Precisa rodar o anexos_imagens.sql no Supabase. */
-const IMG_BALDE = 'talhao-imagens', IMG_LADO_MAX = 1600, IMG_QUALIDADE = 0.82, IMG_MAX_BYTES = 25*1024*1024;
-// consulta separada de propósito: se a coluna ainda não existe no banco, nada mais quebra.
-async function carregarImagens(records){
-  try{
-    const { data, error } = await fetchAllPaginated('talhoes','id, imagem_caminho', q=> q.not('imagem_caminho','is',null));
-    if(error){ console.warn('Imagem por talhão indisponível (rode o anexos_imagens.sql no Supabase):', error.message); return; }
-    const mapa = new Map(data.map(x=> [x.id, x.imagem_caminho]));
-    records.forEach(r=>{ r.imagem_caminho = mapa.get(r.id) || null; });
-  }catch(e){ console.warn(e); }
-}
+/* ===== FOTO DO ANEXO (tabelas Máximas e Ladrões) =====
+   Os anexos agora vivem no molde criarAnexos (balde "anexos-projetos"). Aqui ficam só a redução da foto (usada por ele) e o visualizador da foto no modal. */
+const IMG_LADO_MAX = 1600, IMG_QUALIDADE = 0.82, IMG_MAX_BYTES = 25*1024*1024;
 const imgAttr = s=> String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const imgMsgErro = e=>{ const m = (e && e.message) || String(e); return /imagem_caminho|42703|PGRST204|bucket/i.test(m) ? 'Imagens ainda não configuradas no banco: rode o anexos_imagens.sql no Supabase.' : 'Erro com a imagem: '+m; };
-function imgSlotHtml(rec){
-  return rec && rec.imagem_caminho
-    ? `<button type="button" class="lm-img-thumb" data-img-acao="ver" title="Ver a imagem do talhão"><img alt="Imagem do talhão" data-img-path="${imgAttr(rec.imagem_caminho)}"></button>`
-    : `<button type="button" class="lm-img-btn" data-img-acao="anexar" title="Anexar imagem do talhão (JPG ou PNG). A foto é salva na hora, sem precisar do Salvar.">📎</button>`;
-}
-// links temporários (balde privado): pede todos de uma vez e guarda por ~50 min
-async function imgUrlsAssinadas(paths){
-  const cache = state.imgUrls = state.imgUrls || {}, pend = state.imgPend = state.imgPend || {}, agora = Date.now(), out = {};
-  const faltam = [...new Set(paths)].filter(p=> p && !(cache[p] && cache[p].ate > agora) && !pend[p]);
-  if(faltam.length){   // um pedido só pra todos os que faltam; quem pedir os mesmos enquanto ele não volta espera o mesmo pedido
-    const req = (async()=>{
-      try{
-        const { data, error } = await sb.storage.from(IMG_BALDE).createSignedUrls(faltam, 3600);
-        if(!error && data) data.forEach(d=>{ if(d && d.signedUrl) cache[d.path] = { url:d.signedUrl, ate:agora+50*60*1000 }; });
-      }catch(e){ console.warn(e); }
-      faltam.forEach(p=>{ delete pend[p]; });
-    })();
-    faltam.forEach(p=>{ pend[p] = req; });
-  }
-  await Promise.all([...new Set(paths.map(p=> pend[p]).filter(Boolean))]);
-  paths.forEach(p=>{ out[p] = cache[p] ? cache[p].url : null; });
-  return out;
-}
-async function imgPreencherMiniaturas(raiz){
-  const imgs = [...raiz.querySelectorAll('img[data-img-path]')]; if(!imgs.length) return;
-  const urls = await imgUrlsAssinadas(imgs.map(i=>i.dataset.imgPath));
-  imgs.forEach(i=>{ const u = urls[i.dataset.imgPath]; if(u) i.src = u; else i.alt = 'Imagem indisponível'; });
-}
 // reduz a foto (lado maior 1600 px, JPEG): alguns MB viram algumas centenas de KB
 function redimensionarImagem(file){
   return new Promise((res, rej)=>{
@@ -10892,82 +10844,29 @@ function redimensionarImagem(file){
     img.src = url;
   });
 }
-async function enviarImagemTalhao(rec, file){
-  if(!file || !/^image\/(jpeg|png)$/.test(file.type)) throw new Error('use uma imagem JPG ou PNG');
-  if(file.size > IMG_MAX_BYTES) throw new Error('a imagem é grande demais (máximo 25 MB)');
-  const blob = await (window.__imgRedim || redimensionarImagem)(file);
-  const caminho = rec.id+'/'+Date.now()+'.jpg', st = sb.storage.from(IMG_BALDE);
-  const up = await st.upload(caminho, blob, { contentType:'image/jpeg', upsert:false });
-  if(up.error) throw up.error;
-  const { data, error } = await sb.from('talhoes').update({ imagem_caminho:caminho }).eq('id', rec.id).select('id');
-  if(error || !data || !data.length){ try{ await st.remove([caminho]); }catch(e){} throw (error || new Error('o talhão não foi atualizado (sem permissão?)')); }
-  const antigo = rec.imagem_caminho; rec.imagem_caminho = caminho;
-  if(antigo){ try{ await st.remove([antigo]); }catch(e){} if(state.imgUrls) delete state.imgUrls[antigo]; }   // a imagem anterior sai do balde
-}
-async function removerImagemTalhao(rec){
-  const antigo = rec.imagem_caminho; if(!antigo) return;
-  const { data, error } = await sb.from('talhoes').update({ imagem_caminho:null }).eq('id', rec.id).select('id');
-  if(error || !data || !data.length) throw (error || new Error('o talhão não foi atualizado (sem permissão?)'));
-  rec.imagem_caminho = null;
-  try{ await sb.storage.from(IMG_BALDE).remove([antigo]); }catch(e){}
-  if(state.imgUrls) delete state.imgUrls[antigo];
-}
-function imgRecDoSlot(slot){ const key = decodeURIComponent(slot.dataset.lmImgKey); return RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key); }
-function imgRedesenharSlots(rec){
-  document.querySelectorAll('.lm-img-slot').forEach(slot=>{ const r = imgRecDoSlot(slot); if(r && r.id===rec.id){ slot.innerHTML = imgSlotHtml(rec); imgLigarSlot(slot); } });
-}
-function imgEscolherArquivo(rec, msgEl){
-  let inp = document.getElementById('imgTalhaoInput');
-  if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'imgTalhaoInput'; inp.accept = 'image/jpeg,image/png'; inp.hidden = true; document.body.appendChild(inp); }
-  inp.onchange = async ()=>{
-    const f = inp.files && inp.files[0]; inp.value = ''; if(!f) return;
-    const msg = (t, erro)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; } };
-    msg('⏳ Enviando foto…');
-    try{ await enviarImagemTalhao(rec, f); msg('✓ Foto salva'); setTimeout(()=>{ if(msgEl && msgEl.textContent==='✓ Foto salva') msg(''); }, 2500); }
-    catch(e){ msg(imgMsgErro(e), true); }
-    imgRedesenharSlots(rec);
-  };
-  inp.click();
-}
-async function abrirImagemTalhao(rec, msgEl, opts){
+function abrirImagemUrl(url, titulo){   // só ver: Esc, o botão Fechar e o clique fora fecham
   const antigo = document.getElementById('imgTalhaoViewer'); if(antigo) antigo.remove();
-  const url = (await imgUrlsAssinadas([rec.imagem_caminho]))[rec.imagem_caminho];
   const ov = document.createElement('div'); ov.id = 'imgTalhaoViewer';
   ov.innerHTML = `<style>
       #imgTalhaoViewer{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:7200;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
       #imgTalhaoViewer .iv-box{background:#fff;border-radius:14px;max-width:min(94vw,1100px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;}
-      #imgTalhaoViewer .iv-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;}
+      #imgTalhaoViewer .iv-top{padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;}
       #imgTalhaoViewer .iv-img{background:#111;display:flex;align-items:center;justify-content:center;min-height:200px;overflow:auto;}
       #imgTalhaoViewer .iv-img img{max-width:100%;max-height:72vh;object-fit:contain;display:block;}
       #imgTalhaoViewer .iv-acoes{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line);}
     </style>
-    <div class="iv-box" role="dialog" aria-modal="true" aria-label="Imagem do talhão">
-      <div class="iv-top"><b>${imgAttr(rec.cliente)} / ${imgAttr(rec.fazenda)} / ${imgAttr(rec.talhao)}</b></div>
-      <div class="iv-img">${url ? `<img alt="Imagem do talhão" src="${imgAttr(url)}">` : '<div style="color:#fff;padding:30px;font-size:13px;">Imagem indisponível agora.</div>'}</div>
-      <div class="iv-acoes">${opts && opts.somenteVer ? '' : '<button type="button" class="btn ghost" id="ivTrocar">Trocar</button><button type="button" class="btn ghost" id="ivRemover" style="color:#c62828;">Remover</button>'}<button type="button" class="btn btn-preto" id="ivFechar">Fechar</button></div>
+    <div class="iv-box" role="dialog" aria-modal="true" aria-label="Foto do talhão">
+      <div class="iv-top"><b>${imgAttr(titulo)}</b></div>
+      <div class="iv-img">${url ? `<img alt="Foto do talhão" src="${imgAttr(url)}">` : '<div style="color:#fff;padding:30px;font-size:13px;">Imagem indisponível agora.</div>'}</div>
+      <div class="iv-acoes"><button type="button" class="btn ghost" id="ivFechar">Fechar</button></div>
     </div>`;
   document.body.appendChild(ov);
   const fecha = ()=>{ ov.remove(); document.removeEventListener('keydown', esc); }, esc = e=>{ if(e.key==='Escape') fecha(); };
   document.addEventListener('keydown', esc);
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) fecha(); });
   ov.querySelector('#ivFechar').addEventListener('click', fecha);
-  const bTrocar = ov.querySelector('#ivTrocar'), bRemover = ov.querySelector('#ivRemover');
-  if(bTrocar) bTrocar.addEventListener('click', ()=>{ fecha(); imgEscolherArquivo(rec, msgEl); });
-  if(bRemover) bRemover.addEventListener('click', async ()=>{
-    if(!confirm('Remover a imagem do talhão '+rec.fazenda+' / '+rec.talhao+'? Não dá pra desfazer.')) return;
-    fecha();
-    try{ await removerImagemTalhao(rec); if(msgEl){ msgEl.textContent = '✓ Imagem removida'; msgEl.style.color = ''; setTimeout(()=>{ if(msgEl.textContent==='✓ Imagem removida') msgEl.textContent=''; }, 2500); } }
-    catch(e){ if(msgEl){ msgEl.textContent = imgMsgErro(e); msgEl.style.color = '#c62828'; } }
-    imgRedesenharSlots(rec);
-  });
 }
-function imgLigarSlot(slot){
-  const rec = imgRecDoSlot(slot); if(!rec) return;
-  const msgEl = slot.closest('td') ? slot.closest('td').querySelector('.lm-acomp-msg') : null;
-  slot.querySelectorAll('button[data-img-acao]').forEach(b=> b.addEventListener('click', ()=>{ b.dataset.imgAcao==='anexar' ? imgEscolherArquivo(rec, msgEl) : abrirImagemTalhao(rec, msgEl); }));
-  imgPreencherMiniaturas(slot);
-}
-/* ===== FIM IMAGEM POR TALHÃO ===== */
+/* ===== FIM FOTO DO ANEXO ===== */
 function renderLadroesMaximasMapa(){
   const container = document.getElementById('tab-ladroesmaximas-mapa');
   if(!container) return;
@@ -11146,7 +11045,7 @@ function renderLadroesMaximasMapa(){
       const totalCols = ocorrencias.length*2;
       return `
       <div class="lm-card full-card" style="margin-top:12px;">
-        <h3 style="margin:0 0 4px;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>
+        <div class="anx-barra"><h3 style="margin:0;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>${anxBarra(titulo==='Máximas' ? ANX_MAX : ANX_LAD)}</div>
         <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
         <div class="table-scroll" data-topscroll="sempre">
           <table data-colfilter="lm-acomp-${String(titulo).replace(/\s+/g,'-')}">
@@ -11186,7 +11085,7 @@ function renderLadroesMaximasMapa(){
                   <td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="status_plantio" style="background:${r.max_status_plantio==='Plantado'?'#c8e6c9':r.max_status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;"><option value="" ${!r.max_status_plantio?'selected':''}>—</option><option value="Plantado" ${r.max_status_plantio==='Plantado'?'selected':''}>Plantado</option><option value="Estimativa" ${r.max_status_plantio==='Estimativa'?'selected':''}>Estimativa</option></select></td>
                   ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" data-prevista="${dataPrevistaStr(oc)}" value="${entry[oc.campoKey+'_data']||(entry[oc.campoKey]==='Executado'?'':dataPrevistaStr(oc))}"></td>`).join('')}
                   <td class="lm-freeze-right lm-acomp-save-col" style="white-space:nowrap;">
-                    <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button><span class="lm-img-slot" data-lm-img-key="${encodeURIComponent(key)}">${imgSlotHtml(r)}</span>
+                    <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(titulo==='Máximas' ? ANX_MAX : ANX_LAD, r.id)}
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
                   </td>
                 </tr>`;
@@ -11241,8 +11140,7 @@ function renderLadroesMaximasMapa(){
       salvarCicloLadroesMaximas(el.dataset.lmTalhaoId, valor, el);
     });
   });
-  container.querySelectorAll('.lm-img-slot').forEach(slot=>{ const rec = imgRecDoSlot(slot); if(rec){ const msgEl = slot.closest('td').querySelector('.lm-acomp-msg'); slot.querySelectorAll('button[data-img-acao]').forEach(b=> b.addEventListener('click', ()=>{ b.dataset.imgAcao==='anexar' ? imgEscolherArquivo(rec, msgEl) : abrirImagemTalhao(rec, msgEl); })); } });
-  imgPreencherMiniaturas(container);   // um pedido só pros links temporários de todas as miniaturas
+  anxLigar(container, ANX_MAX, ANX_LAD);
   container.querySelectorAll('.lm-acomp-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const key = decodeURIComponent(btn.dataset.lmKey);
@@ -11764,7 +11662,7 @@ function renderVidaNoSolo(){
     </div>
 
     <div class="vns-card full-card" style="margin-top:12px;">
-      <div class="anx-barra"><h3>🗓️ Acompanhamento</h3><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="manual" data-anx-tid="">${ANX_VNS.htmlTabela('manual')}</span><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="ficha_geral" data-anx-tid="">${ANX_VNS.htmlTabela('ficha_geral')}</span><span class="anx-msg" data-anx-msg="tabela"></span></div>
+      <div class="anx-barra"><h3>🗓️ Acompanhamento</h3>${anxBarra(ANX_VNS)}</div>
       <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
       <div class="table-scroll" data-topscroll="sempre">
         <table data-colfilter="vns-talhoes">
@@ -11808,9 +11706,8 @@ function renderVidaNoSolo(){
                     + `<td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${uid}_data" data-vns-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" value="${dataSalva||(algumExec?'':prev)}"></td>`;
                 }).join('')}
                 <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
-                  <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="anexo" data-anx-tid="${r.id}">${ANX_VNS.htmlLinha('anexo', r.id)}</span><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="ficha" data-anx-tid="${r.id}">${ANX_VNS.htmlLinha('ficha', r.id)}</span>
+                  <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>${anxCelula(ANX_VNS, r.id)}
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
-                  <span class="anx-msg" data-anx-msg="${r.id}"></span>
                 </td>
               </tr>`;
             }).join('') || `<tr><td colspan="${11+VNS_COLUNAS_ETAPAS}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
@@ -11893,7 +11790,7 @@ function renderVidaNoSolo(){
       salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsGrupo ? el.dataset.vnsGrupo.split(',').map(k=>k+'_data') : el.dataset.vnsCampo, valorEtapa, el);   // data de bloco: grava a mesma nas avaliações dele
     });
   });
-  ANX_VNS.ligar(container); ANX_VNS.carregar().then(()=> ANX_VNS.redesenhar(document));   // anexos: os botões ligam já, e os registros chegam do banco em seguida
+  anxLigar(container, ANX_VNS);
   container.querySelectorAll('.vns-linha-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const talhaoId = btn.dataset.vnsTalhaoId;
@@ -13041,7 +12938,6 @@ function montarDadosOxidoBase(rec){
     oxc_acomp_etapa3: rec.oxc_acomp_etapa3 ?? null,
     oxc_acomp_etapa4: rec.oxc_acomp_etapa4 ?? null,
     oxc_acomp_modo_aplicacao: rec.oxc_acomp_modo_aplicacao ?? null,
-    oxc_acomp_pdf: rec.oxc_acomp_pdf ?? null,
   };
 }
 async function salvarCronogramaCampo(key, etapaKey, valor, selEl){
@@ -13145,84 +13041,6 @@ async function salvarOxcAcompEntradaCompleta(rec, entry, user){
   }
   return { error };
 }
-// ---- PDF por talhão na tabela Acompanhamento do Óxido: um por talhão. O arquivo fica no balde PRIVADO "oxido-pdfs" e o registro
-// (caminho, nome, tamanho, data) no JSON do talhão no projeto Óxido (oxc_acomp_pdf). Anexa, troca, baixa e exclui na hora, sem o Salvar.
-const OXC_PDF_BALDE = 'oxido-pdfs', OXC_PDF_MAX = 10*1024*1024;
-const oxcPdfMsgErro = e=>{ const m = (e && e.message) || String(e); return /bucket|not found|row-level|violates|policy/i.test(m) ? 'PDF ainda não configurado no banco: rode o anexos_oxido_pdf.sql no Supabase.' : 'Erro com o PDF: '+m; };
-const oxcPdfTamanho = n=> n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(n/1024))+' KB';
-function oxcPdfHtml(rec){
-  const reg = rec && rec.oxc_acomp_pdf;
-  if(!reg) return `<button type="button" class="row-save oxc-pdf-ac" data-oxc-pdf="anexar" title="Anexar um PDF a este talhão (até 10 MB). Ele é salvo na hora, sem precisar do Salvar.">📎 PDF</button>`;
-  const dt = reg.em ? new Date(reg.em).toLocaleDateString('pt-BR') : '';
-  return `<span class="oxc-pdf-chip" title="${imgAttr(reg.nome+' · '+oxcPdfTamanho(reg.tamanho||0)+(dt?' · '+dt:''))}">📄 ${imgAttr(reg.nome)}</span>`
-    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="baixar" title="Baixar o PDF">⬇</button>`
-    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="trocar" title="Trocar o PDF">🔄</button>`
-    + `<button type="button" class="oxc-pdf-ic" data-oxc-pdf="excluir" title="Excluir o PDF" style="color:#c62828;">🗑</button>`;
-}
-async function oxcPdfGravarRegistro(rec, registro){
-  const dados = montarDadosOxidoBase(rec); dados.oxc_acomp_pdf = registro;
-  const { data: { user } } = await sb.auth.getUser();
-  const { error } = await sb.from('dados_projeto').upsert({
-    talhao_id: rec.id, projeto_id: projetosIds['oxido-magnesio'], dados,
-    updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
-  }, { onConflict: 'talhao_id,projeto_id' });
-  return error;
-}
-async function oxcPdfAnexar(rec, file){
-  if(!rec || !projetosIds['oxido-magnesio']) throw new Error('talhão ou projeto não encontrado');
-  if(!file || !(file.type==='application/pdf' || /\.pdf$/i.test(file.name||''))) throw new Error('use um arquivo PDF');
-  if(file.size > OXC_PDF_MAX) throw new Error('o PDF é grande demais (máximo 10 MB)');
-  const caminho = rec.id+'/'+Date.now()+'.pdf', st = sb.storage.from(OXC_PDF_BALDE);
-  const up = await st.upload(caminho, file, { contentType:'application/pdf', upsert:false });
-  if(up.error) throw up.error;
-  const registro = { caminho, nome:file.name, tamanho:file.size, em:new Date().toISOString() };
-  const erro = await oxcPdfGravarRegistro(rec, registro);
-  if(erro){ try{ await st.remove([caminho]); }catch(e){} throw erro; }   // não deixa arquivo solto se o registro não gravou
-  const antigo = rec.oxc_acomp_pdf && rec.oxc_acomp_pdf.caminho; rec.oxc_acomp_pdf = registro;
-  if(antigo){ try{ await st.remove([antigo]); }catch(e){} }   // o PDF anterior sai do balde
-}
-async function oxcPdfExcluir(rec){
-  const reg = rec && rec.oxc_acomp_pdf; if(!reg) return;
-  const rm = await sb.storage.from(OXC_PDF_BALDE).remove([reg.caminho]);
-  if(rm.error) throw rm.error;   // se o arquivo não saiu, o registro fica (a referência não se perde)
-  const erro = await oxcPdfGravarRegistro(rec, null); if(erro) throw erro;
-  rec.oxc_acomp_pdf = null;
-}
-async function oxcPdfBaixar(rec){
-  const reg = rec && rec.oxc_acomp_pdf; if(!reg) return;
-  const { data, error } = await sb.storage.from(OXC_PDF_BALDE).createSignedUrl(reg.caminho, 120, { download: reg.nome });
-  if(error || !data || !data.signedUrl) throw (error || new Error('não foi possível gerar o link do PDF'));
-  const a = document.createElement('a'); a.href = data.signedUrl; a.download = reg.nome; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
-}
-function oxcPdfEscolher(aoEscolher){
-  let inp = document.getElementById('oxcPdfInput');
-  if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'oxcPdfInput'; inp.accept = 'application/pdf,.pdf'; inp.hidden = true; document.body.appendChild(inp); }
-  inp.onchange = ()=>{ const f = inp.files && inp.files[0]; inp.value = ''; if(f) aoEscolher(f); };
-  inp.click();
-}
-function oxcPdfSlotLigar(slot){ slot.querySelectorAll('[data-oxc-pdf]').forEach(b=> b.addEventListener('click', ()=> oxcPdfAcao(b.dataset.oxcPdf, slot))); }
-async function oxcPdfAcao(acao, slot){
-  const chave = slot.dataset.oxcPdfSlot, key = decodeURIComponent(chave);
-  const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key); if(!rec) return;
-  const msgEl = document.querySelector(`.oxc-pdf-msg[data-oxc-pdf-msg="${chave}"]`);
-  const msg = (t, erro, some)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; if(some) setTimeout(()=>{ if(msgEl.textContent===t) msgEl.textContent = ''; }, 2500); } };
-  const redesenhar = ()=>{ slot.innerHTML = oxcPdfHtml(rec); oxcPdfSlotLigar(slot); };
-  try{
-    if(acao==='anexar' || acao==='trocar'){
-      oxcPdfEscolher(async f=>{
-        msg('⏳ Enviando PDF…');
-        try{ await oxcPdfAnexar(rec, f); msg('✓ PDF salvo', false, true); }catch(e){ msg(oxcPdfMsgErro(e), true); }
-        redesenhar();
-      });
-    } else if(acao==='baixar'){ msg('⏳ Gerando o link…'); await oxcPdfBaixar(rec); msg(''); }
-    else if(acao==='excluir'){
-      if(!confirm('Excluir o PDF "'+rec.oxc_acomp_pdf.nome+'" do talhão '+rec.fazenda+' / '+rec.talhao+'? Não dá pra desfazer.')) return;
-      msg('⏳ Excluindo…'); await oxcPdfExcluir(rec); msg('✓ PDF excluído', false, true); redesenhar();
-    }
-  }catch(e){ msg(oxcPdfMsgErro(e), true); }
-}
-
-
 // Acompanhamento do Condicionador — mesmo padrão do Cronograma do Óxido, mas dentro do próprio projeto Condicionador.
 // Importante: reconstrói TODOS os campos já existentes do Condicionador (área/tipo teste/dose/produto),
 // senão o upsert sobrescreveria o jsonb inteiro e apagaria o que já estava salvo.
@@ -13296,14 +13114,7 @@ function montarDadosEstrBase(rec){
     ciclo_acomp: rec.estr_acomp_ciclo ?? null,
     tipo_material_acomp: rec.estr_acomp_tipo_material ?? null,
     status_plantio_acomp: rec.estr_acomp_status_plantio ?? null,
-    pdf_acomp_estr: rec.estr_acomp_pdf ?? null,
   };
-}
-// JSON completo do talhão na Estruturação (base + as etapas): serve pra gravações que não são de etapa (o PDF) não apagarem nada
-function montarDadosEstrCompleto(rec){
-  const dados = montarDadosEstrBase(rec);
-  ESTR_ETAPAS.forEach(e=>{ dados['acomp_'+e.key+'_mes'] = rec['estr_acomp_'+e.key+'_mes'] ?? null; dados['acomp_'+e.key+'_exec'] = rec['estr_acomp_'+e.key+'_exec'] ?? null; });
-  return dados;
 }
 // Data prevista de um bloco da Estruturação (plantio + DAP), no mesmo formato aaaa-mm-dd que os campos de data usam.
 function estrDataPrevistaBloco(rec, bloco){
@@ -13379,91 +13190,6 @@ async function salvarEstrAcompEntradaCompleta(rec, entry, user){
   }
   return { error };
 }
-// ---- PDF por talhão — MOLDE reutilizável (o mesmo comportamento do Óxido): um PDF por talhão; o arquivo fica num balde PRIVADO do projeto e o registro
-// (caminho, nome, tamanho, data) no JSON do talhão. Anexa, troca, baixa e exclui na hora, sem o Salvar. Pra usar em outra tabela: criarAnexoPdf({ ... }).
-// cfg: { balde, slug (projeto), campoRec (campo do talhão), campoDb (chave no JSON), dados(rec) (JSON completo do talhão no projeto), achar(key), sql (nome do arquivo SQL) }
-function criarAnexoPdf(cfg){
-  const MAX = 10*1024*1024;
-  const tam = n=> n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(n/1024))+' KB';
-  const msgErro = e=>{ const m = (e && e.message) || String(e); return /bucket|not found|row-level|violates|policy/i.test(m) ? 'PDF ainda não configurado no banco: rode o '+cfg.sql+' no Supabase.' : 'Erro com o PDF: '+m; };
-  const html = rec=>{
-    const reg = rec && rec[cfg.campoRec];
-    if(!reg) return `<button type="button" class="row-save anexo-pdf-ac" data-anexo-pdf="anexar" title="Anexar um PDF a este talhão (até 10 MB). Ele é salvo na hora, sem precisar do Salvar.">📎 PDF</button>`;
-    const dt = reg.em ? new Date(reg.em).toLocaleDateString('pt-BR') : '';
-    return `<span class="anexo-pdf-chip" title="${imgAttr(reg.nome+' · '+tam(reg.tamanho||0)+(dt?' · '+dt:''))}">📄 ${imgAttr(reg.nome)}</span>`
-      + `<button type="button" class="anexo-pdf-ic" data-anexo-pdf="baixar" title="Baixar o PDF">⬇</button>`
-      + `<button type="button" class="anexo-pdf-ic" data-anexo-pdf="trocar" title="Trocar o PDF">🔄</button>`
-      + `<button type="button" class="anexo-pdf-ic" data-anexo-pdf="excluir" title="Excluir o PDF" style="color:#c62828;">🗑</button>`;
-  };
-  const gravar = async (rec, registro)=>{
-    const dados = cfg.dados(rec); dados[cfg.campoDb] = registro;
-    const { data: { user } } = await sb.auth.getUser();
-    const { error } = await sb.from('dados_projeto').upsert({
-      talhao_id: rec.id, projeto_id: projetosIds[cfg.slug], dados,
-      updated_at: new Date().toISOString(), updated_by: user ? user.id : null,
-    }, { onConflict: 'talhao_id,projeto_id' });
-    return error;
-  };
-  const anexar = async (rec, file)=>{
-    if(!rec || !projetosIds[cfg.slug]) throw new Error('talhão ou projeto não encontrado');
-    if(!file || !(file.type==='application/pdf' || /\.pdf$/i.test(file.name||''))) throw new Error('use um arquivo PDF');
-    if(file.size > MAX) throw new Error('o PDF é grande demais (máximo 10 MB)');
-    const caminho = rec.id+'/'+Date.now()+'.pdf', st = sb.storage.from(cfg.balde);
-    const up = await st.upload(caminho, file, { contentType:'application/pdf', upsert:false });
-    if(up.error) throw up.error;
-    const registro = { caminho, nome:file.name, tamanho:file.size, em:new Date().toISOString() };
-    const erro = await gravar(rec, registro);
-    if(erro){ try{ await st.remove([caminho]); }catch(e){} throw erro; }   // não deixa arquivo solto se o registro não gravou
-    const antigo = rec[cfg.campoRec] && rec[cfg.campoRec].caminho; rec[cfg.campoRec] = registro;
-    if(antigo){ try{ await st.remove([antigo]); }catch(e){} }   // o PDF anterior sai do balde
-  };
-  const excluir = async rec=>{
-    const reg = rec && rec[cfg.campoRec]; if(!reg) return;
-    const rm = await sb.storage.from(cfg.balde).remove([reg.caminho]);
-    if(rm.error) throw rm.error;   // se o arquivo não saiu, o registro fica (a referência não se perde)
-    const erro = await gravar(rec, null); if(erro) throw erro;
-    rec[cfg.campoRec] = null;
-  };
-  const baixar = async rec=>{
-    const reg = rec && rec[cfg.campoRec]; if(!reg) return;
-    const { data, error } = await sb.storage.from(cfg.balde).createSignedUrl(reg.caminho, 120, { download: reg.nome });
-    if(error || !data || !data.signedUrl) throw (error || new Error('não foi possível gerar o link do PDF'));
-    const a = document.createElement('a'); a.href = data.signedUrl; a.download = reg.nome; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
-  };
-  const escolher = aoEscolher=>{
-    let inp = document.getElementById('anexoPdfInput');
-    if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'anexoPdfInput'; inp.accept = 'application/pdf,.pdf'; inp.hidden = true; document.body.appendChild(inp); }
-    inp.onchange = ()=>{ const f = inp.files && inp.files[0]; inp.value = ''; if(f) aoEscolher(f); };
-    inp.click();
-  };
-  const acao = async (qual, slot)=>{
-    const chave = slot.dataset.anexoPdfSlot, rec = cfg.achar(decodeURIComponent(chave)); if(!rec) return;
-    const msgEl = document.querySelector(`.anexo-pdf-msg[data-anexo-pdf-msg="${chave}"]`);
-    const msg = (t, erro, some)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; if(some) setTimeout(()=>{ if(msgEl.textContent===t) msgEl.textContent = ''; }, 2500); } };
-    const redesenhar = ()=>{ slot.innerHTML = html(rec); ligar(slot); };
-    try{
-      if(qual==='anexar' || qual==='trocar'){
-        escolher(async f=>{
-          msg('⏳ Enviando PDF…');
-          try{ await anexar(rec, f); msg('✓ PDF salvo', false, true); }catch(e){ msg(msgErro(e), true); }
-          redesenhar();
-        });
-      } else if(qual==='baixar'){ msg('⏳ Gerando o link…'); await baixar(rec); msg(''); }
-      else if(qual==='excluir'){
-        if(!confirm('Excluir o PDF "'+rec[cfg.campoRec].nome+'" do talhão '+rec.fazenda+' / '+rec.talhao+'? Não dá pra desfazer.')) return;
-        msg('⏳ Excluindo…'); await excluir(rec); msg('✓ PDF excluído', false, true); redesenhar();
-      }
-    }catch(e){ msg(msgErro(e), true); }
-  };
-  const ligar = slot=>{ slot.querySelectorAll('[data-anexo-pdf]').forEach(b=> b.addEventListener('click', ()=> acao(b.dataset.anexoPdf, slot))); };
-  return { MAX, html, gravar, anexar, excluir, baixar, escolher, ligar, acao, msgErro };
-}
-const ESTR_PDF = criarAnexoPdf({
-  balde:'estruturacao-pdfs', slug:'projeto-estruturacao', campoRec:'estr_acomp_pdf', campoDb:'pdf_acomp_estr', sql:'anexos_estruturacao_pdf.sql',
-  dados: rec=> montarDadosEstrCompleto(rec),
-  achar: key=> RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key),
-});
-
 // ---- ANEXOS POR TABELA — molde reutilizável. Na tabela: "Manual completo" e "Ficha geral" (um PDF cada). Em cada talhão: "Anexo" (UM arquivo, foto ou PDF) e
 // "Ficha" (um PDF). Arquivos no balde PRIVADO "anexos-projetos"; registros na tabela anexos_projetos (uma linha por vaga: projeto + tipo + talhão).
 // Anexa, troca, baixa e exclui na hora, sem o Salvar. A foto é reduzida no navegador (1600 px, JPEG), como na imagem da Máximas.
@@ -13473,6 +13199,7 @@ function criarAnexos(cfg){
   const reg = new Map(); let carregado = false, carregando = null;
   const chave = (tipo, tid)=> tipo+'|'+(tid||'');
   const tam = n=> n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(n/1024))+' KB';
+  const url = async (tipo, tid, seg)=>{ const r = reg.get(chave(tipo,tid)); if(!r) return null; const { data, error } = await sb.storage.from(BALDE).createSignedUrl(r.caminho, seg||120); return (error || !data) ? null : data.signedUrl; };
   const msgErro = e=>{ const m = (e && e.message) || String(e); return /anexos_projetos|42P01|relation|schema cache|bucket|not found|row-level|violates|policy/i.test(m) ? 'Anexos ainda não configurados no banco: rode o anexos_projetos.sql no Supabase.' : 'Erro com o anexo: '+m; };
   const dica = r=> r.nome+' · '+tam(r.tamanho||0)+(r.atualizado_em ? ' · '+new Date(r.atualizado_em).toLocaleDateString('pt-BR') : '');
   const carregar = async forcar=>{
@@ -13554,7 +13281,7 @@ function criarAnexos(cfg){
   const ligar = raiz=> (raiz||document).querySelectorAll('.anx[data-anx-proj="'+cfg.projeto+'"]').forEach(ligarSlot);
   const acao = async (qual, slot, btn)=>{
     const tipo = slot.dataset.anxSlot, tid = slot.dataset.anxTid||'';
-    const msgEl = document.querySelector('.anx-msg[data-anx-msg="'+(tid||'tabela')+'"]');
+    const msgEl = document.querySelector('.anx-msg[data-anx-proj="'+cfg.projeto+'"][data-anx-msg="'+(tid||'tabela')+'"]');
     const msg = (t, erro, some)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; if(some) setTimeout(()=>{ if(msgEl.textContent===t) msgEl.textContent = ''; }, 2500); } };
     try{
       if(qual==='escolher' || qual==='trocar'){
@@ -13572,9 +13299,14 @@ function criarAnexos(cfg){
       }
     }catch(e){ msg(msgErro(e), true); }
   };
-  return { TIPOS, htmlTabela, htmlLinha, carregar, enviar, excluir, baixar, escolher, ligar, redesenhar, abrirMenu, fecharMenu, acao, msgErro, reg };
+  return { projeto:cfg.projeto, TIPOS, htmlTabela, htmlLinha, carregar, enviar, excluir, baixar, url, escolher, ligar, redesenhar, abrirMenu, fecharMenu, acao, msgErro, reg };
 }
-const ANX_VNS = criarAnexos({ projeto:'vida-no-solo' });
+const ANX_VNS = criarAnexos({ projeto:'vida-no-solo' }), ANX_OXC = criarAnexos({ projeto:'oxido-magnesio' }), ANX_ESTR = criarAnexos({ projeto:'projeto-estruturacao' }),
+      ANX_MAX = criarAnexos({ projeto:'maximas' }), ANX_LAD = criarAnexos({ projeto:'ladroes' });
+// HTML dos botões: cabeçalho da tabela (Manual completo e Ficha geral) e célula de cada talhão (Anexo e Ficha); e a ligação dos botões depois de desenhar
+const anxBarra = anx=> ['manual','ficha_geral'].map(t=>`<span class="anx" data-anx-proj="${anx.projeto}" data-anx-slot="${t}" data-anx-tid="">${anx.htmlTabela(t)}</span>`).join('')+`<span class="anx-msg" data-anx-proj="${anx.projeto}" data-anx-msg="tabela"></span>`;
+const anxCelula = (anx, tid)=> ['anexo','ficha'].map(t=>`<span class="anx" data-anx-proj="${anx.projeto}" data-anx-slot="${t}" data-anx-tid="${tid}">${anx.htmlLinha(t, String(tid))}</span>`).join('')+`<span class="anx-msg" data-anx-proj="${anx.projeto}" data-anx-msg="${tid}"></span>`;
+function anxLigar(raiz, ...lista){ lista.forEach(a=> a.ligar(raiz)); Promise.all(lista.map(a=> a.carregar())).then(()=> lista.forEach(a=> a.redesenhar(document))); }   // os botões ligam já e os registros chegam do banco em seguida
 
 
 function montarDadosMicroBase(rec){
