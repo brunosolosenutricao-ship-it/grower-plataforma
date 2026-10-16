@@ -303,6 +303,22 @@
   .oxc-pdf-chip, .anexo-pdf-chip{display:inline-block;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;vertical-align:middle;}
   .oxc-pdf-ic, .anexo-pdf-ic{padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;line-height:1;font-family:inherit;}
   .oxc-pdf-msg, .anexo-pdf-msg{display:block;font-size:10.5px;}
+  .anx{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;}
+  .lm-freeze-right > span.anx{display:inline-flex;margin-left:6px;font-size:inherit;white-space:nowrap;}
+  .anx-ic{position:relative;width:30px;height:30px;padding:0;font-size:15px;line-height:1;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;}
+  .anx-ic.anx-tem{border-color:#2e7d32;}
+  .anx-dot{position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:#2e7d32;border:2px solid #fff;}
+  .anx-hd{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border:1px dashed var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;}
+  .anx-hd.anx-ok{border:1px solid #2e7d32;background:#f1f8f1;cursor:default;}
+  .anx-nm{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom;}
+  .anx-ib{width:26px;height:26px;padding:0;font-size:13px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;}
+  .anx-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+  .anx-barra h3{margin:0;}
+  .anx-msg{font-size:10.5px;}
+  .anx-menu{position:fixed;z-index:7300;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:6px 0;min-width:190px;font-size:13px;}
+  .anx-menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 12px;cursor:pointer;font-family:inherit;font-size:13px;}
+  .anx-menu button:hover{background:#f3f2ec;}
+  .anx-menu-t{padding:4px 12px 6px;font-size:12px;color:var(--ink-soft);border-bottom:1px solid var(--line);margin-bottom:4px;word-break:break-all;}
 
 .chart-zoom-btn{position:absolute;top:2px;right:2px;z-index:6;width:22px;height:22px;border-radius:6px;border:1px solid var(--line,#d8dccb);background:rgba(255,255,255,.9);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .chart-zoom-btn:hover{background:#fff;transform:scale(1.08);}
@@ -11748,7 +11764,7 @@ function renderVidaNoSolo(){
     </div>
 
     <div class="vns-card full-card" style="margin-top:12px;">
-      <h3>🗓️ Acompanhamento</h3>
+      <div class="anx-barra"><h3>🗓️ Acompanhamento</h3><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="manual" data-anx-tid="">${ANX_VNS.htmlTabela('manual')}</span><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="ficha_geral" data-anx-tid="">${ANX_VNS.htmlTabela('ficha_geral')}</span><span class="anx-msg" data-anx-msg="tabela"></span></div>
       <p class="sub-sm">Talhões com Área do projeto (Vida no Solo) &gt; 0 · ${tabelaTalhoesVnsFiltrada.length}${filtroStatusVns.size>0?` de ${tabelaTalhoesVns.length}`:''} no total. Status de compra é só leitura aqui — edite na Alimentação.</p>
       <div class="table-scroll" data-topscroll="sempre">
         <table data-colfilter="vns-talhoes">
@@ -11757,7 +11773,7 @@ function renderVidaNoSolo(){
             <th rowspan="3">Data de plantio</th><th rowspan="3">Status do Plantio</th>
             <th rowspan="3">Presença de nematoides</th><th rowspan="3">Presença de doenças</th><th rowspan="3">Participação no projeto</th><th rowspan="3">Status de compra</th>
             ${vnsCabEstagios.map(g=>`<th colspan="${g.cols}" ${g.semTitulo ? 'rowspan="2"' : ''} style="background:${VNS_BLOCO_COR[g.estagio]||'#6b7a3f'};color:#fff;">${g.estagio}</th>`).join('')}
-            <th rowspan="3" class="lm-freeze-right">Salvar</th>
+            <th rowspan="3" class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
           </tr>
           <tr>
             ${vnsCabEstagios.filter(g=>!g.semTitulo).map(g=> g.blocos.map(b=>`<th colspan="${b.keys.length+1}">${vnsTituloBloco(b)||''}</th>`).join('')).join('')}
@@ -11791,9 +11807,10 @@ function renderVidaNoSolo(){
                   return b.keys.map(k=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${k}" data-cor-status="${uid}" data-cor-faixa="${prazo.faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+k]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
                     + `<td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${uid}_data" data-vns-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" value="${dataSalva||(algumExec?'':prev)}"></td>`;
                 }).join('')}
-                <td class="lm-freeze-right" style="white-space:nowrap;">
-                  <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>
+                <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
+                  <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="anexo" data-anx-tid="${r.id}">${ANX_VNS.htmlLinha('anexo', r.id)}</span><span class="anx" data-anx-proj="vida-no-solo" data-anx-slot="ficha" data-anx-tid="${r.id}">${ANX_VNS.htmlLinha('ficha', r.id)}</span>
                   <span class="vns-linha-msg" data-vns-msg-id="${r.id}"></span>
+                  <span class="anx-msg" data-anx-msg="${r.id}"></span>
                 </td>
               </tr>`;
             }).join('') || `<tr><td colspan="${11+VNS_COLUNAS_ETAPAS}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
@@ -11876,6 +11893,7 @@ function renderVidaNoSolo(){
       salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsGrupo ? el.dataset.vnsGrupo.split(',').map(k=>k+'_data') : el.dataset.vnsCampo, valorEtapa, el);   // data de bloco: grava a mesma nas avaliações dele
     });
   });
+  ANX_VNS.ligar(container); ANX_VNS.carregar().then(()=> ANX_VNS.redesenhar(document));   // anexos: os botões ligam já, e os registros chegam do banco em seguida
   container.querySelectorAll('.vns-linha-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const talhaoId = btn.dataset.vnsTalhaoId;
@@ -13445,6 +13463,118 @@ const ESTR_PDF = criarAnexoPdf({
   dados: rec=> montarDadosEstrCompleto(rec),
   achar: key=> RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key),
 });
+
+// ---- ANEXOS POR TABELA — molde reutilizável. Na tabela: "Manual completo" e "Ficha geral" (um PDF cada). Em cada talhão: "Anexo" (UM arquivo, foto ou PDF) e
+// "Ficha" (um PDF). Arquivos no balde PRIVADO "anexos-projetos"; registros na tabela anexos_projetos (uma linha por vaga: projeto + tipo + talhão).
+// Anexa, troca, baixa e exclui na hora, sem o Salvar. A foto é reduzida no navegador (1600 px, JPEG), como na imagem da Máximas.
+function criarAnexos(cfg){
+  const BALDE = 'anexos-projetos', MAX_PDF = 10*1024*1024;
+  const TIPOS = { manual:{ ic:'📄', nome:'Manual completo', escopo:'tabela', fotos:false }, ficha_geral:{ ic:'🗂️', nome:'Ficha geral', escopo:'tabela', fotos:false }, anexo:{ ic:'📎', nome:'Anexo', escopo:'talhao', fotos:true }, ficha:{ ic:'🗂️', nome:'Ficha do talhão', escopo:'talhao', fotos:false } };
+  const reg = new Map(); let carregado = false, carregando = null;
+  const chave = (tipo, tid)=> tipo+'|'+(tid||'');
+  const tam = n=> n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(n/1024))+' KB';
+  const msgErro = e=>{ const m = (e && e.message) || String(e); return /anexos_projetos|42P01|relation|schema cache|bucket|not found|row-level|violates|policy/i.test(m) ? 'Anexos ainda não configurados no banco: rode o anexos_projetos.sql no Supabase.' : 'Erro com o anexo: '+m; };
+  const dica = r=> r.nome+' · '+tam(r.tamanho||0)+(r.atualizado_em ? ' · '+new Date(r.atualizado_em).toLocaleDateString('pt-BR') : '');
+  const carregar = async forcar=>{
+    if(carregado && !forcar) return; if(carregando) return carregando;
+    carregando = (async()=>{
+      const { data, error } = await sb.from('anexos_projetos').select('*').eq('projeto', cfg.projeto);
+      carregando = null;
+      if(error){ console.error(error); carregado = false; return; }
+      reg.clear(); (data||[]).forEach(r=> reg.set(chave(r.tipo, r.talhao_id), r)); carregado = true;
+    })();
+    return carregando;
+  };
+  const htmlTabela = tipo=>{
+    const t = TIPOS[tipo], r = reg.get(chave(tipo,''));
+    if(!r) return `<button type="button" class="anx-hd" data-anx-acao="escolher" title="Anexar o PDF: ${t.nome}">${t.ic} ${t.nome} ＋</button>`;
+    return `<span class="anx-hd anx-ok" title="${imgAttr(dica(r))}">${t.ic} ${t.nome} · <span class="anx-nm">${imgAttr(r.nome)}</span></span>`
+      + `<button type="button" class="anx-ib" data-anx-acao="baixar" title="Baixar">⬇</button><button type="button" class="anx-ib" data-anx-acao="trocar" title="Trocar o arquivo">🔄</button><button type="button" class="anx-ib" data-anx-acao="excluir" title="Excluir" style="color:#c62828;">🗑</button>`;
+  };
+  const htmlLinha = (tipo, tid)=>{
+    const t = TIPOS[tipo], r = reg.get(chave(tipo, String(tid)));
+    if(!r) return `<button type="button" class="anx-ic" data-anx-acao="escolher" title="${tipo==='anexo' ? 'Anexar uma foto ou um PDF a este talhão' : 'Anexar a ficha (PDF) deste talhão'}">${t.ic}</button>`;
+    return `<button type="button" class="anx-ic anx-tem" data-anx-acao="menu" title="${imgAttr(t.nome+': '+dica(r))}">${t.ic}<i class="anx-dot"></i></button>`;
+  };
+  const html = slot=> TIPOS[slot.dataset.anxSlot].escopo==='tabela' ? htmlTabela(slot.dataset.anxSlot) : htmlLinha(slot.dataset.anxSlot, slot.dataset.anxTid);
+  const enviar = async (tipo, tid, file)=>{
+    const t = TIPOS[tipo]; if(!t) throw new Error('tipo de anexo desconhecido');
+    const ehPdf = !!file && (file.type==='application/pdf' || /\.pdf$/i.test(file.name||'')), ehImg = !!file && /^image\/(jpeg|png)$/.test(file.type);
+    if(!ehPdf && !(t.fotos && ehImg)) throw new Error(t.fotos ? 'use uma foto JPG ou PNG, ou um PDF' : 'use um arquivo PDF');
+    let corpo = file, mime = 'application/pdf', ext = 'pdf', nome = file.name;
+    if(ehPdf){ if(file.size > MAX_PDF) throw new Error('o PDF é grande demais (máximo 10 MB)'); }
+    else {
+      if(file.size > IMG_MAX_BYTES) throw new Error('a foto é grande demais (máximo 25 MB)');
+      corpo = await (window.__imgRedim || redimensionarImagem)(file); mime = 'image/jpeg'; ext = 'jpg'; nome = (file.name||'foto').replace(/\.(png|jpe?g)$/i,'')+'.jpg';
+    }
+    const atual = reg.get(chave(tipo,tid)), atualPdf = atual && atual.mime==='application/pdf';
+    if(atual && atualPdf !== ehPdf && !confirm('O arquivo atual é '+(atualPdf?'um PDF':'uma foto')+' e o novo é '+(ehPdf?'um PDF':'uma foto')+'. Como é sempre um só por talhão, o atual será substituído. Continuar?')) return false;
+    const caminho = cfg.projeto+'/'+tipo+'/'+(tid||'tabela')+'/'+Date.now()+'.'+ext, st = sb.storage.from(BALDE);
+    const up = await st.upload(caminho, corpo, { contentType:mime, upsert:false }); if(up.error) throw up.error;
+    const { data: { user } } = await sb.auth.getUser();
+    const linha = { projeto:cfg.projeto, tipo, talhao_id:tid||'', caminho, nome, tamanho:corpo.size||file.size, mime, atualizado_em:new Date().toISOString(), atualizado_por:user ? user.id : null };
+    const { data, error } = await sb.from('anexos_projetos').upsert(linha, { onConflict:'projeto,tipo,talhao_id' }).select().single();
+    if(error){ try{ await st.remove([caminho]); }catch(e){} throw error; }   // não deixa arquivo solto se o registro não gravou
+    reg.set(chave(tipo,tid), data || linha);
+    if(atual){ try{ await st.remove([atual.caminho]); }catch(e){} }   // o arquivo anterior sai do balde
+    return true;
+  };
+  const excluir = async (tipo, tid)=>{
+    const r = reg.get(chave(tipo,tid)); if(!r) return;
+    const rm = await sb.storage.from(BALDE).remove([r.caminho]); if(rm.error) throw rm.error;   // se o arquivo não saiu, o registro fica
+    const { error } = await sb.from('anexos_projetos').delete().match({ projeto:cfg.projeto, tipo, talhao_id:tid||'' }); if(error) throw error;
+    reg.delete(chave(tipo,tid));
+  };
+  const baixar = async (tipo, tid)=>{
+    const r = reg.get(chave(tipo,tid)); if(!r) return;
+    const { data, error } = await sb.storage.from(BALDE).createSignedUrl(r.caminho, 120, { download:r.nome });
+    if(error || !data || !data.signedUrl) throw (error || new Error('não foi possível gerar o link do arquivo'));
+    const a = document.createElement('a'); a.href = data.signedUrl; a.download = r.nome; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  };
+  const escolher = (tipo, aoEscolher)=>{
+    let inp = document.getElementById('anxInput');
+    if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.id = 'anxInput'; inp.hidden = true; document.body.appendChild(inp); }
+    inp.accept = TIPOS[tipo].fotos ? 'application/pdf,.pdf,image/jpeg,image/png' : 'application/pdf,.pdf';
+    inp.onchange = ()=>{ const f = inp.files && inp.files[0]; inp.value = ''; if(f) aoEscolher(f); };
+    inp.click();
+  };
+  const fecharMenu = ()=>{ const m = document.getElementById('anxMenu'); if(m) m.remove(); };
+  const abrirMenu = (btn, slot, tipo, tid)=>{
+    fecharMenu(); const r = reg.get(chave(tipo,tid)); if(!r) return;
+    const m = document.createElement('div'); m.id = 'anxMenu'; m.className = 'anx-menu'; const rc = btn.getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(rc.left, (window.innerWidth||1200)-230))+'px'; m.style.top = (rc.bottom+4)+'px';
+    m.innerHTML = `<div class="anx-menu-t">${imgAttr(TIPOS[tipo].nome)}: ${imgAttr(dica(r))}</div><button type="button" data-m="baixar">⬇ Baixar</button><button type="button" data-m="trocar">🔄 Trocar</button><button type="button" data-m="excluir" style="color:#c62828;">🗑 Excluir</button>`;
+    document.body.appendChild(m);
+    const fora = e=>{ if(!m.contains(e.target)){ fecharMenu(); document.removeEventListener('mousedown', fora); } };
+    setTimeout(()=> document.addEventListener('mousedown', fora), 0);
+    m.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ fecharMenu(); acao(b.dataset.m, slot, btn); }));
+  };
+  const redesenhar = raiz=> (raiz||document).querySelectorAll('.anx[data-anx-proj="'+cfg.projeto+'"]').forEach(slot=>{ slot.innerHTML = html(slot); ligarSlot(slot); });
+  const ligarSlot = slot=> slot.querySelectorAll('[data-anx-acao]').forEach(b=> b.addEventListener('click', e=>{ e.stopPropagation(); acao(b.dataset.anxAcao, slot, b); }));
+  const ligar = raiz=> (raiz||document).querySelectorAll('.anx[data-anx-proj="'+cfg.projeto+'"]').forEach(ligarSlot);
+  const acao = async (qual, slot, btn)=>{
+    const tipo = slot.dataset.anxSlot, tid = slot.dataset.anxTid||'';
+    const msgEl = document.querySelector('.anx-msg[data-anx-msg="'+(tid||'tabela')+'"]');
+    const msg = (t, erro, some)=>{ if(msgEl){ msgEl.textContent = t; msgEl.style.color = erro ? '#c62828' : ''; if(some) setTimeout(()=>{ if(msgEl.textContent===t) msgEl.textContent = ''; }, 2500); } };
+    try{
+      if(qual==='escolher' || qual==='trocar'){
+        escolher(tipo, async f=>{
+          msg('⏳ Enviando…');
+          try{ const ok = await enviar(tipo, tid, f); msg(ok===false ? '' : '✓ Arquivo salvo', false, true); }catch(e){ msg(msgErro(e), true); }
+          redesenhar(document);
+        });
+      } else if(qual==='menu') abrirMenu(btn, slot, tipo, tid);
+      else if(qual==='baixar'){ msg('⏳ Gerando o link…'); await baixar(tipo, tid); msg(''); }
+      else if(qual==='excluir'){
+        const r = reg.get(chave(tipo,tid)); if(!r) return;
+        if(!confirm('Excluir "'+r.nome+'"? Não dá pra desfazer.')) return;
+        msg('⏳ Excluindo…'); await excluir(tipo, tid); msg('✓ Arquivo excluído', false, true); redesenhar(document);
+      }
+    }catch(e){ msg(msgErro(e), true); }
+  };
+  return { TIPOS, htmlTabela, htmlLinha, carregar, enviar, excluir, baixar, escolher, ligar, redesenhar, abrirMenu, fecharMenu, acao, msgErro, reg };
+}
+const ANX_VNS = criarAnexos({ projeto:'vida-no-solo' });
 
 
 function montarDadosMicroBase(rec){
