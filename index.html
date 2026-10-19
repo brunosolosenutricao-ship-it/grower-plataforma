@@ -9881,6 +9881,8 @@ function cgAbrirPlanejador(cfg){
       .cp-tit{font-size:17px;font-weight:700;}
       .cp-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:680px;}
       .cp-acoes{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;flex:none;max-width:760px;}
+      .cp-realce{outline:3px solid #f1c40f;box-shadow:0 0 0 7px rgba(241,196,15,.4);animation:cpPulsa 1s ease-in-out 4;position:relative;z-index:2;}
+      @keyframes cpPulsa{0%,100%{box-shadow:0 0 0 4px rgba(241,196,15,.35);}50%{box-shadow:0 0 0 12px rgba(241,196,15,.15);}}
       .cp-fds{font-size:12px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:4px;cursor:pointer;}
       .cp-cont{font-size:12.5px;color:var(--ink-soft);margin-right:4px;white-space:nowrap;}
       .cp-acoes button[hidden]{display:none;}
@@ -9948,7 +9950,7 @@ function cgAbrirPlanejador(cfg){
       ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${cgDataBr(g.dataStr).slice(0,5)}</div>` + (motivos[g.id] ? `<div class="cp-mot">${cgEscH(String(motivos[g.id]).startsWith('data prevista') ? motivos[g.id] : 'sem dia possível: '+motivos[g.id])}</div>` : '')
       : (dia && dev!==0 ? `<div class="cp-leg cp-dev${fora?' fora':''}" title="tolerância deste estádio: ±${g.faixa ?? 4} dias">${dev>0?'+':'−'}${Math.abs(dev)}d · prev. ${cgDataBr(g.dataStr).slice(0,5)}${fora?' · fora da tolerância':''}</div>` : '');
     const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+(cgEmEst(g)?' (plantio em estimativa)':'')+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
-    return `<div class="cp-item"><div class="cg-pill cp-pill${cgEmEst(g)?' est':''}" draggable="true" data-id="${g.id}" style="${cgEstiloPill(g,pj)}" title="${cgEscH(dica)}">${cgEscH(txt)}</div>${leg}</div>`;
+    return `<div class="cp-item"><div class="cg-pill cp-pill${cgEmEst(g)?' est':''}" draggable="true" data-id="${g.id}" data-chave="${cgEscH([g.projeto,g.cliente,g.fazenda,g.talhao].join('|'))}" style="${cgEstiloPill(g,pj)}" title="${cgEscH(dica)}">${cgEscH(txt)}</div>${leg}</div>`;
   };
   const exHtml = g=>{
     const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
@@ -10079,17 +10081,22 @@ function cgAbrirPlanejador(cfg){
   btnNovo.addEventListener('click', ()=> abrirSalvar('novo'));
   document.addEventListener('keydown', cgEscPlanejador);
   desenhar();
+  if(cfg.destaque){   // realça o pill do talhão (ou os pills, se ele tiver mais de um dia) e leva ele pro meio da tela; o realce some sozinho
+    const d = cfg.destaque, k = [d.projeto,d.cliente,d.fazenda,d.talhao].join('|'), pills = [...ov.querySelectorAll('.cp-pill')].filter(x=> x.dataset.chave===k);
+    if(pills.length){ pills.forEach(x=> x.classList.add('cp-realce')); if(pills[0].scrollIntoView) pills[0].scrollIntoView({ block:'center', inline:'center', behavior:'smooth' }); setTimeout(()=> pills.forEach(x=> x.classList.remove('cp-realce')), 6000); }
+  }
   $('#cpFechar').focus();
 }
 
 // ---------- cards na Visão Geral ----------
-function cgPlanosAbrir(id, revisar){
+function cgPlanosAbrir(id, revisar, destaque){
   const plano = cgPlanosEstado().lista.find(p=>p.id===id); if(!plano) return;
   const rec = cgReconciliarPlano(plano, cgPontosVivos(), cgExisteTalhao), mudou = cgTemAvisos(rec);
   const cfg = { semanas:plano.semanas, plano, filtros:plano.filtros };
   cfg.executados = revisar ? rec.revisado.executados : rec.comoSalvo.executados;
   if(revisar){ cfg.grupos = rec.revisado.grupos; cfg.colocado = rec.revisado.colocado; cfg.motivos = rec.revisado.motivos; cfg.info = cgTextoRevisao(rec.mudaram, rec.revisado.saiu, rec); }
   else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram, extras:rec } : null; }
+  cfg.destaque = destaque || null;   // vem do modal de Alertas ("Ver no planejamento"): o pill do talhão fica realçado e no meio da tela
   cgAbrirPlanejador(cfg);
 }
 /* ===== EXPORTAÇÃO DO PLANEJAMENTO (PDF e Excel) =====
@@ -10732,8 +10739,8 @@ function alertasCalcular(opt){
   const somaDias = (iso,n)=>{ const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return cgIsoLocal(d); };
   const chaveT = (c,fz,t)=> [c,fz,t].join('|');
   // o que já está em planejamento salvo: por talhão, por projeto+talhão e por projeto+talhão+estádio
-  const cobTal = new Set(), cobProj = new Set(), cobEst = new Set();
-  planos.forEach(pl=> (pl.itens||[]).forEach(it=>{ const k = chaveT(it.cliente,it.fazenda,it.talhao); cobTal.add(k); cobProj.add(it.projeto+'|'+k); (it.avaliacoes||[]).forEach(a=> cobEst.add(it.projeto+'|'+k+'|'+a.estagio)); }));
+  const cobTal = new Set(), cobProj = new Set(), cobEst = new Set(), cobPlano = new Map();   // cobPlano: projeto|talhão|estádio → planejamentos que o cobrem (na ordem da lista: do mais recente ao mais antigo), com o dia salvo
+  planos.forEach(pl=> (pl.itens||[]).forEach(it=>{ const k = chaveT(it.cliente,it.fazenda,it.talhao); cobTal.add(k); cobProj.add(it.projeto+'|'+k); (it.avaliacoes||[]).forEach(a=>{ const kk = it.projeto+'|'+k+'|'+a.estagio; cobEst.add(kk); if(!cobPlano.has(kk)) cobPlano.set(kk,[]); const arr = cobPlano.get(kk); if(!arr.some(x=> x.id===pl.id && x.dia===it.dia)) arr.push({ id:pl.id, regiao:pl.regiao || 'Planejamento', dia:it.dia }); }); }));
   const passaRec = r=> (!f.estado || (r.estado||'').toUpperCase()===f.estado) && (!f.consultor || (r.consultor||'')===f.consultor) && (!f.parceiro || (r.responsavel_parceiro||'Em aberto')===f.parceiro) && (!f.projeto || rfParticipa(r,f.projeto));
   const projsDe = r=> PROJ.filter(k=> rfParticipa(r,k) && (!f.projeto || k===f.projeto));
   const recs = RECORDS.filter(r=> passaRec(r) && projsDe(r).length);
@@ -10749,7 +10756,13 @@ function alertasCalcular(opt){
     if(!g){ g = { projeto:p.projeto, cliente:p.cliente, fazenda:p.fazenda, talhao:p.talhao, estado:p.estado, consultor:p.consultor, parceiro:p.parceiro || 'Em aberto', estagio:p.estagio, n:0, prev:p.dataStr, faixa:p.faixa, dias, semViagem:!cobEst.has(chave) }; m.set(chave,g); }
     g.n++; if(p.dataStr < g.prev){ g.prev = p.dataStr; g.faixa = p.faixa; g.dias = dias; }
   });
-  const fecha = g=>{ g.ini = somaDias(g.prev,-g.faixa); g.fim = somaDias(g.prev,g.faixa); return g; };
+  const fecha = g=>{
+    g.ini = somaDias(g.prev,-g.faixa); g.fim = somaDias(g.prev,g.faixa);
+    const arr = cobPlano.get(g.projeto+'|'+chaveT(g.cliente,g.fazenda,g.talhao)+'|'+g.estagio) || [];
+    g.plano = arr[0] || null; g.maisPlanos = Math.max(0, arr.length-1);   // o planejamento mais recente que cobre este estádio (+ quantos outros também cobrem)
+    g.sinal = !g.plano ? '' : (g.plano.dia < hojeISO ? 'passou' : ((g.plano.dia > g.fim || g.plano.dia < g.ini) ? 'fora' : ''));   // dia salvo já passou (e a avaliação segue pendente) ou cai fora da janela de tolerância
+    return g;
+  };
   const lAtr = [...atr.values()].map(fecha).sort((a,b)=> b.dias-a.dias || a.prev.localeCompare(b.prev));
   const lProx = [...prox.values()].map(fecha).sort((a,b)=> a.dias-b.dias || a.prev.localeCompare(b.prev));
   // sem planejamento: talhões que não aparecem em NENHUM planejamento salvo, com a próxima avaliação pendente de cada um
@@ -10780,9 +10793,15 @@ const altPl = (n,a,b)=> n+' '+(n===1?a:b);
 function alertasLinhaAP(g, aba){
   const pill = aba==='atr' ? altPill(altPl(g.dias,'dia','dias')+' de atraso','dan') : (g.dias===0 ? altPill('na janela agora','ok') : altPill('faltam '+altPl(g.dias,'dia','dias'),'war'));
   const det = aba==='atr' ? `previsto ${altDM(g.prev)} · tolerância ±${g.faixa} (venceu em ${altDM(g.fim)})` : `previsto ${altDM(g.prev)} · janela ${altDM(g.ini)} a ${altDM(g.fim)} (±${g.faixa})`;
-  return `<div class="alt-rw"><div>${pill}${g.semViagem ? ' '+altPill('⚠ sem viagem planejada','war') : ''}<div class="alt-t1">${cgEscH(g.fazenda)} · ${cgEscH(g.talhao)}</div><div class="alt-t2">${cgEscH(g.cliente)} · ${cgEscH(g.estado)}</div></div>`
-    + `<div><div class="alt-t1s">${cgEscH(g.estagio)} · ${altPl(g.n,'avaliação','avaliações')}</div><div class="alt-t2">${det}</div>${altChip(g.projeto)}</div>`
-    + `<div class="alt-dir"><div class="alt-t2">${cgEscH(g.parceiro)} · ${cgEscH(g.consultor)}</div><button type="button" class="alt-go" data-alt="ir" data-data="${g.prev}">📅 Ver no cronograma</button></div></div>`;
+  const pl = g.plano
+    ? `<div class="alt-pl${g.sinal==='passou' ? ' alt-pl-dan' : g.sinal==='fora' ? ' alt-pl-war' : ''}">📋 Planejado para ${altDM(g.plano.dia)} · ${cgEscH(g.plano.regiao)}${g.maisPlanos ? ' +'+g.maisPlanos : ''}${g.sinal==='passou' ? ' · já passou' : g.sinal==='fora' ? ' · fora da janela' : ''}</div>`
+    : `<div class="alt-pl alt-pl-war">⚠ Sem viagem planejada</div>`;
+  const acao = g.plano
+    ? `<button type="button" class="alt-go" data-alt="plano" data-plano="${cgEscH(g.plano.id)}" data-proj="${cgEscH(g.projeto)}" data-cli="${cgEscH(g.cliente)}" data-faz="${cgEscH(g.fazenda)}" data-tal="${cgEscH(g.talhao)}">📋 Ver no planejamento</button>`
+    : `<button type="button" class="alt-go" data-alt="ir" data-data="${g.prev}">📅 Ver no cronograma</button>`;
+  return `<div class="alt-rw"><div>${pill}<div class="alt-t1">${cgEscH(g.fazenda)} · ${cgEscH(g.talhao)}</div><div class="alt-t2">${cgEscH(g.cliente)} · ${cgEscH(g.estado)}</div></div>`
+    + `<div><div class="alt-t1s">${cgEscH(g.estagio)} · ${altPl(g.n,'avaliação','avaliações')}</div><div class="alt-t2">${det}</div>${pl}${altChip(g.projeto)}</div>`
+    + `<div class="alt-dir"><div class="alt-t2">${cgEscH(g.parceiro)} · ${cgEscH(g.consultor)}</div>${acao}</div></div>`;
 }
 function alertasLinhaSem(g){
   let pill, meio, data = '';
@@ -10804,7 +10823,7 @@ function alertasHtml(r){
   const lista = st.aba==='atr' ? r.atr : st.aba==='prox' ? r.prox : (st.soUrg ? r.sem.filter(g=>g.urgente) : r.sem);
   const tab = (k,em,nome,n,tipo)=> `<button type="button" class="alt-tab${st.aba===k?' on':''}" data-alt="aba" data-k="${k}">${em} ${nome} ${altPill(n,tipo)}</button>`;
   const desc = st.aba==='atr' ? 'Pendentes que já passaram da janela de tolerância (data prevista + tolerância do estádio). As mais atrasadas primeiro.'
-    : st.aba==='prox' ? `Pendentes na janela agora ou que abrem nos próximos ${r.hor} dias. A etiqueta "sem viagem planejada" marca o estádio que não está em nenhum planejamento salvo.`
+    : st.aba==='prox' ? `Pendentes na janela agora ou que abrem nos próximos ${r.hor} dias. Cada linha mostra o dia salvo no planejamento (ou "sem viagem planejada", quando o estádio não está em nenhum).`
     : `Talhões que não estão em nenhum planejamento de viagem salvo. O horizonte de ${r.hor} dias marca os urgentes.`;
   const vazio = '<div class="alt-vz">Nada por aqui com esses filtros.</div>';
   const corpo = !lista.length ? vazio : st.aba==='sem' ? lista.map(alertasLinhaSem).join('') : lista.map(g=> alertasLinhaAP(g, st.aba)).join('');
@@ -10850,6 +10869,7 @@ const ALT_CSS = `
   #alertasOverlay .alt-desc{font-size:12.5px;color:var(--ink-soft);padding:8px 20px 0;}
   #alertasOverlay .alt-rw{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.5fr) auto;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);align-items:center;}
   #alertasOverlay .alt-pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;} #alertasOverlay .alt-chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;margin:6px 4px 0 0;}
+  #alertasOverlay .alt-pl{font-size:12.5px;font-weight:700;margin-top:3px;} #alertasOverlay .alt-pl-dan{color:#a32018;} #alertasOverlay .alt-pl-war{color:#8a5a00;}
   #alertasOverlay .alt-dir{text-align:right;} #alertasOverlay .alt-go{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;}
   #alertasOverlay .alt-vz{padding:30px 20px;text-align:center;color:var(--ink-soft);font-size:13px;} #alertasOverlay .alt-ft{display:flex;gap:10px;align-items:center;padding:12px 20px;}
   #alertasOverlay .alt-pill.alt-dan{background:#fde8e6;color:#a32018;} #alertasOverlay .alt-pill.alt-war{background:#fff3d6;color:#8a5a00;} #alertasOverlay .alt-pill.alt-ok{background:#e3f1e4;color:#1b5e20;} #alertasOverlay .alt-pill.alt-neu{background:#eceae2;color:#5f5e5a;}
@@ -10863,13 +10883,17 @@ function alertasIr(iso){   // abre o Cronograma Geral no mês da avaliação
   state.cgMes = state.cgMes || {}; if(typeof CG_MESES!=='undefined' && CG_MESES.some(m=>m.key===iso.slice(0,7))) state.cgMes.geral = iso.slice(0,7);
   if(typeof abrirCronogramaGeral==='function') abrirCronogramaGeral('geral');
 }
+function alertasIrPlano(d){   // fecha o modal e abre o planejamento salvo no Planejar, com o talhão realçado
+  const ov = document.getElementById('alertasOverlay'); if(ov) ov.remove();
+  if(typeof cgPlanosAbrir==='function') cgPlanosAbrir(d.plano, false, { projeto:d.proj, cliente:d.cli, fazenda:d.faz, talhao:d.tal });
+}
 function alertasExcel(){
   if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
   const st = alertasEstado(), r = alertasCalcular({ horizonte:st.hor, filtros:st.f, planos:cgPlanosEstado().lista }), nome = k=> (CG_PROJ[k]||{label:k}).label, wb = XLSX.utils.book_new();
   const base = g=> [nome(g.projeto),g.cliente,g.fazenda,g.talhao,g.estado,g.estagio,g.n,altDMA(g.prev),g.faixa], sv = g=> g.semViagem ? 'Sim' : 'Não', cab = ['Projeto','Cliente','Fazenda','Talhão','Estado','Estádio','Avaliações pendentes','Data prevista','Tolerância (±dias)'];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Indicador','Valor'],['Talhões no total',r.cobertura.total],['Com planejamento salvo',r.cobertura.com],['Sem planejamento',r.cobertura.sem],[],['Projeto','Talhões','Com planejamento','Sem planejamento'],...r.cobertura.porProjeto.map(p=>[p.label,p.total,p.com,p.total-p.com])]), 'Cobertura');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Venceu em','Dias de atraso','Sem viagem planejada','Parceiro','Consultor'],...r.atr.map(g=>[...base(g),altDMA(g.fim),g.dias,sv(g),g.parceiro,g.consultor])]), 'Atrasadas');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Janela começa','Janela termina','Faltam (dias)','Sem viagem planejada','Parceiro','Consultor'],...r.prox.map(g=>[...base(g),altDMA(g.ini),altDMA(g.fim),g.dias,sv(g),g.parceiro,g.consultor])]), 'Próximas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Venceu em','Dias de atraso','Planejado para','Planejamento','Sem viagem planejada','Parceiro','Consultor'],...r.atr.map(g=>[...base(g),altDMA(g.fim),g.dias,g.plano?altDMA(g.plano.dia):'',g.plano?g.plano.regiao+(g.maisPlanos?' (+'+g.maisPlanos+')':''):'',sv(g),g.parceiro,g.consultor])]), 'Atrasadas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Janela começa','Janela termina','Faltam (dias)','Planejado para','Planejamento','Sem viagem planejada','Parceiro','Consultor'],...r.prox.map(g=>[...base(g),altDMA(g.ini),altDMA(g.fim),g.dias,g.plano?altDMA(g.plano.dia):'',g.plano?g.plano.regiao+(g.maisPlanos?' (+'+g.maisPlanos+')':''):'',sv(g),g.parceiro,g.consultor])]), 'Próximas');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Cliente','Fazenda','Talhão','Estado','Projetos','Próxima avaliação','Data prevista','Dias (negativo = atrasada)','Urgente','Observação','Parceiro','Consultor'],...r.sem.map(g=>[g.cliente,g.fazenda,g.talhao,g.estado,g.projs.map(nome).join(', '),g.prox?g.prox.estagio:'',g.prox?altDMA(g.prox.prev):'',g.prox?(g.prox.atraso?-g.prox.dias:g.prox.dias):'',g.urgente?'Sim':'Não',g.semPlantio?'Sem data de plantio':(g.prox?'':'Nada pendente'),g.parceiro,g.consultor])]), 'Sem planejamento');
   try{ XLSX.writeFile(wb, 'Alertas_'+r.hoje+'.xlsx', { cellDates:true }); }catch(e){ console.error(e); alert('Não foi possível gerar o Excel dos alertas: '+(e.message||e)); }
 }
@@ -10888,6 +10912,7 @@ async function abrirAlertas(){
     else if(a==='hor'){ st.hor = +b.dataset.v; alertasDesenhar(); }
     else if(a==='urg'){ st.soUrg = b.dataset.v==='1'; alertasDesenhar(); }
     else if(a==='ir'){ fecha(); alertasIr(b.dataset.data); }
+    else if(a==='plano'){ fecha(); alertasIrPlano(b.dataset); }
     else if(a==='excel') alertasExcel();
   });
   ov.addEventListener('change', e=>{ const s = e.target.closest('select[data-alt="f"]'); if(!s) return; alertasEstado().f[s.dataset.c] = s.value; alertasDesenhar(); });
