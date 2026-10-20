@@ -12269,6 +12269,8 @@ const VG_PROJETOS = [
 // VG_PROJETOS continua inteira porque a Alimentação usa as cores dela.
 const VG_BLOQUEADOS = ['cond','op','micro'];
 const VG_VISIVEIS = VG_PROJETOS.filter(p=> !VG_BLOQUEADOS.includes(p.key));
+// "Os 4 projetos" (botão da Visão Geral): os de campo que o time acompanha o ano todo. Mostra o talhão que está em pelo menos um deles, mesmo que também esteja no Óxido; some quem está só no Óxido
+const VG_CAMPO = ['vns','estr','maximas','ladroes'];
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
@@ -12786,9 +12788,9 @@ function renderVisaoGeral(){
     return;
   }
 
-  if(state.visaoGeralFiltro && state.visaoGeralFiltro!=='Todos' && !VG_VISIVEIS.some(p=>p.key===state.visaoGeralFiltro)) state.visaoGeralFiltro = 'Todos';
+  if(state.visaoGeralFiltro && state.visaoGeralFiltro!=='Todos' && state.visaoGeralFiltro!=='campo' && !VG_VISIVEIS.some(p=>p.key===state.visaoGeralFiltro)) state.visaoGeralFiltro = 'Todos';
   const filtroAtivo = state.visaoGeralFiltro || 'Todos';
-  const linhasProj = filtroAtivo==='Todos' ? linhas : linhas.filter(l=> l.projetos.includes(filtroAtivo));
+  const linhasProj = filtroAtivo==='Todos' ? linhas : filtroAtivo==='campo' ? linhas.filter(l=> l.projetos.some(k=> VG_CAMPO.includes(k))) : linhas.filter(l=> l.projetos.includes(filtroAtivo));
   // filtros multi-seleção (valem pro mapa e pra tabela, junto com o pill de projeto)
   if(!state.vgF) state.vgF = { estado:new Set(), consultor:new Set(), cliente:new Set() };
   const VGF = [
@@ -12947,6 +12949,7 @@ function renderVisaoGeral(){
 
   <div class="vg-filtros">
     <button class="vg-filtro-pill ${filtroAtivo==='Todos'?'active':''}" style="${filtroAtivo==='Todos'?'background:var(--green-deep);border-color:var(--green-deep);':''}" data-filtro="Todos">Todos</button>
+    <button class="vg-filtro-pill ${filtroAtivo==='campo'?'active':''}" style="${filtroAtivo==='campo'?'background:var(--green-deep);border-color:var(--green-deep);':''}" data-filtro="campo" title="Talhões que estão em pelo menos um destes: Vida no Solo, Estruturação, Máximas ou Ladrões (mesmo que também estejam no Óxido). Some quem está só no Óxido.">Os 4 projetos</button>
     ${VG_VISIVEIS.map(p=>`<button class="vg-filtro-pill ${filtroAtivo===p.key?'active':''}" style="${filtroAtivo===p.key?`background:${p.cor};border-color:${p.cor};`:''}" data-filtro="${p.key}">${p.label}</button>`).join('')}
   </div>
 
@@ -13229,7 +13232,7 @@ function renderVisaoGeral(){
   // monta um ponto por (talhão, projeto) — um talhão em vários projetos gera vários pontos levemente espalhados
   const pontosVg = [];
   comPonto.forEach(l=>{
-    const projetosPlotar = filtroAtivo==='Todos' ? l.projetos : [filtroAtivo];
+    const projetosPlotar = filtroAtivo==='Todos' ? l.projetos : filtroAtivo==='campo' ? l.projetos.filter(k=> VG_CAMPO.includes(k)) : [filtroAtivo];   // em "Os 4 projetos" o mapa também só marca os 4 (sem o ponto do Óxido)
     projetosPlotar.forEach((pk,i)=>{
       const proj = VG_VISIVEIS.find(p=>p.key===pk);
       const jitter = i * 0.01; // graus, espalha pontos sobrepostos do mesmo talhão
