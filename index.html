@@ -15127,7 +15127,7 @@ function renderVidaNoSolo(){
         <table data-colfilter="vns-talhoes">
           <thead><tr>
             <th rowspan="3" class="vns-freeze vns-freeze-1">Cliente</th><th rowspan="3" class="vns-freeze vns-freeze-2">Fazenda</th><th rowspan="3" class="vns-freeze vns-freeze-3">Talhão</th><th rowspan="3" class="vns-freeze vns-freeze-4">Área do talhão (ha)</th>
-            <th rowspan="3">Data de plantio</th><th rowspan="3">Status do Plantio</th>
+            <th rowspan="3">Data de plantio</th><th rowspan="3">Status do Plantio</th><th rowspan="3">Tipo de teste</th>
             <th rowspan="3">Presença de nematoides</th><th rowspan="3">Presença de doenças</th><th rowspan="3">Participação no projeto</th><th rowspan="3">Status de compra</th>
             ${vnsCabEstagios.map(g=>`<th colspan="${g.cols}" ${g.semTitulo ? 'rowspan="2"' : ''} style="background:${VNS_BLOCO_COR[g.estagio]||'#6b7a3f'};color:#fff;">${g.estagio}</th>`).join('')}
             <th rowspan="3" class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
@@ -15152,6 +15152,7 @@ function renderVidaNoSolo(){
                   <option value="Plantado" ${r.vns_status_plantio==='Plantado'?'selected':''}>Plantado</option>
                   <option value="Estimativa" ${r.vns_status_plantio==='Estimativa'?'selected':''}>Estimativa</option>
                 </select></td>
+                <td>${r.vns_tipo_teste || '—'}</td>
                 <td><span style="color:${temNema?'#e74c3c':'var(--ink-soft)'};font-weight:${temNema?'700':'400'};">${temNema?'Sim':'Não'}</span></td>
                 <td><span style="color:${temDoenca?'#e74c3c':'var(--ink-soft)'};font-weight:${temDoenca?'700':'400'};">${temDoenca?'Sim':'Não'}</span></td>
                 <td><span style="color:${participa?'#2ecc71':'var(--ink-soft)'};font-weight:${participa?'700':'400'};">${participa?'Sim':'Não'}</span></td>
