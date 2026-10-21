@@ -10836,7 +10836,7 @@ function alertasHtml(r){
     + `<div class="alt-barra"><i style="width:${pc(cob.com)}%"></i></div><div class="alt-t2">${cob.com} de ${cob.total} talhões (${pc(cob.com)}%) já estão em algum planejamento de viagem</div><button type="button" class="alt-ver" data-alt="aba" data-k="sem">Ver os ${cob.sem} sem planejamento ›</button></div>`
     + `<div><div class="alt-t1s">Por projeto</div>${proj || '<div class="alt-t2">Nenhum talhão com esses filtros.</div>'}<div class="alt-t2" style="margin-top:6px">Um talhão em mais de um projeto conta em cada um deles.</div></div></div></div>`
     + `<div class="alt-fl"><label>Projeto <select data-alt="f" data-c="projeto">${opcoes(VG_VISIVEIS.map(p=>({v:p.key,t:p.label})), st.f.projeto, 'Todos')}</select></label><label>Estado <select data-alt="f" data-c="estado">${opcoes(un(x=> (x.estado||'').toUpperCase()), st.f.estado, 'Todos')}</select></label>`
-    + `<label>Consultor <select data-alt="f" data-c="consultor">${opcoes(un(x=>x.consultor), st.f.consultor, 'Todos')}</select></label><label>Parceiro <select data-alt="f" data-c="parceiro">${opcoes([...VG_PARCEIROS.map(p=>({v:p.v,t:p.v}))], st.f.parceiro, 'Todos')}</select></label>`
+    + `<label>Consultor <select data-alt="f" data-c="consultor">${opcoes(un(x=>x.consultor), st.f.consultor, 'Todos')}</select></label><label>Parceiro <select data-alt="f" data-c="parceiro">${opcoes([...VG_PARCEIROS.map(p=>({v:p.v,t:p.v})), ...[...new Set(RECORDS.map(x=> x.responsavel_parceiro).filter(v=> v && !VG_PARCEIROS.some(p=> p.v===v)))].sort((a,b)=> a.localeCompare(b,'pt-BR')).map(v=>({v,t:v+' (fora da lista)'}))], st.f.parceiro, 'Todos')}</select></label>`
     + `<span style="flex:1"></span><span class="alt-t2">Olhar à frente</span><span class="alt-segs">${ALT_HORIZONTES.map(d=> `<button type="button" class="alt-seg${st.hor===d?' on':''}" data-alt="hor" data-v="${d}">${d} dias</button>`).join('')}</span></div>`
     + `<div class="alt-tabs">${tab('atr','⚠️','Atrasadas',r.atr.length,'dan')}${tab('prox','⏰','Próximas',r.prox.length,'war')}${tab('sem','🧭','Sem planejamento',r.sem.length,'dan')}</div>`
     + `<div class="alt-desc">${desc}</div>${toggle}<div class="alt-lista">${corpo}</div>`
@@ -12274,7 +12274,7 @@ const VG_CAMPO = ['vns','estr','maximas','ladroes'];
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
-  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Gabriel Piati FG', cor:'#632149' }, { v:'Tadeu FG', cor:'#6a06e5' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' }, { v:'Forquimica', cor:'#0055ff' },
   { v:'Em aberto', cor:'#757575' },
 ];
 const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
@@ -12813,8 +12813,8 @@ function renderVisaoGeral(){
   const parcAtual = r=> (r.id in state.vgParceiroPend) ? state.vgParceiroPend[r.id] : (r.responsavel_parceiro || '');
   const parcAlterado = r=> (r.id in state.vgParceiroPend) && state.vgParceiroPend[r.id] !== (r.responsavel_parceiro || '');
   const parcSelectHtml = r=>{
-    const atual = parcAtual(r), nome = atual || 'Em aberto';
-    return `<select class="vg-parceiro" data-id="${r.id}" style="background:${vgParceiroCor(atual)};">${VG_PARCEIROS.map(p=>`<option value="${p.v==='Em aberto'?'':p.v}" style="background:${p.cor};color:#fff;" ${p.v===nome?'selected':''}>${p.v}</option>`).join('')}</select>`;
+    const atual = parcAtual(r), nome = atual || 'Em aberto', legado = !!atual && !VG_PARCEIROS.some(p=> p.v===atual);   // legado: o talhão guarda um parceiro que saiu da lista; ele continua aparecendo (não vira outro por engano) e dá pra trocar, mas não é opção pra escolher
+    return `<select class="vg-parceiro" data-id="${r.id}" style="background:${legado ? '#9e9e9e' : vgParceiroCor(atual)};">${legado ? `<option value="${cgEscH(atual)}" style="background:#9e9e9e;color:#fff;" selected>${cgEscH(atual)} (fora da lista)</option>` : ''}${VG_PARCEIROS.map(p=>`<option value="${p.v==='Em aberto'?'':p.v}" style="background:${p.cor};color:#fff;" ${p.v===nome?'selected':''}>${p.v}</option>`).join('')}</select>`;
   };
   // ---- mapa de avaliações: o que cada projeto avalia, por estádio. A célula fica verde pro talhão que participa do projeto ----
   if(!state.vgOcultos) state.vgOcultos = { pp:false, vns:false, estr:false, max:false, lad:false };
