@@ -11018,21 +11018,24 @@ const labsNum = s=>{ const t = String(s==null?'':s).trim().replace(',','.'); if(
 const labsNorm = s=> String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const labsRuaExpandida = r=> String(r||'').replace(/^\s*av\.?\s+/i,'Avenida ').replace(/^\s*r\.?\s+/i,'Rua ').replace(/^\s*rod\.?\s+/i,'Rodovia ').replace(/^\s*al\.?\s+/i,'Alameda ');
 const labsDentroBrasil = (lat,lng)=> lat>=-34 && lat<=6 && lng>=-74 && lng<=-34;
+const labsDentroPais = (lat,lng,uf)=> uf==='PY' ? (lat>=-27.65 && lat<=-19.25 && lng>=-62.7 && lng<=-54.2) : labsDentroBrasil(lat,lng);   // PY = Paraguai (só o parceiro pode ter); os demais estados são do Brasil
+const labsMsgForaPais = uf=> uf==='PY' ? 'Essa latitude e longitude ficam fora do Paraguai. Confira o sinal (no Paraguai as duas são negativas).' : 'Essa latitude e longitude ficam fora do Brasil. Confira o sinal (no Brasil as duas costumam ser negativas).';
+const labsCidUf = o=> (o.cidade ? o.cidade+'/' : '')+o.uf;   // com a cidade vazia mostra só o estado, sem a barra solta
 function labsDistKm(a,b){ const R = 6371, rad = x=> x*Math.PI/180, dLa = rad(b.lat-a.lat), dLo = rad(b.lng-a.lng); const h = Math.sin(dLa/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 const LABS_ROT_PREC = { 'endereço':'no endereço', rua:'na rua', bairro:'no bairro', CEP:'pelo CEP', cidade:'no centro da cidade (aproximado)', manual:'ajustada à mão', informada:'pelas coordenadas informadas' };
 const labsRotPrec = p=> LABS_ROT_PREC[p] || 'aproximada';
 // Links do Google Maps (só abrem o Google; o app não lê a resposta de lá)
-const labsTextoEndereco = (tipo,o)=> tipo==='lab' ? `${o.rua}, ${o.numero}, ${o.bairro}, ${o.cidade}, ${o.uf}, ${o.cep}, Brasil` : tipo==='labx' ? [o.endereco, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : tipo==='apoio' ? [o.rua && (o.rua+(o.numero ? ', '+o.numero : '')), o.bairro, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : [o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ');
+const labsTextoEndereco = (tipo,o)=> tipo==='lab' ? `${o.rua}, ${o.numero}, ${o.bairro}, ${o.cidade}, ${o.uf}, ${o.cep}, Brasil` : tipo==='labx' ? [o.endereco, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : tipo==='apoio' ? [o.rua && (o.rua+(o.numero ? ', '+o.numero : '')), o.bairro, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : [o.cidade, o.uf, o.cep, o.uf==='PY' ? 'Paraguai' : 'Brasil'].filter(Boolean).join(', ');
 const labsLinkEndereco = (tipo,o)=> 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(labsTextoEndereco(tipo,o));
 const labsLinkPosicao = (lat,lng)=> 'https://www.google.com/maps/search/?api=1&query='+Number(lat).toFixed(6)+','+Number(lng).toFixed(6);
-function labsParseCoord(t){   // aceita o que o Google Maps copia ("-11.864200, -55.502500"), vírgula decimal, ou o link completo do ponto (@lat,lng ou !3d..!4d..)
+function labsParseCoord(t, uf){   // aceita o que o Google Maps copia ("-11.864200, -55.502500"), vírgula decimal, ou o link completo do ponto (@lat,lng ou !3d..!4d..)
   const s = String(t||'').replace(/[−–]/g,'-'), erro = { erro:'Não entendi as coordenadas. Cole algo como -11.864200, -55.502500 (o que o Google Maps copia ao clicar com o botão direito no ponto) ou o link completo do ponto.' };
   const m = s.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
   let a, b;
   if(m){ a = Number(m[1]); b = Number(m[2]); }
   else { const n = s.match(/-?\d+(?:[.,]\d+)?/g) || []; if(n.length!==2) return erro; a = Number(n[0].replace(',','.')); b = Number(n[1].replace(',','.')); }
   if(!Number.isFinite(a) || !Number.isFinite(b)) return erro;
-  if(!labsDentroBrasil(a,b)) return { erro:'Essa latitude e longitude ficam fora do Brasil. Confira o sinal (no Brasil as duas costumam ser negativas).' };
+  if(!labsDentroPais(a,b,uf)) return { erro:labsMsgForaPais(uf) };
   return { lat:a, lng:b };
 }
 // ---------- busca pelo endereço (OpenStreetMap / Nominatim)
@@ -11053,19 +11056,23 @@ function labsPrecisao(r, nivel){   // o quão perto do endereço o resultado rea
   if(/^(suburb|neighbourhood|quarter|city_district|hamlet|isolated_dwelling|borough)$/.test(t)) return 'bairro';
   return 'cidade';
 }
-function labsValida(r, uf, ref, maxKm){   // descarta resultado de outro estado ou longe demais da cidade (evita pino em lugar errado)
-  const lat = Number(r.lat), lng = Number(r.lon); if(!Number.isFinite(lat) || !Number.isFinite(lng) || !labsDentroBrasil(lat,lng)) return false;
-  const est = r.address && r.address.state; if(est && labsNorm(est)!==labsNorm(LABS_UF_NOME[uf]||uf)) return false;
+function labsValida(r, uf, ref, maxKm){   // descarta resultado de outro estado/país ou longe demais da cidade (evita pino em lugar errado)
+  const lat = Number(r.lat), lng = Number(r.lon); if(!Number.isFinite(lat) || !Number.isFinite(lng) || !labsDentroPais(lat,lng,uf)) return false;
+  if(uf==='PY'){ const cc = r.address && r.address.country_code; if(cc && String(cc).toLowerCase()!=='py') return false; }
+  else { const est = r.address && r.address.state; if(est && labsNorm(est)!==labsNorm(LABS_UF_NOME[uf]||uf)) return false; }
   if(ref && maxKm && labsDistKm({ lat, lng }, ref)>maxKm) return false;
   return true;
 }
 // end: { rua, numero, bairro, cidade, uf, cep }. Tentativas, da mais exata pra menos: número + rua, só a rua, CEP, cidade. Erro de rede sobe (nada é gravado); sem achar nada devolve null.
 async function labsGeocodificar(end, opt){
-  opt = opt || {}; const estado = LABS_UF_NOME[end.uf] || end.uf, rua = labsRuaExpandida(end.rua), tent = [];
-  if(rua && end.numero) tent.push({ nivel:'endereco', p:{ street: end.numero+' '+rua, city:end.cidade, state:estado } });
-  if(rua) tent.push({ nivel:'rua', p:{ street: rua, city:end.cidade, state:estado } });
-  if(end.cep && String(end.cep).replace(/\D/g,'').length===8) tent.push({ nivel:'cep', p:{ postalcode: labsFmtCep(end.cep), city:end.cidade, state:estado } });
-  tent.push({ nivel:'cidade', p:{ city:end.cidade, state:estado } });
+  opt = opt || {}; const py = end.uf==='PY', estado = LABS_UF_NOME[end.uf] || end.uf, rua = labsRuaExpandida(end.rua), tent = [];
+  const lugar = py ? { city:end.cidade, countrycodes:'py' } : { city:end.cidade, state:estado };   // Paraguai: procura só no Paraguai, sem estado
+  if(!py){
+    if(rua && end.numero) tent.push({ nivel:'endereco', p:{ street: end.numero+' '+rua, ...lugar } });
+    if(rua) tent.push({ nivel:'rua', p:{ street: rua, ...lugar } });
+    if(end.cep && String(end.cep).replace(/\D/g,'').length===8) tent.push({ nivel:'cep', p:{ postalcode: labsFmtCep(end.cep), ...lugar } });
+  }
+  if(end.cidade) tent.push({ nivel:'cidade', p:{ ...lugar } });
   for(const t of tent){
     const res = await labsBuscar(t.p);
     const r = (res||[]).find(x=> labsValida(x, end.uf, opt.ref, opt.maxKm));
@@ -11092,12 +11099,13 @@ const labsUnidadePos = u=>{ const o = LABS.pos[u.id]; return o ? { lat:o.lat, ln
 const labsParcCor = nome=> (typeof vgParceiroCor==='function' ? vgParceiroCor(nome) : '#757575');
 const labsIcone = (tipo, cor)=>{ const t = (tipo==='lab' || tipo==='labx') ? 18 : 24; return L.divIcon({ className:'labs-pino', iconSize:[t,t], iconAnchor:[t/2,t/2], popupAnchor:[0,-t/2], tooltipAnchor:[0,-t/2],
   html: tipo==='lab' ? `<span class="labs-lab" style="background:${LABS_COR_LAB}"></span>` : tipo==='labx' ? `<span class="labs-lab" style="background:${cor}"></span>` : tipo==='apoio' ? `<span class="labs-apoio" style="background:${LABS_COR_APOIO}"></span>` : `<span class="labs-parc" style="background:${cor}"></span>` }); };
-const LABS_PROJETOS = ['estr','oxc','vns','ladroes','maximas'];   // os 5 projetos da Visão Geral: Estruturação, Óxido de Magnésio, Vida no Solo, Ladrões e Máximas
+const labsProjKeys = ()=> typeof VG_VISIVEIS!=='undefined' ? VG_VISIVEIS.map(p=> p.key) : ['estr','oxc','vns','ladroes','maximas'];   // os projetos da Visão Geral: a MESMA lista (VG_VISIVEIS) que a tabela principal dela usa
+const labsListaProj = ()=>{ const n = labsProjKeys().map(k=> labsProjInfo(k).label); return n.length>1 ? n.slice(0,-1).join(', ')+' e '+n[n.length-1] : n.join(''); };
 const labsProjInfo = k=> (typeof VG_PROJETOS!=='undefined' ? VG_PROJETOS.find(p=> p.key===k) : null) || { key:k, label:k, cor:'#757575' };
 const labsDadosProntos = ()=> typeof RECORDS!=='undefined' && RECORDS.length>0;
 function labsProjetosDoParceiro(nome){   // projetos em que ele tem talhão: o parceiro é gravado em cada talhão, e cada talhão sabe em quais projetos participa
-  const recs = (typeof RECORDS!=='undefined' ? RECORDS : []).filter(r=> (r.responsavel_parceiro || 'Em aberto')===nome);
-  return LABS_PROJETOS.map(k=> ({ key:k, n:recs.filter(r=> rfParticipa(r,k)).length })).filter(x=> x.n>0);
+  const recs = (typeof RECORDS!=='undefined' ? RECORDS : []).filter(r=> (String(r.responsavel_parceiro || '').trim() || 'Em aberto')===nome);
+  return labsProjKeys().map(k=> ({ key:k, n:recs.filter(r=> rfParticipa(r,k)).length })).filter(x=> x.n>0);
 }
 function labsResolverDestino(tipo, id){   // laboratório (unidade fixa ou adicionado) ou ponto de apoio -> nome, posição e cor
   if(tipo==='laboratorio'){
@@ -11112,7 +11120,7 @@ function labsGrupos(p){   // um grupo por laboratório de destino: { chave, dest
   const g = new Map(), linhas = LABS.atrib.filter(a=> a.parceiro===p.parceiro);
   linhas.forEach(a=>{ const ch = a.destino_tipo+':'+a.destino_id; if(!g.has(ch)) g.set(ch, { chave:ch, tipo:a.destino_tipo, id:a.destino_id, projetos:[] }); g.get(ch).projetos.push(a.projeto); });
   if(!linhas.length && p.atribuido_tipo && p.atribuido_id) g.set(p.atribuido_tipo+':'+p.atribuido_id, { chave:p.atribuido_tipo+':'+p.atribuido_id, tipo:p.atribuido_tipo, id:p.atribuido_id, projetos: labsDadosProntos() ? labsProjetosDoParceiro(p.parceiro).map(x=> x.key) : null });
-  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? LABS_PROJETOS.filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
+  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? labsProjKeys().filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
 }
 function labsSemLab(p){   // projetos do parceiro sem laboratório. Só vale quando ele já tem alguma atribuição: aí é projeto novo e merece o aviso
   if(!labsDadosProntos()) return [];
@@ -11128,12 +11136,12 @@ async function labsDesligarDestino(id){   // quando um laboratório ou ponto de 
   LABS.atrib = LABS.atrib.filter(a=> a.destino_id!==id);
 }
 function labsInfoLab(u, p){ return `<b>${cgEscH(labsNomeUnidade(u))}</b><br>${cgEscH(u.rua)}, ${cgEscH(u.numero)}${u.complemento ? ' – '+cgEscH(u.complemento) : ''}<br>${cgEscH(u.bairro)} · ${cgEscH(u.cidade)}/${cgEscH(u.uf)}<br>CEP ${cgEscH(u.cep)}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`; }
-function labsInfoApoio(a){ return `<b>${cgEscH(a.nome)}</b> <span class="labs-peq">(ponto de apoio)</span><br>${[a.rua && (a.rua+(a.numero?', '+a.numero:'')), a.bairro].filter(Boolean).map(cgEscH).join(' – ')}${a.rua||a.bairro ? '<br>' : ''}${cgEscH(a.cidade)}/${cgEscH(a.uf)}${a.cep ? '<br>CEP '+cgEscH(a.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(a.precisao)}</span>`; }
-function labsInfoLabx(l){ return `<b>${cgEscH(l.nome)}</b> <span class="labs-peq">(laboratório)</span><br>${l.endereco ? cgEscH(l.endereco)+'<br>' : ''}${cgEscH(l.cidade)}/${cgEscH(l.uf)}${l.cep ? '<br>CEP '+cgEscH(l.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(l.precisao)}</span>`; }
+function labsInfoApoio(a){ return `<b>${cgEscH(a.nome)}</b> <span class="labs-peq">(ponto de apoio)</span><br>${[a.rua && (a.rua+(a.numero?', '+a.numero:'')), a.bairro].filter(Boolean).map(cgEscH).join(' – ')}${a.rua||a.bairro ? '<br>' : ''}${cgEscH(labsCidUf(a))}${a.cep ? '<br>CEP '+cgEscH(a.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(a.precisao)}</span>`; }
+function labsInfoLabx(l){ return `<b>${cgEscH(l.nome)}</b> <span class="labs-peq">(laboratório)</span><br>${l.endereco ? cgEscH(l.endereco)+'<br>' : ''}${cgEscH(labsCidUf(l))}${l.cep ? '<br>CEP '+cgEscH(l.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(l.precisao)}</span>`; }
 function labsInfoParc(p){
   const gr = labsGrupos(p), sem = labsSemLab(p);
   const lista = gr.length ? gr.map(g=> '→ <b>'+cgEscH(g.dest.nome)+'</b>: '+(g.projetos ? g.projetos.map(k=> cgEscH(labsProjInfo(k).label)).join(', ') : 'todos os projetos')).join('<br>') : '<b>—</b>';
-  return `<b>${cgEscH(p.parceiro)}</b><br>${cgEscH(p.cidade)}/${cgEscH(p.uf)}${p.cep ? ' · CEP '+cgEscH(p.cep) : ''}<br>Tem correio na cidade: <b>${p.tem_correio ? 'Sim' : 'Não'}</b><br>Atribuído a: ${lista}${sem.length ? '<br><span class="labs-aviso-i">⚠ Sem laboratório: '+sem.map(k=> cgEscH(labsProjInfo(k).label)).join(', ')+'</span>' : ''}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`;
+  return `<b>${cgEscH(p.parceiro)}</b><br>${cgEscH(labsCidUf(p))}${p.cep ? ' · CEP '+cgEscH(p.cep) : ''}<br>Tem correio na cidade: <b>${p.tem_correio ? 'Sim' : 'Não'}</b><br>Atribuído a: ${lista}${sem.length ? '<br><span class="labs-aviso-i">⚠ Sem laboratório: '+sem.map(k=> cgEscH(labsProjInfo(k).label)).join(', ')+'</span>' : ''}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`;
 }
 function labsPopup(tipo, o){
   const links = (t, obj, lat, lng)=> `<div class="labs-pop-links"><a href="${cgEscH(labsLinkEndereco(t,obj))}" target="_blank" rel="noopener">🗺️ Endereço no Google Maps</a><a href="${cgEscH(labsLinkPosicao(lat,lng))}" target="_blank" rel="noopener">📍 Esta posição no Google Maps</a></div>`;
@@ -11173,7 +11181,7 @@ function labsSepararEndereco(txt){   // "Av. Brasil, 100 – Centro" -> rua, nú
   return { rua:partes[0], numero, bairro: resto.length ? resto[0].replace(/^bairro:?\s*/i,'') : null };
 }
 function labsItensDd(dd){   // itens do dropdown: parceiros que já têm ponto, ou laboratórios (unidades, adicionados e pontos de apoio)
-  if(dd==='parc') return [...LABS.parceiros].sort((a,b)=> a.parceiro.localeCompare(b.parceiro,'pt-BR')).map(p=> ({ chave:p.parceiro, nome:p.parceiro, sub:p.cidade+'/'+p.uf, cor:labsParcCor(p.parceiro), grupo:'' }));
+  if(dd==='parc') return [...LABS.parceiros].sort((a,b)=> a.parceiro.localeCompare(b.parceiro,'pt-BR')).map(p=> ({ chave:p.parceiro, nome:p.parceiro, sub:labsCidUf(p), cor:labsParcCor(p.parceiro), grupo:'' }));
   return [ ...LABS_UNIDADES.map(u=> ({ chave:'laboratorio:'+u.id, nome:labsNomeUnidade(u), sub:u.uf, cor:LABS_COR_LAB, grupo:'Unidades do laboratório' })),
            ...LABS.labsExtra.map(l=> ({ chave:'laboratorio:'+l.id, nome:l.nome, sub:l.uf, cor:l.cor, grupo:'Laboratórios adicionados' })),
            ...LABS.apoios.map(a=> ({ chave:'apoio:'+a.id, nome:a.nome, sub:a.uf, cor:LABS_COR_APOIO, grupo:'Pontos de apoio' })) ];
@@ -11295,21 +11303,23 @@ async function labsConferirUnidades(somente){   // busca o endereço exato de ca
   }
 }
 // ---------- cadastro (parceiro e ponto de apoio), no painel lateral
-const labsUfOptions = sel=> '<option value="">UF</option>'+Object.keys(LABS_UF_NOME).map(u=> `<option value="${u}"${u===sel?' selected':''}>${u}</option>`).join('');
-function labsLerCoord(lat, lng){   // devolve { lat, lng } válidos, null (nenhum digitado) ou { erro }
+const labsUfOptions = (sel, comPY)=> '<option value="">UF</option>'+Object.keys(LABS_UF_NOME).map(u=> `<option value="${u}"${u===sel?' selected':''}>${u}</option>`).join('')+(comPY ? `<option value="PY"${sel==='PY'?' selected':''}>PY – Paraguai</option>` : '');
+function labsLerCoord(lat, lng, uf){   // devolve { lat, lng } válidos, null (nenhum digitado) ou { erro }
   const la = labsNum(lat), lo = labsNum(lng);
   if(la===null && lo===null) return null;
   if(la===null || lo===null || Number.isNaN(la) || Number.isNaN(lo)) return { erro:'Latitude e longitude: preencha as duas com números (ex.: -11,8642 e -55,5025), ou deixe as duas vazias.' };
-  if(!labsDentroBrasil(la,lo)) return { erro:'Essa latitude e longitude ficam fora do Brasil. Confira o sinal (no Brasil as duas costumam ser negativas).' };
+  if(!labsDentroPais(la,lo,uf)) return { erro:labsMsgForaPais(uf) };
   return { lat:la, lng:lo };
 }
 async function labsSalvarForm(tipo){
   const g = id=> { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
   const btn = document.getElementById('labsFormSalvar'), erro = t=>{ const e = document.getElementById('labsFormErro'); if(e) e.textContent = t || ''; }, stat = t=>{ const e = document.getElementById('labsFormStatus'); if(e) e.textContent = t || ''; };
   erro(''); stat('');
-  const base = { cidade:g('lbCidade'), uf:g('lbUf'), cep:labsFmtCep(g('lbCep')) };
-  if(!base.cidade || !base.uf){ erro('Preencha a cidade e o estado.'); return; }
-  if(base.cep && base.cep.length!==9){ erro('CEP incompleto: use os 8 números (ex.: 78550-542) ou deixe em branco.'); return; }
+  const py = g('lbUf')==='PY', base = { cidade:g('lbCidade'), uf:g('lbUf'), cep: py ? g('lbCep') : labsFmtCep(g('lbCep')) };   // no Paraguai o código postal é livre
+  if(!base.uf){ erro(base.cidade ? 'Escolha o estado.' : 'Preencha a cidade e o estado.'); return; }
+  const c0 = labsLerCoord(g('lbLat'), g('lbLng'), base.uf); if(c0 && c0.erro){ erro(c0.erro); return; }
+  if(!base.cidade && !c0){ erro('Preencha a cidade (ou informe a latitude e a longitude).'); return; }   // a cidade só é necessária para a busca; com coordenadas ela é opcional
+  if(!py && base.cep && base.cep.length!==9){ erro('CEP incompleto: use os 8 números (ex.: 78550-542) ou deixe em branco.'); return; }
   base.cep = base.cep || null;   // o CEP é opcional: sem ele a busca usa a cidade (ou o endereço, no ponto de apoio)
   let extra = {};
   if(tipo==='parceiro'){
@@ -11323,7 +11333,7 @@ async function labsSalvarForm(tipo){
     const nome = g('lbNome'); if(!nome){ erro('Dê um nome ao ponto de apoio.'); return; }
     extra = { nome, rua:g('lbRua')||null, numero:g('lbNumero')||null, bairro:g('lbBairro')||null };
   }
-  const c = labsLerCoord(g('lbLat'), g('lbLng')); if(c && c.erro){ erro(c.erro); return; }
+  const c = c0;
   const prev = tipo==='parceiro' ? LABS.parceiros.find(p=> p.parceiro===LABS.editando) : tipo==='laboratorio' ? LABS.labsExtra.find(a=> a.id===LABS.editando) : LABS.apoios.find(a=> a.id===LABS.editando);
   if(c && prev && Math.abs(c.lat-prev.lat)<1e-7 && Math.abs(c.lng-prev.lng)<1e-7 && (base.cidade!==prev.cidade || base.uf!==prev.uf || (base.cep||null)!==(prev.cep||null) || (tipo==='laboratorio' && (extra.endereco||null)!==(prev.endereco||null)))){
     if(!confirm('Você mudou o endereço, mas a latitude e a longitude continuam as de antes, e elas têm prioridade sobre o endereço.\n\nOK = manter essas coordenadas.\nCancelar = apagar os dois campos para o app buscar pelo novo endereço.')){
@@ -11374,10 +11384,10 @@ function labsFormHtml(tipo){
   const corpo = tipo==='parceiro' ? '' : tipo==='laboratorio' ? campo('Nome do laboratório *','lbNome',v('nome'))+campo('Endereço (rua, número, bairro)','lbEndereco',v('endereco'))+`<div class="labs-rot">Cor do pino</div><div class="labs-cores">${LABS_CORES_LAB.map(k=> `<button type="button" class="labs-cor${k===corLab ? ' sel' : ''}" data-labs-acao="cor" data-cor="${k}" style="background:${k}" title="${k}"></button>`).join('')}</div><input type="hidden" id="lbCor" value="${corLab}">` : campo('Nome do ponto de apoio *','lbNome',v('nome'))+campo('Rua','lbRua',v('rua'))+`<div class="labs-2">${campo('Número','lbNumero',v('numero'))}${campo('Bairro','lbBairro',v('bairro'))}</div>`;
   const correio = tipo==='parceiro' ? `<div class="labs-rot">O parceiro tem correio na cidade? *</div><div class="labs-radios"><label><input type="radio" name="lbCorreio" value="sim"${p && p.tem_correio===true?' checked':''}> Sim</label><label><input type="radio" name="lbCorreio" value="nao"${p && p.tem_correio===false?' checked':''}> Não</label></div>` : '';
   return `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button>${cabecalho}${corpo}
-    <div class="labs-2">${campo('Cidade *','lbCidade',v('cidade'))}<div><label class="labs-rot" for="lbUf">Estado *</label><select id="lbUf" class="labs-in">${labsUfOptions(p ? p.uf : '')}</select></div></div>
+    <div class="labs-2">${campo('Cidade','lbCidade',v('cidade'))}<div><label class="labs-rot" for="lbUf">Estado *</label><select id="lbUf" class="labs-in">${labsUfOptions(p ? p.uf : '', tipo==='parceiro')}</select></div></div>
     ${campo('CEP (opcional)','lbCep',v('cep'),'inputmode="numeric" maxlength="9" placeholder="00000-000"')}
-    <div class="labs-peq">Sem CEP, e sem latitude e longitude, o pino do ${tipo==='parceiro' ? 'parceiro' : tipo==='laboratorio' ? 'laboratório sem endereço' : 'ponto de apoio sem rua e número'} fica no centro da cidade.</div>
-    <div class="labs-rot labs-dica">Latitude e longitude (opcional — deixe vazio que o app busca pelo endereço)</div>
+    <div class="labs-peq">Sem CEP, e sem latitude e longitude, o pino do ${tipo==='parceiro' ? 'parceiro' : tipo==='laboratorio' ? 'laboratório sem endereço' : 'ponto de apoio sem rua e número'} fica no centro da cidade.${tipo==='parceiro' ? ' Para o Paraguai (PY), o código postal é livre e a busca procura só no Paraguai.' : ''}</div>
+    <div class="labs-rot labs-dica">Latitude e longitude (opcional). Com elas a cidade também é opcional; sem elas o app busca pelo endereço e a cidade é obrigatória</div>
     <div class="labs-2">${campo('Latitude','lbLat',p && (p.precisao==='manual' || p.precisao==='informada') ? v('lat') : '','placeholder="-11,8642"')}${campo('Longitude','lbLng',p && (p.precisao==='manual' || p.precisao==='informada') ? v('lng') : '','placeholder="-55,5025"')}</div>
     ${correio}
     <div id="labsFormErro" class="labs-erro"></div><div id="labsFormStatus" class="labs-status"></div>
@@ -11405,7 +11415,7 @@ function labsCoordHtml(){
 async function labsSalvarCoord(){
   const o = labsObjChave(LABS.editando || ''); if(!o) return;
   const g = id=> { const e = document.getElementById(id); return e ? e.value.trim() : ''; }, erro = t=>{ const e = document.getElementById('labsFormErro'); if(e) e.textContent = t || ''; };
-  erro(''); const txt = g('lbCoordTxt'), c = txt ? labsParseCoord(txt) : labsLerCoord(g('lbLat'), g('lbLng'));
+  erro(''); const txt = g('lbCoordTxt'), c = txt ? labsParseCoord(txt, o.obj.uf) : labsLerCoord(g('lbLat'), g('lbLng'), o.obj.uf);
   if(!c){ erro('Informe a latitude e a longitude: cole o que o Google Maps copia, ou digite as duas.'); return; }
   if(c.erro){ erro(c.erro); return; }
   const nova = { lat:c.lat, lng:c.lng, precisao:'informada', fonte:'informada' };
@@ -11418,22 +11428,27 @@ async function labsSalvarCoord(){
     labsAviso('✓ '+o.nome+': o mapa passa a usar as coordenadas informadas.');
   }catch(e){ console.error(e); erro(labsErroBanco(e)); }
 }
-async function labsCarregarParcTabela(){   // os parceiros que o painel "Adicionar parceiro" oferece vêm DIRETO da tabela de talhões (quem tem pelo menos um talhão), não de uma lista fixa no código
+async function labsCarregarParcTabela(atualizar){   // quem o painel "Adicionar parceiro" oferece: só parceiros com talhão em algum dos 5 projetos, lido dos talhões carregados do banco (nada de lista fixa no código)
   LABS.parcTabEstado = 'carregando'; LABS.parcTabErro = '';
   try{
-    const { data, error } = await fetchAllPaginated('talhoes', 'responsavel_parceiro', q=> q.not('responsavel_parceiro', 'is', null));
-    if(error) throw error;
-    const m = new Map(); (data || []).forEach(r=>{ const v = String(r.responsavel_parceiro || '').trim(); if(!v || v==='Em aberto') return; m.set(v, (m.get(v) || 0)+1); });   // vazio no banco = "Em aberto": não conta como parceiro
-    LABS.parcTab = [...m.entries()].map(([nome,qtd])=> ({ nome, qtd })).sort((a,b)=> a.nome.localeCompare(b.nome, 'pt-BR')); LABS.parcTabEstado = 'ok';
+    if((atualizar || !labsDadosProntos()) && typeof carregarDadosDoSupabase==='function') await carregarDadosDoSupabase();   // lê de novo as tabelas (talhões e dados dos projetos)
+    if(!labsDadosProntos()) throw new Error('Os talhões ainda não carregaram.');
+    const por = new Map();
+    RECORDS.forEach(r=>{
+      const n = String(r.responsavel_parceiro || '').trim(); if(!n || n==='Em aberto') return;   // vazio no banco = "Em aberto": não conta como parceiro
+      const ks = labsProjKeys().filter(k=> rfParticipa(r,k)); if(!ks.length) return;   // talhão que não está em nenhum dos 5 projetos não conta
+      const e = por.get(n) || { nome:n, qtd:0, proj:{} }; e.qtd++; ks.forEach(k=>{ e.proj[k] = (e.proj[k] || 0)+1; }); por.set(n, e);
+    });
+    LABS.parcTab = [...por.values()].sort((a,b)=> a.nome.localeCompare(b.nome, 'pt-BR')); LABS.parcTabEstado = 'ok';
   }catch(e){ console.error(e); LABS.parcTabEstado = 'erro'; LABS.parcTabErro = (e && e.message) || String(e); }
   if(LABS.modo==='parceiro-lista') labsDesenharPainel();
 }
-function labsAbrirAtrib(nome){   // abre a tela: os projetos do parceiro e o laboratório de cada um (rascunho até clicar em Salvar)
+function labsAbrirAtrib(nome, jaTentou){   // abre a tela: os projetos do parceiro e o laboratório de cada um (rascunho até clicar em Salvar)
   const p = LABS.parceiros.find(x=> x.parceiro===nome); if(!p) return;
   LABS.msg = ''; LABS.modo = 'atrib'; if(LABS.mapa) LABS.mapa.closePopup();
   if(!labsDadosProntos()){
     LABS.rascunho = { parceiro:nome, pronto:false, atrib:{}, blocos:[], sujo:false, erro:'' };
-    if(typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome); }); }
+    if(!jaTentou && typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome, true); }); }
     labsDesenharPainel(); return;
   }
   const projs = labsProjetosDoParceiro(nome).map(x=> x.key), grupos = labsGrupos(p), atrib = {};
@@ -11453,7 +11468,7 @@ function labsAtribHtml(){
   const cab = `${voltar}<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(r.parceiro)}"></span>${cgEscH(r.parceiro)}</h3><p class="labs-peq">Arraste a ficha de cada projeto para o laboratório que vai atendê-lo. Cada projeto vai para um laboratório só. Nada vale até clicar em Salvar.</p>`;
   if(!r.pronto) return cab+'<p class="labs-status">⏳ Carregando os talhões e projetos deste parceiro…</p><button type="button" class="btn ghost" data-labs-acao="atrib-recarregar">Tentar de novo</button>';
   const projs = labsProjetosDoParceiro(r.parceiro);
-  if(!projs.length) return cab+'<p class="labs-aviso">Este parceiro ainda não tem talhões em nenhum dos 5 projetos (Estruturação, Óxido de Magnésio, Vida no Solo, Ladrões, Máximas).</p>';
+  if(!projs.length) return cab+'<p class="labs-aviso">Este parceiro ainda não tem talhões em nenhum dos '+labsProjKeys().length+' projetos ('+labsListaProj()+').</p>';
   const ficha = k=>{ const pj = labsProjInfo(k), n = projs.find(x=> x.key===k).n; return `<div class="labs-ficha" draggable="true" data-projeto="${k}" style="border-left:4px solid ${pj.cor}"><b>${cgEscH(pj.label)}</b> <span class="labs-peq">${n} talhão(ões)</span>${r.novos.includes(k) ? ' <span class="labs-novo">novo</span>' : ''}</div>`; };
   const em = ch=> projs.map(x=> x.key).filter(k=> (r.atrib[k] || null)===ch);
   const blocos = r.blocos.map(ch=>{ const d = labsDestPorChave(ch), fs = em(ch); return `<div class="labs-bloco" data-destino="${cgEscH(ch)}"><div class="labs-bloco-t"><span class="labs-ponto" style="background:${d ? d.cor : '#999'}"></span><b>${cgEscH(d ? d.nome : ch)}</b><button type="button" class="labs-x" data-labs-acao="atrib-remover-bloco" data-destino="${cgEscH(ch)}" title="Tirar este laboratório (os projetos voltam para Sem laboratório)">✕</button></div><div class="labs-bloco-c">${fs.map(ficha).join('') || '<span class="labs-peq">Arraste um projeto para cá</span>'}</div></div>`; }).join('');
@@ -11501,15 +11516,15 @@ function labsDesenharPainel(){
   if(LABS.modo==='atrib'){ el.innerHTML = labsAtribHtml(); return; }
   const info = (LABS.msg ? `<div class="${LABS.msgErro ? 'labs-erro' : 'labs-ok'}">${cgEscH(LABS.msg)}</div>` : '')+(LABS.progresso ? `<div class="labs-status">⏳ ${cgEscH(LABS.progresso)}</div>` : '');
   if(LABS.modo==='parceiro-lista'){
-    const topo = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Só aparecem os parceiros que têm talhão na tabela (aba de projetos). Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`;
-    if(LABS.parcTabEstado==='erro'){ el.innerHTML = topo+`<div class="labs-erro">Não consegui ler os parceiros da tabela: ${cgEscH(LABS.parcTabErro)}</div><button type="button" class="btn ghost" data-labs-acao="novo-parceiro">Tentar de novo</button>`; return; }
+    const topo = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Só aparecem os parceiros que têm talhão em algum dos ${labsProjKeys().length} projetos (${labsListaProj()}), os mesmos da Visão Geral. Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`;
+    if(LABS.parcTabEstado==='erro'){ el.innerHTML = topo+`<div class="labs-erro">Não consegui ler os parceiros: ${cgEscH(LABS.parcTabErro)}</div><button type="button" class="btn ghost" data-labs-acao="parc-atualizar">Tentar de novo</button>`; return; }
     if(LABS.parcTabEstado!=='ok' || !LABS.parcTab){ el.innerHTML = topo+'<p class="labs-status">⏳ Buscando os parceiros dos talhões…</p>'; return; }
     const lista = LABS.parcTab, nomesTab = new Set(lista.map(x=> x.nome)), foraLista = n=> typeof VG_PARCEIROS!=='undefined' && !VG_PARCEIROS.some(p=> p.v===n);
-    const item = (n, sub)=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${sub} · ${ja ? '📍 '+cgEscH(ja.cidade)+'/'+cgEscH(ja.uf) : 'sem ponto'}</span></button>`; };
+    const item = (n, sub, dica)=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}" title="${cgEscH(dica || '')}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${sub} · ${ja ? '📍 '+cgEscH(labsCidUf(ja)) : 'sem ponto'}</span></button>`; };
     const semTalhao = LABS.parceiros.filter(p=> !nomesTab.has(p.parceiro));
-    el.innerHTML = topo
-      + (lista.length ? lista.map(x=> item(x.nome, x.qtd+(x.qtd===1 ? ' talhão' : ' talhões')+(foraLista(x.nome) ? ' · fora da lista' : ''))).join('') : '<div class="labs-aviso">Nenhum talhão tem parceiro cadastrado ainda.</div>')
-      + (semTalhao.length ? `<h3 class="labs-h">No mapa, mas sem talhão na tabela</h3><p class="labs-peq">Estes parceiros têm ponto no mapa, mas nenhum talhão aponta para eles hoje. Clique para editar; para tirar do mapa, use o popup do pino.</p>`+semTalhao.map(p=> item(p.parceiro, '⚠ sem talhão')).join('') : '');
+    el.innerHTML = topo+'<button type="button" class="btn ghost" data-labs-acao="parc-atualizar" title="Lê de novo os talhões e os projetos">🔄 Atualizar talhões</button>'
+      + (lista.length ? lista.map(x=> item(x.nome, x.qtd+(x.qtd===1 ? ' talhão' : ' talhões')+' em projeto'+(foraLista(x.nome) ? ' · fora da lista' : ''), labsProjKeys().filter(k=> x.proj[k]).map(k=> labsProjInfo(k).label+': '+x.proj[k]).join(' · '))).join('') : '<div class="labs-aviso">Nenhum parceiro tem talhão em projeto ainda.</div>')
+      + (semTalhao.length ? `<h3 class="labs-h">No mapa, mas sem talhão em projeto</h3><p class="labs-peq">Estes parceiros têm ponto no mapa, mas nenhum talhão em projeto aponta para eles hoje. Clique para editar; para tirar do mapa, use o popup do pino.</p>`+semTalhao.map(p=> item(p.parceiro, '⚠ sem talhão em projeto', '')).join('') : '');
     return;
   }
   if(LABS.modo==='coord'){ el.innerHTML = labsCoordHtml(); return; }
@@ -11519,15 +11534,16 @@ function labsDesenharPainel(){
   const parcs = [...LABS.parceiros].sort((a,b)=> a.parceiro.localeCompare(b.parceiro,'pt-BR'));
   el.innerHTML = `${info}<div class="labs-botoes"><button type="button" class="btn btn-preto" data-labs-acao="novo-parceiro">➕ Adicionar parceiro</button><button type="button" class="btn ghost" data-labs-acao="novo-apoio">➕ Adicionar ponto de apoio</button><button type="button" class="btn ghost" data-labs-acao="novo-lab">➕ Adicionar laboratório</button></div>
     <div class="labs-leg"><span><i class="labs-lab" style="background:${LABS_COR_LAB}"></i> Unidade do laboratório</span><span><i class="labs-lab" style="background:${LABS_CORES_LAB[0]}"></i> Laboratório adicionado (cor à escolha)</span><span><i class="labs-apoio" style="background:${LABS_COR_APOIO}"></i> Ponto de apoio</span><span><i class="labs-parc" style="background:#9e9e9e"></i> Parceiro (cor da lista)</span><span><i class="labs-linha"></i> Atribuição</span></div>
-    <h3 class="labs-h">Parceiros no mapa (${parcs.length})</h3>${parcs.length ? parcs.map(p=>{ const gr = labsGrupos(p), d = gr.length===1 ? gr[0].dest : null; return `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('parc:'+p.parceiro)}"><span class="labs-ponto" style="background:${labsParcCor(p.parceiro)}"></span><span class="labs-item-t">${cgEscH(p.parceiro)}</span><span class="labs-item-s">${cgEscH(p.cidade)}/${cgEscH(p.uf)}${gr.length>1 ? ' → '+gr.length+' laboratórios' : d ? ' → '+cgEscH(d.nome) : ''}${labsSemLab(p).length ? ' · ⚠ projeto sem laboratório' : ''}${!labsParcVisivel(p) ? ' · oculto' : ''}</span></button>`; }).join('') : '<p class="labs-peq">Nenhum parceiro no mapa ainda.</p>'}
-    <h3 class="labs-h">Laboratórios adicionados (${LABS.labsExtra.length})</h3>${LABS.labsExtra.length ? LABS.labsExtra.map(l=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('labx:'+l.id)}"><span class="labs-ponto" style="background:${cgEscH(l.cor)}"></span><span class="labs-item-t">${cgEscH(l.nome)}</span><span class="labs-item-s">${cgEscH(l.cidade)}/${cgEscH(l.uf)}</span></button>`).join('') : '<p class="labs-peq">Nenhum laboratório adicionado ainda.</p>'}
-    <h3 class="labs-h">Pontos de apoio (${LABS.apoios.length})</h3>${LABS.apoios.length ? LABS.apoios.map(a=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('apoio:'+a.id)}"><span class="labs-ponto labs-ponto-ap"></span><span class="labs-item-t">${cgEscH(a.nome)}</span><span class="labs-item-s">${cgEscH(a.cidade)}/${cgEscH(a.uf)}</span></button>`).join('') : '<p class="labs-peq">Nenhum ponto de apoio ainda.</p>'}
+    <h3 class="labs-h">Parceiros no mapa (${parcs.length})</h3>${parcs.length ? parcs.map(p=>{ const gr = labsGrupos(p), d = gr.length===1 ? gr[0].dest : null; return `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('parc:'+p.parceiro)}"><span class="labs-ponto" style="background:${labsParcCor(p.parceiro)}"></span><span class="labs-item-t">${cgEscH(p.parceiro)}</span><span class="labs-item-s">${cgEscH(labsCidUf(p))}${gr.length>1 ? ' → '+gr.length+' laboratórios' : d ? ' → '+cgEscH(d.nome) : ''}${labsSemLab(p).length ? ' · ⚠ projeto sem laboratório' : ''}${!labsParcVisivel(p) ? ' · oculto' : ''}</span></button>`; }).join('') : '<p class="labs-peq">Nenhum parceiro no mapa ainda.</p>'}
+    <h3 class="labs-h">Laboratórios adicionados (${LABS.labsExtra.length})</h3>${LABS.labsExtra.length ? LABS.labsExtra.map(l=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('labx:'+l.id)}"><span class="labs-ponto" style="background:${cgEscH(l.cor)}"></span><span class="labs-item-t">${cgEscH(l.nome)}</span><span class="labs-item-s">${cgEscH(labsCidUf(l))}</span></button>`).join('') : '<p class="labs-peq">Nenhum laboratório adicionado ainda.</p>'}
+    <h3 class="labs-h">Pontos de apoio (${LABS.apoios.length})</h3>${LABS.apoios.length ? LABS.apoios.map(a=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('apoio:'+a.id)}"><span class="labs-ponto labs-ponto-ap"></span><span class="labs-item-t">${cgEscH(a.nome)}</span><span class="labs-item-s">${cgEscH(labsCidUf(a))}</span></button>`).join('') : '<p class="labs-peq">Nenhum ponto de apoio ainda.</p>'}
     <h3 class="labs-h">Unidades do laboratório (${LABS_UNIDADES.length})</h3>${LABS_UNIDADES.map(u=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('lab:'+u.id)}"><span class="labs-ponto labs-ponto-lab"></span><span class="labs-item-t">${cgEscH(labsNomeUnidade(u))}</span><span class="labs-item-s">${cgEscH(u.uf)} · ${labsRotPrec(labsUnidadePos(u).precisao)}${LABS.destOcultos.has('laboratorio:'+u.id) ? ' · oculto' : ''}</span></button>`).join('')}`;
 }
 function labsAcao(b){
   const a = b.dataset.labsAcao;
   if(a==='voltar'){ LABS.modo = 'inicio'; LABS.editando = null; LABS.msg = ''; LABS.rascunho = null; labsDesenharPainel(); }
   else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; LABS.parcTabEstado = 'carregando'; labsDesenharPainel(); labsCarregarParcTabela(); }
+  else if(a==='parc-atualizar'){ LABS.parcTabEstado = 'carregando'; labsDesenharPainel(); labsCarregarParcTabela(true); }
   else if(a==='novo-apoio'){ LABS.msg = ''; LABS.modo = 'apoio-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='novo-lab'){ LABS.msg = ''; LABS.modo = 'lab-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='editar-lab'){ LABS.msg = ''; LABS.editando = b.dataset.id; LABS.modo = 'lab-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
@@ -11573,7 +11589,7 @@ async function labsAbrir(){   // chamada pelo menu: monta tudo na primeira vez; 
     caixa.dataset.labsLigado = '1';
     caixa.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
     painel.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
-    painel.addEventListener('input', e=>{ if(e.target.id==='lbCep') e.target.value = labsFmtCep(e.target.value); });
+    painel.addEventListener('input', e=>{ if(e.target.id==='lbCep'){ const u = document.getElementById('lbUf'); if(!(u && u.value==='PY')) e.target.value = labsFmtCep(e.target.value); } });
     const faixa = document.getElementById('labsFiltro');
     if(faixa){
       faixa.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
