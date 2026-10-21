@@ -303,6 +303,45 @@
   .anx-hd.anx-ok{border:1px solid #2e7d32;background:#f1f8f1;cursor:default;}
   .anx-nm{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom;}
   .anx-ib{width:26px;height:26px;padding:0;font-size:13px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;}
+  .labs-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start;}
+  .labs-mapa-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px;} #labsMapa{height:calc(100vh - 230px);min-height:540px;border-radius:10px;z-index:0;}
+  .labs-filtro{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:2px 4px 8px;position:relative;}
+  .labs-dd{position:relative;display:inline-block;} .labs-dd-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit;color:var(--ink);} .labs-dd.aberto .labs-dd-btn{border-color:#0b4f8a;}
+  .labs-dd-painel{position:absolute;top:calc(100% + 4px);left:0;z-index:1200;width:290px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;display:flex;flex-direction:column;gap:6px;}
+  .labs-dd-busca{width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px;}
+  .labs-dd-acoes{display:flex;gap:6px;} .labs-dd-acoes button{flex:1;border:1px solid var(--line);background:#f3f2ec;border-radius:7px;padding:4px 6px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+  .labs-dd-lista{overflow:auto;max-height:240px;} .labs-dd-grupo{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin:8px 2px 2px;}
+  .labs-dd-item{display:flex;align-items:center;gap:7px;padding:4px;border-radius:6px;font-size:12.5px;cursor:pointer;} .labs-dd-item:hover{background:#f3f2ec;} .labs-dd-item i{width:10px;height:10px;border-radius:50%;flex:none;} .labs-dd-item span{flex:1;} .labs-dd-item small{color:var(--ink-soft);font-size:11px;}
+  .labs-dd-item[hidden], .labs-dd-grupo[hidden], .labs-chip[hidden]{display:none !important;} .labs-filtro-res{font-size:11.5px;color:var(--ink-soft);margin-left:auto;} .labs-filtro-t{font-size:12px;font-weight:700;color:var(--ink-soft);margin-right:4px;}
+  .labs-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--ink);} .labs-chip:hover{background:#f3f2ec;} .labs-chip.off{opacity:.4;text-decoration:line-through;}
+  .labs-chip i{display:inline-block;width:10px;height:10px;border-radius:50%;} .labs-chip-acao{background:#f3f2ec;font-weight:600;}
+  .labs-painel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;max-height:calc(100vh - 210px);overflow:auto;}
+  @media (max-width:1000px){ .labs-grid{grid-template-columns:1fr;} #labsMapa{height:60vh;} .labs-painel{max-height:none;} }
+  .labs-pino{background:none;border:0;}
+  .labs-lab{display:block;position:relative;width:16.5px;height:16.5px;margin:.75px;border:1.5px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;}
+  .labs-lab::after{content:'';position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;}
+  .labs-apoio{display:block;position:relative;width:18px;height:18px;margin:3px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;}
+  .labs-apoio::after{content:'';position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#263238;}
+  .labs-parc{display:block;width:18px;height:18px;margin:3px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;}
+  .labs-leg{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-soft);margin:12px 0 4px;} .labs-leg i{display:inline-block;vertical-align:middle;margin:0 8px 0 2px;width:11px;height:11px;box-shadow:none;}
+  .labs-leg i{position:relative;border-radius:50%;} .labs-leg i.labs-lab,.labs-leg i.labs-parc,.labs-leg i.labs-apoio{border:0;margin:0 8px 0 2px;width:13px;height:13px;} .labs-leg i.labs-lab{width:11px;height:11px;margin:0 9px 0 3px;} .labs-leg i.labs-lab::after{width:4px;height:4px;margin:-2px 0 0 -2px;} .labs-leg i.labs-apoio::after{width:4px;height:4px;margin:-2px 0 0 -2px;} .labs-linha{display:inline-block;width:22px;height:0;border-top:3px dashed #888;margin:0 6px 0 0;vertical-align:middle;}
+  .labs-bloco{border:1px solid var(--line);border-radius:10px;padding:8px;margin:8px 0;background:#fbfaf4;} .labs-bloco.alvo{outline:2px dashed #0b4f8a;background:#eef5fb;} .labs-bloco-sem{border-style:dashed;}
+  .labs-bloco-t{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px;} .labs-x{margin-left:auto;border:0;background:none;cursor:pointer;color:var(--ink-soft);font-size:13px;} .labs-bloco-c{display:flex;flex-direction:column;gap:6px;min-height:28px;}
+  .labs-ficha{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;cursor:grab;user-select:none;} .labs-ficha:active{cursor:grabbing;}
+  .labs-novo{background:#c62828;color:#fff;border-radius:999px;padding:1px 7px;font-size:10.5px;margin-left:4px;} .labs-aviso{color:#7a4b00;background:#fff3d6;border-radius:8px;padding:6px 9px;font-size:12px;margin-top:8px;} .labs-aviso-i{color:#a35a00;font-weight:600;}
+  .labs-btn-atr{width:100%;font-weight:600;}
+  .labs-cores{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px;} .labs-cor{width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);cursor:pointer;padding:0;} .labs-cor.sel{box-shadow:0 0 0 2px #111;}
+  .labs-h{font-size:14px;margin:16px 0 6px;} .labs-botoes{display:flex;flex-direction:column;gap:8px;}
+  .labs-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 9px;margin-bottom:6px;cursor:pointer;font-family:inherit;} .labs-item:hover{background:#f3f2ec;}
+  .labs-item-t{font-weight:700;font-size:13px;flex:1;} .labs-item-s{font-size:11.5px;color:var(--ink-soft);text-align:right;}
+  .labs-ponto{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none;} .labs-ponto-ap{background:#ffb300;} .labs-ponto-lab{background:#263238;}
+  .labs-peq{font-size:11.5px;color:var(--ink-soft);} .labs-voltar{border:0;background:none;color:var(--ink-soft);cursor:pointer;font-size:13px;padding:0;margin-bottom:6px;font-family:inherit;}
+  .labs-rot{display:block;font-size:12px;color:var(--ink-soft);margin:9px 0 3px;} .labs-dica{margin-top:14px;} .labs-in{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:#fff;}
+  .labs-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .labs-radios{display:flex;gap:18px;font-size:13px;}
+  .labs-erro{color:#a32018;font-size:12.5px;margin-top:8px;} .labs-ok{color:#1b5e20;font-size:12.5px;margin-bottom:8px;} .labs-status{color:#0b4f8a;font-size:12.5px;margin-top:8px;} .labs-acoes-form{display:flex;gap:8px;margin-top:12px;}
+  .labs-pop{font-size:12.5px;line-height:1.45;} .labs-pop-links{display:flex;flex-direction:column;gap:3px;margin-top:8px;font-size:12px;} .labs-pop-links a, .labs-painel a{color:#0b4f8a;text-decoration:none;} .labs-pop-links a:hover, .labs-painel a:hover{text-decoration:underline;}
+  .labs-pop-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;} .labs-pop button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 8px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+  .labs-pop-atr{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;} .labs-pop-atr label{font-size:11.5px;color:#5f5e5a;} .labs-pop-atr select{font:inherit;font-size:12px;max-width:100%;} .labs-tip{font-size:12px;line-height:1.4;}
   .alt-badge{background:#c62828;color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;margin-left:4px;}
   .anx-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
   .anx-barra h3{margin:0;}
@@ -655,6 +694,7 @@
       <div class="nav-item" data-view="visaogeral-dash">🌍 Visão Geral de Projetos</div>
       <div class="nav-item" data-view="coletafoliar-dash">🌿 Coleta Foliar 2026.27</div>
       <div class="nav-item" data-view="regenera-dash">♻️ Regenera</div>
+      <div class="nav-item" data-view="gestaolabs-dash">🧭 Gestão de Laboratórios</div>
       </div>
     </div>
     <div class="sidebar-user">
@@ -1035,6 +1075,20 @@
       </div>
       <div id="regeneraApp" style="display:none;">
         <div id="tab-regenera"></div>
+      </div>
+    </div>
+
+    <div id="viewGestaoLabs" style="display:none;">
+      <div class="main-header">
+        <div>
+          <h2>🧭 Gestão de Laboratórios</h2>
+          <p class="sub">Unidades do laboratório, parceiros e pontos de apoio no mapa — com a atribuição de cada parceiro.</p>
+        </div>
+        <div style="display:flex;gap:8px;"><button class="atualizar-dash-btn" onclick="window.labsRecarregar && window.labsRecarregar()">🔄 Atualizar</button></div>
+      </div>
+      <div class="labs-grid">
+        <div class="labs-mapa-card"><div id="labsFiltro" class="labs-filtro"></div><div id="labsMapa"></div></div>
+        <aside id="labsPainel" class="labs-painel"></aside>
       </div>
     </div>
   </div>
@@ -2944,11 +2998,13 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
     document.getElementById('viewVisaoGeral').style.display = view==='visaogeral-dash' ? 'block' : 'none';
     document.getElementById('viewColetaFoliar').style.display = view==='coletafoliar-dash' ? 'block' : 'none';
     document.getElementById('viewRegenera').style.display = view==='regenera-dash' ? 'block' : 'none';
+    document.getElementById('viewGestaoLabs').style.display = view==='gestaolabs-dash' ? 'block' : 'none';
+    if(view==='gestaolabs-dash' && window.labsAbrir) window.labsAbrir();
     if(view==='regenera-dash' && !window.regeneraJaCarregado){
       window.regeneraJaCarregado = true;
       if(window.carregarDadosRegenera) window.carregarDadosRegenera();
     }
-    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash' || view==='vidanosolo-dash' || view==='visaogeral-dash' || view==='coletafoliar-dash') && !dashMgJaCarregado){
+    if((view==='dashboard-mg' || view==='ladroes-dash' || view==='maximas-dash' || view==='condicionador-dash' || view==='otimizacaop-dash' || view==='estruturacao-dash' || view==='oxidoconsumo-dash' || view==='microsolo-dash' || view==='ladroesmaximas-mapa-dash' || view==='vidanosolo-dash' || view==='visaogeral-dash' || view==='coletafoliar-dash' || view==='gestaolabs-dash') && !dashMgJaCarregado){
       dashMgJaCarregado = true;
       if(window.dashMgInitCustosSimulador) window.dashMgInitCustosSimulador();
       if(window.dashMgCarregarDados) window.dashMgCarregarDados();
@@ -4286,6 +4342,7 @@ async function carregarDadosDoSupabase(){
     if(cfAppEl) cfAppEl.style.display = 'block';
     atualizarProgresso(100);
     renderAll();
+    if(window.labsDadosChegaram) window.labsDadosChegaram();
     if(window.verificarRendersPendentes) window.verificarRendersPendentes();
     if(window.verificarMapasPendentes) window.verificarMapasPendentes();
   }catch(err){
@@ -10930,6 +10987,606 @@ async function atualizarBadgeAlertas(){   // o número vermelho do botão: quant
 }
 window.abrirAlertas = abrirAlertas;
 /* ===== FIM ALERTAS DA COORDENAÇÃO ===== */
+/* ===== GESTÃO DE LABORATÓRIOS =====
+   Aba nova do menu: mapa do Brasil (com ruas e avenidas) com as 12 unidades fixas do laboratório (uma por cidade, mesmo marcador), os parceiros (um ponto cada, na cor da lista de parceiros)
+   e os pontos de apoio (outra cor). O parceiro pode ser atribuído a uma unidade ou a um ponto de apoio, e uma linha liga os dois. As posições vêm da BUSCA PELO ENDEREÇO (OpenStreetMap, a mesma busca
+   do resto do app), com plano B: rua, CEP, centro da cidade. O pino pode ser arrastado pra posição certa. Banco: labs_unidades_pos, labs_apoios e labs_parceiros (SQL: gestao_laboratorios.sql). */
+const LABS_ESPERA_MS = 1100;   // a busca do OpenStreetMap aceita ~1 consulta por segundo
+const LABS_COR_LAB = '#263238', LABS_COR_APOIO = '#ffb300';
+const LABS_CORES_LAB = ['#00897b','#1e88e5','#5e35b1','#6d4c41','#7cb342','#c2185b','#00acc1','#546e7a'];   // cores à escolha dos laboratórios adicionados (as 12 unidades fixas são grafite)
+const LABS_UF_NOME = { AC:'Acre', AL:'Alagoas', AP:'Amapá', AM:'Amazonas', BA:'Bahia', CE:'Ceará', DF:'Distrito Federal', ES:'Espírito Santo', GO:'Goiás', MA:'Maranhão', MT:'Mato Grosso', MS:'Mato Grosso do Sul', MG:'Minas Gerais', PA:'Pará', PB:'Paraíba', PR:'Paraná', PE:'Pernambuco', PI:'Piauí', RJ:'Rio de Janeiro', RN:'Rio Grande do Norte', RS:'Rio Grande do Sul', RO:'Rondônia', RR:'Roraima', SC:'Santa Catarina', SP:'São Paulo', SE:'Sergipe', TO:'Tocantins' };
+// As 12 unidades do laboratório (o laboratório é um só; a unidade leva o nome da cidade). lat/lng = centro da cidade (plano B); o pino real vem da busca pelo endereço.
+const LABS_UNIDADES = [
+  { id:'lab-paragominas-pa', cidade:'Paragominas', uf:'PA', rua:'Av. Júlia Kubitschek', numero:'1446', bairro:'Presidente Juscelino (JK)', complemento:'QD 03, LT 12', cep:'68628-598', lat:-2.9967, lng:-47.3533 },
+  { id:'lab-ariquemes-ro', cidade:'Ariquemes', uf:'RO', rua:'Rua Cacaueiro', numero:'1903', bairro:'Setor 01', cep:'76870-130', lat:-9.9133, lng:-63.0408 },
+  { id:'lab-sinop-mt', cidade:'Sinop', uf:'MT', rua:'Av. Colonizador Enio Pipino', numero:'5767', bairro:'Setor Industrial Norte', cep:'78550-542', lat:-11.8642, lng:-55.5025 },
+  { id:'lab-tapurah-mt', cidade:'Tapurah', uf:'MT', rua:'Av. Paraná', numero:'1349', bairro:'Centro', cep:'78573-000', lat:-12.7428, lng:-56.5125 },
+  { id:'lab-sorriso-mt', cidade:'Sorriso', uf:'MT', rua:'Av. Idemar Riedi', numero:'9582', bairro:'Industrial I', cep:'78898-084', lat:-12.5425, lng:-55.7211 },
+  { id:'lab-nova-mutum-mt', cidade:'Nova Mutum', uf:'MT', rua:'Av. Perimetral das Samambaias', numero:'505', bairro:'Centro', cep:'78450-000', lat:-13.8333, lng:-56.0833 },
+  { id:'lab-agua-boa-mt', cidade:'Água Boa', uf:'MT', rua:'Rua 01', numero:'1031', bairro:'Centro II', cep:'78635-000', lat:-14.0508, lng:-52.1608 },
+  { id:'lab-rio-verde-go', cidade:'Rio Verde', uf:'GO', rua:'Av. Lazinho Pimenta', numero:'440', bairro:'DIMPE', complemento:'Qd 20, Lt 24-25', cep:'75910-595', lat:-17.7923, lng:-50.9192 },
+  { id:'lab-luis-eduardo-magalhaes-ba', cidade:'Luís Eduardo Magalhães', uf:'BA', rua:'Rua Valdemar Klein', numero:'356', bairro:'Jd. Imperial', cep:'47864-128', lat:-12.0958, lng:-45.8036 },
+  { id:'lab-uberaba-mg', cidade:'Uberaba', uf:'MG', rua:'Av. Padre Eddie Bernardes Silva', numero:'1441', bairro:'Lourdes', cep:'38035-070', lat:-19.7483, lng:-47.9319 },
+  { id:'lab-assis-sp', cidade:'Assis', uf:'SP', rua:'Rua Sebastião Mendes de Brito', numero:'345', bairro:'Jardim Europa', cep:'19815-140', lat:-22.6619, lng:-50.4122 },
+  { id:'lab-piracicaba-sp', cidade:'Piracicaba', uf:'SP', rua:'Rua Cezira Giovanoni Moretti', numero:'600', bairro:'Jd. Santa Rosa', complemento:'Box 2, Parque Tecnológico de Piracicaba', cep:'13414-157', lat:-22.7253, lng:-47.6492 },
+];
+const LABS = { iniciado:false, mapa:null, camadas:null, marcadores:{}, linhas:[], semBanco:false, pos:{}, apoios:[], parceiros:[], modo:'inicio', editando:null, msg:'', msgErro:false, progresso:'', conferindo:false, cacheGeo:{}, ultimaBusca:0, parcOcultos:new Set(), labsExtra:[], semTabelaLabs:false, atrib:[], semTabelaAtrib:false, rascunho:null, arrastando:null, carregandoDados:false, destOcultos:new Set(), ddAberto:null, ddBusca:'' };
+const labsNomeUnidade = u=> 'Unidade '+u.cidade;
+const labsEnderecoUnidade = u=> `${u.rua}, ${u.numero}${u.complemento ? ' – '+u.complemento : ''} – ${u.bairro} · ${u.cidade}/${u.uf} · CEP ${u.cep}`;
+const labsFmtCep = v=>{ const d = String(v||'').replace(/\D/g,'').slice(0,8); return d.length>5 ? d.slice(0,5)+'-'+d.slice(5) : d; };
+const labsNum = s=>{ const t = String(s==null?'':s).trim().replace(',','.'); if(t==='') return null; const n = Number(t); return Number.isFinite(n) ? n : NaN; };
+const labsNorm = s=> String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const labsRuaExpandida = r=> String(r||'').replace(/^\s*av\.?\s+/i,'Avenida ').replace(/^\s*r\.?\s+/i,'Rua ').replace(/^\s*rod\.?\s+/i,'Rodovia ').replace(/^\s*al\.?\s+/i,'Alameda ');
+const labsDentroBrasil = (lat,lng)=> lat>=-34 && lat<=6 && lng>=-74 && lng<=-34;
+function labsDistKm(a,b){ const R = 6371, rad = x=> x*Math.PI/180, dLa = rad(b.lat-a.lat), dLo = rad(b.lng-a.lng); const h = Math.sin(dLa/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+const LABS_ROT_PREC = { 'endereço':'no endereço', rua:'na rua', bairro:'no bairro', CEP:'pelo CEP', cidade:'no centro da cidade (aproximado)', manual:'ajustada à mão', informada:'pelas coordenadas informadas' };
+const labsRotPrec = p=> LABS_ROT_PREC[p] || 'aproximada';
+// Links do Google Maps (só abrem o Google; o app não lê a resposta de lá)
+const labsTextoEndereco = (tipo,o)=> tipo==='lab' ? `${o.rua}, ${o.numero}, ${o.bairro}, ${o.cidade}, ${o.uf}, ${o.cep}, Brasil` : tipo==='labx' ? [o.endereco, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : tipo==='apoio' ? [o.rua && (o.rua+(o.numero ? ', '+o.numero : '')), o.bairro, o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ') : [o.cidade, o.uf, o.cep, 'Brasil'].filter(Boolean).join(', ');
+const labsLinkEndereco = (tipo,o)=> 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(labsTextoEndereco(tipo,o));
+const labsLinkPosicao = (lat,lng)=> 'https://www.google.com/maps/search/?api=1&query='+Number(lat).toFixed(6)+','+Number(lng).toFixed(6);
+function labsParseCoord(t){   // aceita o que o Google Maps copia ("-11.864200, -55.502500"), vírgula decimal, ou o link completo do ponto (@lat,lng ou !3d..!4d..)
+  const s = String(t||'').replace(/[−–]/g,'-'), erro = { erro:'Não entendi as coordenadas. Cole algo como -11.864200, -55.502500 (o que o Google Maps copia ao clicar com o botão direito no ponto) ou o link completo do ponto.' };
+  const m = s.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+  let a, b;
+  if(m){ a = Number(m[1]); b = Number(m[2]); }
+  else { const n = s.match(/-?\d+(?:[.,]\d+)?/g) || []; if(n.length!==2) return erro; a = Number(n[0].replace(',','.')); b = Number(n[1].replace(',','.')); }
+  if(!Number.isFinite(a) || !Number.isFinite(b)) return erro;
+  if(!labsDentroBrasil(a,b)) return { erro:'Essa latitude e longitude ficam fora do Brasil. Confira o sinal (no Brasil as duas costumam ser negativas).' };
+  return { lat:a, lng:b };
+}
+// ---------- busca pelo endereço (OpenStreetMap / Nominatim)
+async function labsBuscar(params){
+  const qs = new URLSearchParams({ format:'jsonv2', countrycodes:'br', addressdetails:'1', 'accept-language':'pt-BR', limit:'5', ...params }).toString();
+  if(LABS.cacheGeo[qs]) return LABS.cacheGeo[qs];
+  const espera = LABS_ESPERA_MS-(Date.now()-LABS.ultimaBusca); if(espera>0) await new Promise(r=> setTimeout(r,espera));
+  LABS.ultimaBusca = Date.now();
+  const resp = await fetch('https://nominatim.openstreetmap.org/search?'+qs, { headers:{ 'Accept':'application/json' } });
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  const res = await resp.json(); LABS.cacheGeo[qs] = res; return res;
+}
+function labsPrecisao(r, nivel){   // o quão perto do endereço o resultado realmente está
+  const t = r.addresstype || r.type || '';
+  if(/^(house|building|apartments|commercial|industrial|retail|office|amenity|shop|yes|detached|warehouse|farm)$/.test(t)) return nivel==='endereco' ? 'endereço' : 'rua';
+  if(/^(road|residential|tertiary|secondary|primary|trunk|unclassified|service|living_street|pedestrian|motorway|street|footway|path|track)$/.test(t)) return nivel==='endereco' || nivel==='rua' ? 'rua' : 'bairro';
+  if(t==='postcode') return 'CEP';
+  if(/^(suburb|neighbourhood|quarter|city_district|hamlet|isolated_dwelling|borough)$/.test(t)) return 'bairro';
+  return 'cidade';
+}
+function labsValida(r, uf, ref, maxKm){   // descarta resultado de outro estado ou longe demais da cidade (evita pino em lugar errado)
+  const lat = Number(r.lat), lng = Number(r.lon); if(!Number.isFinite(lat) || !Number.isFinite(lng) || !labsDentroBrasil(lat,lng)) return false;
+  const est = r.address && r.address.state; if(est && labsNorm(est)!==labsNorm(LABS_UF_NOME[uf]||uf)) return false;
+  if(ref && maxKm && labsDistKm({ lat, lng }, ref)>maxKm) return false;
+  return true;
+}
+// end: { rua, numero, bairro, cidade, uf, cep }. Tentativas, da mais exata pra menos: número + rua, só a rua, CEP, cidade. Erro de rede sobe (nada é gravado); sem achar nada devolve null.
+async function labsGeocodificar(end, opt){
+  opt = opt || {}; const estado = LABS_UF_NOME[end.uf] || end.uf, rua = labsRuaExpandida(end.rua), tent = [];
+  if(rua && end.numero) tent.push({ nivel:'endereco', p:{ street: end.numero+' '+rua, city:end.cidade, state:estado } });
+  if(rua) tent.push({ nivel:'rua', p:{ street: rua, city:end.cidade, state:estado } });
+  if(end.cep && String(end.cep).replace(/\D/g,'').length===8) tent.push({ nivel:'cep', p:{ postalcode: labsFmtCep(end.cep), city:end.cidade, state:estado } });
+  tent.push({ nivel:'cidade', p:{ city:end.cidade, state:estado } });
+  for(const t of tent){
+    const res = await labsBuscar(t.p);
+    const r = (res||[]).find(x=> labsValida(x, end.uf, opt.ref, opt.maxKm));
+    if(r) return { lat:Number(r.lat), lng:Number(r.lon), precisao:labsPrecisao(r, t.nivel), nome:r.display_name || '' };
+  }
+  return null;
+}
+// ---------- banco
+const labsUser = async ()=>{ try{ const { data:{ user } } = await sb.auth.getUser(); return user ? user.id : null; }catch(e){ return null; } };
+const labsErroBanco = e=>{ const m = (e && e.message) || String(e); return /labs_|42P01|relation|schema cache|does not exist/i.test(m) ? 'As tabelas da Gestão de Laboratórios ainda não existem no banco: rode o gestao_laboratorios.sql no Supabase.' : 'Erro no banco: '+m; };
+async function labsCarregar(){
+  LABS.semBanco = false;
+  const [a,b,c,d,e] = await Promise.all([ sb.from('labs_unidades_pos').select('*'), sb.from('labs_apoios').select('*').order('criado_em'), sb.from('labs_parceiros').select('*'), sb.from('labs_laboratorios').select('*').order('criado_em'), sb.from('labs_atribuicoes').select('*') ]);
+  const erro = a.error || b.error || c.error;
+  if(erro){ console.error(erro); LABS.semBanco = true; LABS.msg = labsErroBanco(erro); LABS.msgErro = true; return; }
+  LABS.pos = {}; (a.data||[]).forEach(r=> LABS.pos[r.id] = r); LABS.apoios = b.data || []; LABS.parceiros = c.data || [];
+  LABS.semTabelaLabs = !!d.error; LABS.labsExtra = d.error ? [] : (d.data || []);
+  LABS.semTabelaAtrib = !!e.error; LABS.atrib = e.error ? [] : (e.data || []);
+  if(d.error || e.error){ console.error(d.error || e.error); LABS.msg = 'Rode de novo o gestao_laboratorios.sql no Supabase: ele cria as tabelas novas ('+[d.error ? 'labs_laboratorios' : '', e.error ? 'labs_atribuicoes' : ''].filter(Boolean).join(' e ')+'), usadas em "Adicionar laboratório" e na atribuição por projeto.'; LABS.msgErro = true; }
+}
+async function labsSalvarPosUnidade(o){ const { error } = await sb.from('labs_unidades_pos').upsert({ ...o, atualizado_em:new Date().toISOString(), atualizado_por:await labsUser() }, { onConflict:'id' }); if(error) throw error; }
+// ---------- mapa
+const labsUnidadePos = u=>{ const o = LABS.pos[u.id]; return o ? { lat:o.lat, lng:o.lng, precisao:o.precisao, fonte:o.fonte } : { lat:u.lat, lng:u.lng, precisao:'cidade', fonte:'txt' }; };
+const labsParcCor = nome=> (typeof vgParceiroCor==='function' ? vgParceiroCor(nome) : '#757575');
+const labsIcone = (tipo, cor)=>{ const t = (tipo==='lab' || tipo==='labx') ? 18 : 24; return L.divIcon({ className:'labs-pino', iconSize:[t,t], iconAnchor:[t/2,t/2], popupAnchor:[0,-t/2], tooltipAnchor:[0,-t/2],
+  html: tipo==='lab' ? `<span class="labs-lab" style="background:${LABS_COR_LAB}"></span>` : tipo==='labx' ? `<span class="labs-lab" style="background:${cor}"></span>` : tipo==='apoio' ? `<span class="labs-apoio" style="background:${LABS_COR_APOIO}"></span>` : `<span class="labs-parc" style="background:${cor}"></span>` }); };
+const LABS_PROJETOS = ['estr','oxc','vns','ladroes','maximas'];   // os 5 projetos da Visão Geral: Estruturação, Óxido de Magnésio, Vida no Solo, Ladrões e Máximas
+const labsProjInfo = k=> (typeof VG_PROJETOS!=='undefined' ? VG_PROJETOS.find(p=> p.key===k) : null) || { key:k, label:k, cor:'#757575' };
+const labsDadosProntos = ()=> typeof RECORDS!=='undefined' && RECORDS.length>0;
+function labsProjetosDoParceiro(nome){   // projetos em que ele tem talhão: o parceiro é gravado em cada talhão, e cada talhão sabe em quais projetos participa
+  const recs = (typeof RECORDS!=='undefined' ? RECORDS : []).filter(r=> (r.responsavel_parceiro || 'Em aberto')===nome);
+  return LABS_PROJETOS.map(k=> ({ key:k, n:recs.filter(r=> rfParticipa(r,k)).length })).filter(x=> x.n>0);
+}
+function labsResolverDestino(tipo, id){   // laboratório (unidade fixa ou adicionado) ou ponto de apoio -> nome, posição e cor
+  if(tipo==='laboratorio'){
+    const u = LABS_UNIDADES.find(x=> x.id===id); if(u) return { tipo:'lab', nome:labsNomeUnidade(u)+' ('+u.uf+')', pos:labsUnidadePos(u), cor:LABS_COR_LAB };
+    const x = LABS.labsExtra.find(l=> l.id===id); return x ? { tipo:'labx', nome:x.nome+' ('+x.uf+')', pos:{ lat:x.lat, lng:x.lng }, cor:x.cor } : null;
+  }
+  if(tipo==='apoio'){ const a = LABS.apoios.find(x=> x.id===id); return a ? { tipo:'apoio', nome:'Apoio: '+a.nome, pos:{ lat:a.lat, lng:a.lng }, cor:LABS_COR_APOIO } : null; }
+  return null;
+}
+const labsDestPorChave = ch=>{ const i = String(ch).indexOf(':'); return labsResolverDestino(String(ch).slice(0,i), String(ch).slice(i+1)); };
+function labsGrupos(p){   // um grupo por laboratório de destino: { chave, dest, projetos:[...] }. A atribuição antiga (um laboratório só) vale para todos os projetos do parceiro
+  const g = new Map(), linhas = LABS.atrib.filter(a=> a.parceiro===p.parceiro);
+  linhas.forEach(a=>{ const ch = a.destino_tipo+':'+a.destino_id; if(!g.has(ch)) g.set(ch, { chave:ch, tipo:a.destino_tipo, id:a.destino_id, projetos:[] }); g.get(ch).projetos.push(a.projeto); });
+  if(!linhas.length && p.atribuido_tipo && p.atribuido_id) g.set(p.atribuido_tipo+':'+p.atribuido_id, { chave:p.atribuido_tipo+':'+p.atribuido_id, tipo:p.atribuido_tipo, id:p.atribuido_id, projetos: labsDadosProntos() ? labsProjetosDoParceiro(p.parceiro).map(x=> x.key) : null });
+  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? LABS_PROJETOS.filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
+}
+function labsSemLab(p){   // projetos do parceiro sem laboratório. Só vale quando ele já tem alguma atribuição: aí é projeto novo e merece o aviso
+  if(!labsDadosProntos()) return [];
+  const gr = labsGrupos(p); if(!gr.length) return [];
+  const cobertos = new Set(gr.flatMap(x=> x.projetos || []));
+  return labsProjetosDoParceiro(p.parceiro).map(x=> x.key).filter(k=> !cobertos.has(k));
+}
+const labsLigados = id=> new Set([...LABS.parceiros.filter(p=> p.atribuido_id===id).map(p=> p.parceiro), ...LABS.atrib.filter(a=> a.destino_id===id).map(a=> a.parceiro)]);
+async function labsDesligarDestino(id){   // quando um laboratório ou ponto de apoio é removido, quem estava ligado a ele fica sem atribuição
+  const r1 = await sb.from('labs_parceiros').update({ atribuido_tipo:null, atribuido_id:null }).eq('atribuido_id', id); if(r1.error) throw r1.error;
+  LABS.parceiros.forEach(p=>{ if(p.atribuido_id===id){ p.atribuido_tipo = null; p.atribuido_id = null; } });
+  if(!LABS.semTabelaAtrib){ const r2 = await sb.from('labs_atribuicoes').delete().eq('destino_id', id); if(r2.error) throw r2.error; }
+  LABS.atrib = LABS.atrib.filter(a=> a.destino_id!==id);
+}
+function labsInfoLab(u, p){ return `<b>${cgEscH(labsNomeUnidade(u))}</b><br>${cgEscH(u.rua)}, ${cgEscH(u.numero)}${u.complemento ? ' – '+cgEscH(u.complemento) : ''}<br>${cgEscH(u.bairro)} · ${cgEscH(u.cidade)}/${cgEscH(u.uf)}<br>CEP ${cgEscH(u.cep)}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`; }
+function labsInfoApoio(a){ return `<b>${cgEscH(a.nome)}</b> <span class="labs-peq">(ponto de apoio)</span><br>${[a.rua && (a.rua+(a.numero?', '+a.numero:'')), a.bairro].filter(Boolean).map(cgEscH).join(' – ')}${a.rua||a.bairro ? '<br>' : ''}${cgEscH(a.cidade)}/${cgEscH(a.uf)}${a.cep ? '<br>CEP '+cgEscH(a.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(a.precisao)}</span>`; }
+function labsInfoLabx(l){ return `<b>${cgEscH(l.nome)}</b> <span class="labs-peq">(laboratório)</span><br>${l.endereco ? cgEscH(l.endereco)+'<br>' : ''}${cgEscH(l.cidade)}/${cgEscH(l.uf)}${l.cep ? '<br>CEP '+cgEscH(l.cep) : ''}<br><span class="labs-peq">Posição ${labsRotPrec(l.precisao)}</span>`; }
+function labsInfoParc(p){
+  const gr = labsGrupos(p), sem = labsSemLab(p);
+  const lista = gr.length ? gr.map(g=> '→ <b>'+cgEscH(g.dest.nome)+'</b>: '+(g.projetos ? g.projetos.map(k=> cgEscH(labsProjInfo(k).label)).join(', ') : 'todos os projetos')).join('<br>') : '<b>—</b>';
+  return `<b>${cgEscH(p.parceiro)}</b><br>${cgEscH(p.cidade)}/${cgEscH(p.uf)}${p.cep ? ' · CEP '+cgEscH(p.cep) : ''}<br>Tem correio na cidade: <b>${p.tem_correio ? 'Sim' : 'Não'}</b><br>Atribuído a: ${lista}${sem.length ? '<br><span class="labs-aviso-i">⚠ Sem laboratório: '+sem.map(k=> cgEscH(labsProjInfo(k).label)).join(', ')+'</span>' : ''}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`;
+}
+function labsPopup(tipo, o){
+  const links = (t, obj, lat, lng)=> `<div class="labs-pop-links"><a href="${cgEscH(labsLinkEndereco(t,obj))}" target="_blank" rel="noopener">🗺️ Endereço no Google Maps</a><a href="${cgEscH(labsLinkPosicao(lat,lng))}" target="_blank" rel="noopener">📍 Esta posição no Google Maps</a></div>`;
+  const acoes = (chave, extra)=> `<div class="labs-pop-acoes"><button type="button" data-labs-acao="ajustar" data-chave="${cgEscH(chave)}">📍 Ajustar posição</button><button type="button" data-labs-acao="coord" data-chave="${cgEscH(chave)}">✏️ Informar coordenadas</button>${extra||''}</div>`;
+  if(tipo==='lab') return `<div class="labs-pop">${labsInfoLab(o, labsUnidadePos(o))}${links('lab', o, labsUnidadePos(o).lat, labsUnidadePos(o).lng)}${acoes('lab:'+o.id, `<button type="button" data-labs-acao="refazer" data-id="${cgEscH(o.id)}">↻ Refazer busca</button>`)}</div>`;
+  if(tipo==='labx') return `<div class="labs-pop">${labsInfoLabx(o)}${links('labx', o, o.lat, o.lng)}${acoes('labx:'+o.id, `<button type="button" data-labs-acao="editar-lab" data-id="${cgEscH(o.id)}">✏️ Editar</button><button type="button" data-labs-acao="remover-lab" data-id="${cgEscH(o.id)}">🗑 Remover</button>`)}</div>`;
+  if(tipo==='apoio') return `<div class="labs-pop">${labsInfoApoio(o)}${links('apoio', o, o.lat, o.lng)}${acoes('apoio:'+o.id, `<button type="button" data-labs-acao="editar-apoio" data-id="${cgEscH(o.id)}">✏️ Editar</button><button type="button" data-labs-acao="remover-apoio" data-id="${cgEscH(o.id)}">🗑 Remover</button>`)}</div>`;
+  return `<div class="labs-pop">${labsInfoParc(o)}<div class="labs-pop-atr"><button type="button" class="labs-btn-atr" data-labs-acao="atribuir-labs" data-parceiro="${cgEscH(o.parceiro)}">🧪 Atribuir laboratórios por projeto</button></div>${links('parc', o, o.lat, o.lng)}${acoes('parc:'+o.parceiro, `<button type="button" data-labs-acao="editar-parceiro" data-parceiro="${cgEscH(o.parceiro)}">✏️ Editar</button><button type="button" data-labs-acao="remover-parceiro" data-parceiro="${cgEscH(o.parceiro)}">🗑 Remover</button>`)}</div>`;
+}
+const labsDestVisivel = ch=> !LABS.destOcultos.has(ch);   // laboratório (unidade, adicionado) ou ponto de apoio, por 'laboratorio:id' / 'apoio:id'
+function labsParcVisivel(p){   // o parceiro aparece se não foi escondido e, com o filtro de laboratórios ligado, se está ligado a algum laboratório que continua selecionado
+  if(LABS.parcOcultos.has(p.parceiro)) return false;
+  if(!LABS.destOcultos.size) return true;
+  return labsGrupos(p).some(g=> labsDestVisivel(g.chave));
+}
+function labsDesenharMapa(opt){
+  if(!LABS.mapa) return;
+  LABS.camadas.clearLayers(); LABS.marcadores = {}; LABS.linhas = [];
+  const por = (chave, lat, lng, icone, tip, pop, tipoPino)=>{ const m = L.marker([lat,lng], { icon:icone, riseOnHover:true, keyboard:false }); m.bindTooltip(tip, { direction:'top', offset:[0,-4], className:'labs-tip' }); m.bindPopup(pop, { minWidth:230, maxWidth:300 }); m.addTo(LABS.camadas); LABS.marcadores[chave] = m; m.options.labsTipo = tipoPino; return m; };
+  const visiveis = LABS.parceiros.filter(labsParcVisivel);   // os filtros de parceiro e de laboratório escondem o pino e as linhas
+  visiveis.forEach(p=>{   // as linhas vão primeiro, pra ficarem por baixo dos pinos
+    labsGrupos(p).filter(g=> labsDestVisivel(g.chave)).forEach(g=>{ const l = L.polyline([[p.lat,p.lng],[g.dest.pos.lat,g.dest.pos.lng]], { color:labsParcCor(p.parceiro), weight:3, opacity:.85, dashArray:'7 6', interactive:false }); l.addTo(LABS.camadas); LABS.linhas.push(l); });
+  });
+  LABS_UNIDADES.filter(u=> labsDestVisivel('laboratorio:'+u.id)).forEach(u=>{ const p = labsUnidadePos(u); por('lab:'+u.id, p.lat, p.lng, labsIcone('lab'), labsInfoLab(u,p), labsPopup('lab',u), 'lab'); });
+  LABS.apoios.filter(a=> labsDestVisivel('apoio:'+a.id)).forEach(a=> por('apoio:'+a.id, a.lat, a.lng, labsIcone('apoio'), labsInfoApoio(a), labsPopup('apoio',a), 'apoio'));
+  LABS.labsExtra.filter(l=> labsDestVisivel('laboratorio:'+l.id)).forEach(l=> por('labx:'+l.id, l.lat, l.lng, labsIcone('labx', l.cor), labsInfoLabx(l), labsPopup('labx',l), 'labx'));
+  visiveis.forEach(p=> por('parc:'+p.parceiro, p.lat, p.lng, labsIcone('parc', labsParcCor(p.parceiro)), labsInfoParc(p), labsPopup('parc',p), 'parc'));
+  if(opt && opt.semFiltro) labsAtualizarFiltro(); else labsDesenharFiltro();
+}
+const labsProximaCor = ()=> LABS_CORES_LAB.find(k=> !LABS.labsExtra.some(l=> l.cor===k)) || LABS_CORES_LAB[LABS.labsExtra.length % LABS_CORES_LAB.length];
+function labsSepararEndereco(txt){   // "Av. Brasil, 100 – Centro" -> rua, número, bairro (a busca precisa do número separado da rua)
+  const partes = String(txt||'').split(/\s+[–-]\s+|,/).map(x=> x.trim()).filter(Boolean);
+  if(!partes.length) return { rua:null, numero:null, bairro:null };
+  let numero = null, i = 1;
+  for(; i<partes.length; i++){ const m = partes[i].match(/^(?:n[º°o.]*\s*)?(\d{1,6}[A-Za-z]?)$/i); if(m){ numero = m[1]; break; } }
+  const resto = partes.slice(1).filter((_,k)=> k+1!==i);
+  return { rua:partes[0], numero, bairro: resto.length ? resto[0].replace(/^bairro:?\s*/i,'') : null };
+}
+function labsItensDd(dd){   // itens do dropdown: parceiros que já têm ponto, ou laboratórios (unidades, adicionados e pontos de apoio)
+  if(dd==='parc') return [...LABS.parceiros].sort((a,b)=> a.parceiro.localeCompare(b.parceiro,'pt-BR')).map(p=> ({ chave:p.parceiro, nome:p.parceiro, sub:p.cidade+'/'+p.uf, cor:labsParcCor(p.parceiro), grupo:'' }));
+  return [ ...LABS_UNIDADES.map(u=> ({ chave:'laboratorio:'+u.id, nome:labsNomeUnidade(u), sub:u.uf, cor:LABS_COR_LAB, grupo:'Unidades do laboratório' })),
+           ...LABS.labsExtra.map(l=> ({ chave:'laboratorio:'+l.id, nome:l.nome, sub:l.uf, cor:l.cor, grupo:'Laboratórios adicionados' })),
+           ...LABS.apoios.map(a=> ({ chave:'apoio:'+a.id, nome:a.nome, sub:a.uf, cor:LABS_COR_APOIO, grupo:'Pontos de apoio' })) ];
+}
+const labsDdSel = (dd, ch)=> dd==='parc' ? !LABS.parcOcultos.has(ch) : !LABS.destOcultos.has(ch);
+function labsDdAplicar(dd, ch, sel){ const S = dd==='parc' ? LABS.parcOcultos : LABS.destOcultos; if(sel) S.delete(ch); else S.add(ch); }
+function labsDdRotulo(dd){
+  const itens = labsItensDd(dd), nome = dd==='parc' ? 'Parceiros' : 'Laboratórios';
+  if(!itens.length) return nome+': nenhum ainda';
+  const n = itens.filter(i=> labsDdSel(dd, i.chave)).length;
+  return nome+': '+(n===itens.length ? 'todos' : n===0 ? 'nenhum' : n+' de '+itens.length);
+}
+function labsDdPainelHtml(dd){
+  const itens = labsItensDd(dd), grupos = [...new Set(itens.map(i=> i.grupo))];
+  const item = i=> `<label class="labs-dd-item" data-nome="${cgEscH(labsNorm(i.nome+' '+i.sub))}"><input type="checkbox" class="labs-dd-cb" data-dd="${dd}" data-chave="${cgEscH(i.chave)}"${labsDdSel(dd, i.chave) ? ' checked' : ''}><i style="background:${cgEscH(i.cor)}"></i><span>${cgEscH(i.nome)}</span><small>${cgEscH(i.sub)}</small></label>`;
+  const lista = grupos.map(g=> (g ? `<div class="labs-dd-grupo">${cgEscH(g)}</div>` : '')+itens.filter(i=> i.grupo===g).map(item).join('')).join('') || '<p class="labs-peq">Nada para escolher ainda.</p>';
+  return `<div class="labs-dd-painel"><input type="search" class="labs-dd-busca" data-dd="${dd}" placeholder="Buscar…" value="${cgEscH(LABS.ddBusca)}"><div class="labs-dd-acoes"><button type="button" data-labs-acao="dd-todos" data-dd="${dd}">Selecionar todos</button><button type="button" data-labs-acao="dd-nenhum" data-dd="${dd}">Limpar seleção</button></div><div class="labs-dd-lista">${lista}</div></div>`;
+}
+function labsDdFiltrarBusca(){   // a busca só esconde itens na lista (não mexe nas marcas)
+  const lista = document.querySelector('#labsFiltro .labs-dd-lista'); if(!lista) return;
+  const termo = labsNorm(LABS.ddBusca); let grupo = null, algum = false;
+  [...lista.children].forEach(el=>{
+    if(el.classList.contains('labs-dd-grupo')){ if(grupo) grupo.hidden = !algum; grupo = el; algum = false; return; }
+    if(!el.classList.contains('labs-dd-item')) return;
+    const ok = !termo || (el.dataset.nome || '').includes(termo); el.hidden = !ok; if(ok) algum = true;
+  });
+  if(grupo) grupo.hidden = !algum;
+}
+function labsDesenharFiltro(){   // barra em cima do mapa: dois dropdowns de seleção múltipla (Parceiros e Laboratórios), Limpar filtros e Enquadrar
+  const el = document.getElementById('labsFiltro'); if(!el) return;
+  const rolagem = (el.querySelector('.labs-dd-lista') || {}).scrollTop || 0;
+  const dd = k=> `<div class="labs-dd${LABS.ddAberto===k ? ' aberto' : ''}" data-dd="${k}"><button type="button" class="labs-dd-btn" data-labs-acao="dd-abrir" data-dd="${k}" aria-expanded="${LABS.ddAberto===k}"></button>${LABS.ddAberto===k ? labsDdPainelHtml(k) : ''}</div>`;
+  el.innerHTML = `<span class="labs-filtro-t">Filtros</span>${dd('parc')}${dd('lab')}<button type="button" class="labs-chip labs-chip-acao" id="labsFiltroLimpar" data-labs-acao="filtro-limpar">✕ Limpar filtros</button><button type="button" class="labs-chip labs-chip-acao" data-labs-acao="enquadrar" title="Ajusta o mapa para mostrar os pinos visíveis">🎯 Enquadrar</button><span class="labs-filtro-res" id="labsFiltroRes"></span>`;
+  labsAtualizarFiltro(); labsDdFiltrarBusca();
+  const l = el.querySelector('.labs-dd-lista'); if(l) l.scrollTop = rolagem;
+}
+function labsAtualizarFiltro(){   // atualiza os rótulos, as marcas e a contagem sem refazer o dropdown aberto (para não perder o que está sendo digitado)
+  const el = document.getElementById('labsFiltro'); if(!el) return;
+  ['parc','lab'].forEach(k=>{ const b = el.querySelector('.labs-dd-btn[data-dd="'+k+'"]'); if(b) b.textContent = labsDdRotulo(k)+' ▾'; });
+  el.querySelectorAll('.labs-dd-cb').forEach(cb=>{ cb.checked = labsDdSel(cb.dataset.dd, cb.dataset.chave); });
+  const lim = document.getElementById('labsFiltroLimpar'); if(lim) lim.hidden = !(LABS.parcOcultos.size || LABS.destOcultos.size);
+  const res = document.getElementById('labsFiltroRes');
+  if(res){ const m = Object.keys(LABS.marcadores), np = m.filter(k=> k.startsWith('parc:')).length, nl = m.length-np; res.textContent = 'No mapa: '+np+' parceiro'+(np===1 ? '' : 's')+' · '+nl+' laboratório'+(nl===1 ? '' : 's')+'/apoio'+(nl===1 ? '' : 's'); }
+}
+function labsFiltroMudou(){ labsDesenharMapa({ semFiltro:true }); labsDesenharPainel(); }
+function labsFecharDd(){ if(!LABS.ddAberto) return; LABS.ddAberto = null; LABS.ddBusca = ''; labsDesenharFiltro(); }
+function labsEnquadrar(){
+  const pts = Object.values(LABS.marcadores).map(m=> m.getLatLng()); if(!pts.length) return;
+  LABS.mapa.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom:6 });
+}
+function labsFocar(chave, zoom){
+  let redesenhar = false;   // pino escondido por um filtro: o filtro cede e ele volta a aparecer
+  if(chave.startsWith('parc:')){
+    const n = chave.slice(5), p = LABS.parceiros.find(x=> x.parceiro===n);
+    if(LABS.parcOcultos.has(n)){ LABS.parcOcultos.delete(n); redesenhar = true; }
+    if(p && !labsParcVisivel(p)){ LABS.destOcultos.clear(); redesenhar = true; }
+  } else {
+    const dc = chave.startsWith('apoio:') ? 'apoio:'+chave.slice(6) : chave.startsWith('labx:') ? 'laboratorio:'+chave.slice(5) : chave.startsWith('lab:') ? 'laboratorio:'+chave.slice(4) : null;
+    if(dc && LABS.destOcultos.has(dc)){ LABS.destOcultos.delete(dc); redesenhar = true; }
+  }
+  if(redesenhar){ labsDesenharMapa(); labsDesenharPainel(); }
+  const m = LABS.marcadores[chave]; if(!m) return;
+  LABS.mapa.setView(m.getLatLng(), Math.max(LABS.mapa.getZoom(), zoom||11)); m.openPopup();
+}
+// ---------- ações dos pinos
+function labsAviso(t, erro){ LABS.msg = t; LABS.msgErro = !!erro; labsDesenharPainel(); }
+function labsAjustar(chave){
+  const m = LABS.marcadores[chave]; if(!m) return;
+  m.closePopup(); m.dragging.enable(); labsAviso('Arraste o pino até a posição certa e solte: a posição é salva ao soltar.');
+  m.once('dragend', async ()=>{
+    m.dragging.disable(); const ll = m.getLatLng(), [tipo, id] = [chave.slice(0,chave.indexOf(':')), chave.slice(chave.indexOf(':')+1)], nova = { lat:ll.lat, lng:ll.lng, precisao:'manual', fonte:'manual' };
+    try{
+      if(tipo==='lab'){ await labsSalvarPosUnidade({ id, ...nova }); LABS.pos[id] = { id, ...nova }; }
+      else if(tipo==='apoio'){ const { error } = await sb.from('labs_apoios').update(nova).eq('id', id); if(error) throw error; Object.assign(LABS.apoios.find(a=> a.id===id), nova); }
+      else if(tipo==='labx'){ const { error } = await sb.from('labs_laboratorios').update(nova).eq('id', id); if(error) throw error; Object.assign(LABS.labsExtra.find(a=> a.id===id), nova); }
+      else { const { error } = await sb.from('labs_parceiros').update({ ...nova, atualizado_em:new Date().toISOString(), atualizado_por:await labsUser() }).eq('parceiro', id); if(error) throw error; Object.assign(LABS.parceiros.find(p=> p.parceiro===id), nova); }
+      labsDesenharMapa(); labsAviso('✓ Posição salva.');
+    }catch(e){ console.error(e); labsAviso(labsErroBanco(e), true); labsDesenharMapa(); }
+  });
+}
+async function labsRemover(tipo, id){
+  try{
+    if(tipo==='parceiro'){ if(!confirm('Remover "'+id+'" do mapa?')) return; const { error } = await sb.from('labs_parceiros').delete().eq('parceiro', id); if(error) throw error; LABS.parceiros = LABS.parceiros.filter(p=> p.parceiro!==id); LABS.parcOcultos.delete(id);
+      if(!LABS.semTabelaAtrib){ const r2 = await sb.from('labs_atribuicoes').delete().eq('parceiro', id); if(r2.error) throw r2.error; } LABS.atrib = LABS.atrib.filter(a=> a.parceiro!==id); }
+    else if(tipo==='lab'){
+      const l = LABS.labsExtra.find(x=> x.id===id), ligados = [...labsLigados(id)];
+      if(!confirm('Remover o laboratório "'+(l?l.nome:'')+'"?'+(ligados.length ? '\n'+ligados.length+' parceiro(s) estão atribuídos a ele e ficarão sem atribuição.' : ''))) return;
+      if(ligados.length) await labsDesligarDestino(id);
+      const { error } = await sb.from('labs_laboratorios').delete().eq('id', id); if(error) throw error; LABS.labsExtra = LABS.labsExtra.filter(x=> x.id!==id); LABS.destOcultos.delete('laboratorio:'+id);
+    }
+    else {
+      const a = LABS.apoios.find(x=> x.id===id), ligados = [...labsLigados(id)];
+      if(!confirm('Remover o ponto de apoio "'+(a?a.nome:'')+'"?'+(ligados.length ? '\n'+ligados.length+' parceiro(s) estão atribuídos a ele e ficarão sem atribuição.' : ''))) return;
+      if(ligados.length) await labsDesligarDestino(id);
+      const { error } = await sb.from('labs_apoios').delete().eq('id', id); if(error) throw error; LABS.apoios = LABS.apoios.filter(x=> x.id!==id); LABS.destOcultos.delete('apoio:'+id);
+    }
+    labsDesenharMapa(); labsAviso('✓ Removido.');
+  }catch(e){ console.error(e); labsAviso(labsErroBanco(e), true); }
+}
+async function labsConferirUnidades(somente){   // busca o endereço exato de cada unidade que ainda não tem posição gravada (ou só a pedida)
+  if(LABS.conferindo || (LABS.semBanco && !somente)) return;
+  if(somente) LABS.cacheGeo = {};   // "Refazer busca": pergunta de novo ao mapa, sem reaproveitar a resposta guardada
+  const alvo = LABS_UNIDADES.filter(u=> somente ? u.id===somente : !LABS.pos[u.id]); if(!alvo.length) return;
+  LABS.conferindo = true; let i = 0, parou = false;
+  try{
+    for(const u of alvo){
+      i++; LABS.progresso = 'Conferindo o endereço das unidades ('+i+'/'+alvo.length+')…'; labsDesenharPainel();
+      let r = null;
+      try{ r = await labsGeocodificar(u, { ref:{ lat:u.lat, lng:u.lng }, maxKm:60 }); }
+      catch(e){ console.error(e); parou = true; break; }
+      const nova = r ? { id:u.id, lat:r.lat, lng:r.lng, precisao:r.precisao, fonte:'nominatim' } : { id:u.id, lat:u.lat, lng:u.lng, precisao:'cidade', fonte:'txt' };
+      try{ await labsSalvarPosUnidade(nova); }catch(e){ console.error(e); }
+      LABS.pos[u.id] = nova; labsDesenharMapa();
+    }
+  } finally {
+    LABS.conferindo = false;
+    LABS.progresso = parou ? 'Sem acesso à busca de endereço agora: as unidades que faltam ficam no centro da cidade e são conferidas na próxima vez.' : '';
+    labsDesenharPainel();
+  }
+}
+// ---------- cadastro (parceiro e ponto de apoio), no painel lateral
+const labsUfOptions = sel=> '<option value="">UF</option>'+Object.keys(LABS_UF_NOME).map(u=> `<option value="${u}"${u===sel?' selected':''}>${u}</option>`).join('');
+function labsLerCoord(lat, lng){   // devolve { lat, lng } válidos, null (nenhum digitado) ou { erro }
+  const la = labsNum(lat), lo = labsNum(lng);
+  if(la===null && lo===null) return null;
+  if(la===null || lo===null || Number.isNaN(la) || Number.isNaN(lo)) return { erro:'Latitude e longitude: preencha as duas com números (ex.: -11,8642 e -55,5025), ou deixe as duas vazias.' };
+  if(!labsDentroBrasil(la,lo)) return { erro:'Essa latitude e longitude ficam fora do Brasil. Confira o sinal (no Brasil as duas costumam ser negativas).' };
+  return { lat:la, lng:lo };
+}
+async function labsSalvarForm(tipo){
+  const g = id=> { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+  const btn = document.getElementById('labsFormSalvar'), erro = t=>{ const e = document.getElementById('labsFormErro'); if(e) e.textContent = t || ''; }, stat = t=>{ const e = document.getElementById('labsFormStatus'); if(e) e.textContent = t || ''; };
+  erro(''); stat('');
+  const base = { cidade:g('lbCidade'), uf:g('lbUf'), cep:labsFmtCep(g('lbCep')) };
+  if(!base.cidade || !base.uf){ erro('Preencha a cidade e o estado.'); return; }
+  if(base.cep && base.cep.length!==9){ erro('CEP incompleto: use os 8 números (ex.: 78550-542) ou deixe em branco.'); return; }
+  base.cep = base.cep || null;   // o CEP é opcional: sem ele a busca usa a cidade (ou o endereço, no ponto de apoio)
+  let extra = {};
+  if(tipo==='parceiro'){
+    const corr = document.querySelector('input[name="lbCorreio"]:checked'); if(!corr){ erro('Responda: o parceiro tem correio na cidade? (Sim ou Não)'); return; }
+    extra = { tem_correio: corr.value==='sim' };
+  } else if(tipo==='laboratorio'){
+    const nome = g('lbNome'); if(!nome){ erro('Dê um nome ao laboratório.'); return; }
+    const corEl = document.getElementById('lbCor');
+    extra = { nome, endereco:g('lbEndereco')||null, cor:(corEl && corEl.value) || LABS_CORES_LAB[0] };
+  } else {
+    const nome = g('lbNome'); if(!nome){ erro('Dê um nome ao ponto de apoio.'); return; }
+    extra = { nome, rua:g('lbRua')||null, numero:g('lbNumero')||null, bairro:g('lbBairro')||null };
+  }
+  const c = labsLerCoord(g('lbLat'), g('lbLng')); if(c && c.erro){ erro(c.erro); return; }
+  const prev = tipo==='parceiro' ? LABS.parceiros.find(p=> p.parceiro===LABS.editando) : tipo==='laboratorio' ? LABS.labsExtra.find(a=> a.id===LABS.editando) : LABS.apoios.find(a=> a.id===LABS.editando);
+  if(c && prev && Math.abs(c.lat-prev.lat)<1e-7 && Math.abs(c.lng-prev.lng)<1e-7 && (base.cidade!==prev.cidade || base.uf!==prev.uf || (base.cep||null)!==(prev.cep||null) || (tipo==='laboratorio' && (extra.endereco||null)!==(prev.endereco||null)))){
+    if(!confirm('Você mudou o endereço, mas a latitude e a longitude continuam as de antes, e elas têm prioridade sobre o endereço.\n\nOK = manter essas coordenadas.\nCancelar = apagar os dois campos para o app buscar pelo novo endereço.')){
+      document.getElementById('lbLat').value = ''; document.getElementById('lbLng').value = ''; erro('Latitude e longitude apagadas. Clique em Salvar para buscar pelo novo endereço.'); return;
+    }
+  }
+  btn.disabled = true;
+  try{
+    let pos = null;
+    if(c){ pos = { lat:c.lat, lng:c.lng, precisao:'informada', fonte:'informada' }; }   // latitude e longitude informadas sempre mandam
+    else {
+      stat('🔎 Buscando a posição pelo endereço…');
+      const sep = tipo==='laboratorio' ? labsSepararEndereco(extra.endereco) : extra, r = await labsGeocodificar({ rua:sep.rua, numero:sep.numero, bairro:sep.bairro, cidade:base.cidade, uf:base.uf, cep:base.cep });
+      if(!r){ erro('Não achei esse endereço no mapa. Confira a cidade, o estado e o CEP, ou informe a latitude e a longitude.'); btn.disabled = false; stat(''); return; }
+      pos = { lat:r.lat, lng:r.lng, precisao:r.precisao, fonte:'nominatim' };
+    }
+    stat('💾 Salvando…');
+    const quem = await labsUser(), agora = new Date().toISOString();
+    if(tipo==='parceiro'){
+      const nome = LABS.editando, ant = LABS.parceiros.find(p=> p.parceiro===nome);
+      const linha = { parceiro:nome, ...base, ...extra, ...pos, atribuido_tipo: ant ? ant.atribuido_tipo : null, atribuido_id: ant ? ant.atribuido_id : null, atualizado_em:agora, atualizado_por:quem };
+      const { error } = await sb.from('labs_parceiros').upsert(linha, { onConflict:'parceiro' }); if(error) throw error;
+      LABS.parceiros = LABS.parceiros.filter(p=> p.parceiro!==nome).concat([linha]); LABS.parcOcultos.delete(nome);
+      LABS.modo = 'inicio'; LABS.editando = null; labsDesenharMapa(); labsDesenharPainel(); labsFocar('parc:'+nome, 9);
+      labsAviso('✓ '+nome+' salvo no mapa ('+labsRotPrec(pos.precisao)+').');
+    } else if(tipo==='laboratorio'){
+      const id = LABS.editando && LABS.editando!=='novo' ? LABS.editando : null, linha = { ...base, ...extra, ...pos };
+      let salvo;
+      if(id){ const { data, error } = await sb.from('labs_laboratorios').update(linha).eq('id', id).select().single(); if(error) throw error; salvo = data || { id, ...linha }; LABS.labsExtra = LABS.labsExtra.map(a=> a.id===id ? salvo : a); }
+      else { const { data, error } = await sb.from('labs_laboratorios').insert({ ...linha, criado_por:quem }).select().single(); if(error) throw error; salvo = data; LABS.labsExtra = LABS.labsExtra.concat([salvo]); }
+      LABS.modo = 'inicio'; LABS.editando = null; labsDesenharMapa(); labsDesenharPainel(); labsFocar('labx:'+salvo.id, 9);
+      labsAviso('✓ Laboratório "'+extra.nome+'" salvo ('+labsRotPrec(pos.precisao)+').');
+    } else {
+      const id = LABS.editando && LABS.editando!=='novo' ? LABS.editando : null, linha = { ...base, ...extra, ...pos };
+      let salvo;
+      if(id){ const { data, error } = await sb.from('labs_apoios').update(linha).eq('id', id).select().single(); if(error) throw error; salvo = data || { id, ...linha }; LABS.apoios = LABS.apoios.map(a=> a.id===id ? salvo : a); }
+      else { const { data, error } = await sb.from('labs_apoios').insert({ ...linha, criado_por:quem }).select().single(); if(error) throw error; salvo = data; LABS.apoios = LABS.apoios.concat([salvo]); }
+      LABS.modo = 'inicio'; LABS.editando = null; labsDesenharMapa(); labsDesenharPainel(); labsFocar('apoio:'+salvo.id, 9);
+      labsAviso('✓ Ponto de apoio "'+extra.nome+'" salvo ('+labsRotPrec(pos.precisao)+').');
+    }
+  }catch(e){ console.error(e); erro(labsErroBanco(e)); btn.disabled = false; stat(''); }
+}
+function labsFormHtml(tipo){
+  const p = tipo==='parceiro' ? LABS.parceiros.find(x=> x.parceiro===LABS.editando) : tipo==='laboratorio' ? LABS.labsExtra.find(x=> x.id===LABS.editando) : LABS.apoios.find(x=> x.id===LABS.editando);
+  const v = k=> cgEscH(p && p[k]!=null ? p[k] : ''), campo = (rot, id, val, extra)=> `<label class="labs-rot" for="${id}">${rot}</label><input id="${id}" class="labs-in" value="${val}" ${extra||''}>`;
+  const cabecalho = tipo==='parceiro' ? `<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(LABS.editando)}"></span>${cgEscH(LABS.editando)}</h3>` : tipo==='laboratorio' ? `<h3 class="labs-h">${p ? 'Editar laboratório' : 'Novo laboratório'}</h3>` : `<h3 class="labs-h">${p ? 'Editar ponto de apoio' : 'Novo ponto de apoio'}</h3>`;
+  const corLab = tipo==='laboratorio' ? ((p && p.cor) || labsProximaCor()) : null;
+  const corpo = tipo==='parceiro' ? '' : tipo==='laboratorio' ? campo('Nome do laboratório *','lbNome',v('nome'))+campo('Endereço (rua, número, bairro)','lbEndereco',v('endereco'))+`<div class="labs-rot">Cor do pino</div><div class="labs-cores">${LABS_CORES_LAB.map(k=> `<button type="button" class="labs-cor${k===corLab ? ' sel' : ''}" data-labs-acao="cor" data-cor="${k}" style="background:${k}" title="${k}"></button>`).join('')}</div><input type="hidden" id="lbCor" value="${corLab}">` : campo('Nome do ponto de apoio *','lbNome',v('nome'))+campo('Rua','lbRua',v('rua'))+`<div class="labs-2">${campo('Número','lbNumero',v('numero'))}${campo('Bairro','lbBairro',v('bairro'))}</div>`;
+  const correio = tipo==='parceiro' ? `<div class="labs-rot">O parceiro tem correio na cidade? *</div><div class="labs-radios"><label><input type="radio" name="lbCorreio" value="sim"${p && p.tem_correio===true?' checked':''}> Sim</label><label><input type="radio" name="lbCorreio" value="nao"${p && p.tem_correio===false?' checked':''}> Não</label></div>` : '';
+  return `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button>${cabecalho}${corpo}
+    <div class="labs-2">${campo('Cidade *','lbCidade',v('cidade'))}<div><label class="labs-rot" for="lbUf">Estado *</label><select id="lbUf" class="labs-in">${labsUfOptions(p ? p.uf : '')}</select></div></div>
+    ${campo('CEP (opcional)','lbCep',v('cep'),'inputmode="numeric" maxlength="9" placeholder="00000-000"')}
+    <div class="labs-peq">Sem CEP, e sem latitude e longitude, o pino do ${tipo==='parceiro' ? 'parceiro' : tipo==='laboratorio' ? 'laboratório sem endereço' : 'ponto de apoio sem rua e número'} fica no centro da cidade.</div>
+    <div class="labs-rot labs-dica">Latitude e longitude (opcional — deixe vazio que o app busca pelo endereço)</div>
+    <div class="labs-2">${campo('Latitude','lbLat',p && (p.precisao==='manual' || p.precisao==='informada') ? v('lat') : '','placeholder="-11,8642"')}${campo('Longitude','lbLng',p && (p.precisao==='manual' || p.precisao==='informada') ? v('lng') : '','placeholder="-55,5025"')}</div>
+    ${correio}
+    <div id="labsFormErro" class="labs-erro"></div><div id="labsFormStatus" class="labs-status"></div>
+    <div class="labs-acoes-form"><button type="button" class="btn btn-preto" id="labsFormSalvar" data-labs-acao="salvar-${tipo}">💾 Salvar</button><button type="button" class="btn ghost" data-labs-acao="voltar">Cancelar</button></div>`;
+}
+function labsObjChave(chave){
+  const i = chave.indexOf(':'), tipo = chave.slice(0,i), id = chave.slice(i+1);
+  if(tipo==='lab'){ const u = LABS_UNIDADES.find(x=> x.id===id); return u ? { tipo, id, nome:labsNomeUnidade(u), obj:u, pos:labsUnidadePos(u) } : null; }
+  if(tipo==='labx'){ const l = LABS.labsExtra.find(x=> x.id===id); return l ? { tipo, id, nome:l.nome, obj:l, pos:l } : null; }
+  if(tipo==='apoio'){ const a = LABS.apoios.find(x=> x.id===id); return a ? { tipo, id, nome:a.nome, obj:a, pos:a } : null; }
+  const p = LABS.parceiros.find(x=> x.parceiro===id); return p ? { tipo:'parc', id, nome:p.parceiro, obj:p, pos:p } : null;
+}
+function labsCoordHtml(){
+  const o = labsObjChave(LABS.editando || ''); if(!o) return '<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button>';
+  const t = o.tipo==='parc' ? 'parceiro' : o.tipo, campo = (rot, id, ph)=> `<label class="labs-rot" for="${id}">${rot}</label><input id="${id}" class="labs-in" placeholder="${ph}">`;
+  return `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Coordenadas · ${cgEscH(o.nome)}</h3>
+    <p class="labs-peq">Posição atual: ${Number(o.pos.lat).toFixed(6)}, ${Number(o.pos.lng).toFixed(6)} (${labsRotPrec(o.pos.precisao)}).<br>Quando há latitude e longitude informadas, é sempre ela que o mapa usa; o endereço só entra quando não há.</p>
+    <p><a href="${cgEscH(labsLinkEndereco(t, o.obj))}" target="_blank" rel="noopener">🗺️ Ver o endereço no Google Maps</a></p>
+    ${campo('Cole as coordenadas (ou o link do ponto no Google Maps)','lbCoordTxt','-11.864200, -55.502500')}
+    <div class="labs-rot labs-dica">ou digite separado:</div><div class="labs-2">${campo('Latitude','lbLat','-11,8642')}${campo('Longitude','lbLng','-55,5025')}</div>
+    <div id="labsFormErro" class="labs-erro"></div><div id="labsFormStatus" class="labs-status"></div>
+    <div class="labs-acoes-form"><button type="button" class="btn btn-preto" id="labsFormSalvar" data-labs-acao="salvar-coord">💾 Salvar coordenadas</button><button type="button" class="btn ghost" data-labs-acao="voltar">Cancelar</button></div>
+    ${o.tipo==='lab' ? `<button type="button" class="btn ghost" style="margin-top:10px;" data-labs-acao="refazer" data-id="${cgEscH(o.id)}">↻ Voltar à busca pelo endereço</button>` : ''}`;
+}
+async function labsSalvarCoord(){
+  const o = labsObjChave(LABS.editando || ''); if(!o) return;
+  const g = id=> { const e = document.getElementById(id); return e ? e.value.trim() : ''; }, erro = t=>{ const e = document.getElementById('labsFormErro'); if(e) e.textContent = t || ''; };
+  erro(''); const txt = g('lbCoordTxt'), c = txt ? labsParseCoord(txt) : labsLerCoord(g('lbLat'), g('lbLng'));
+  if(!c){ erro('Informe a latitude e a longitude: cole o que o Google Maps copia, ou digite as duas.'); return; }
+  if(c.erro){ erro(c.erro); return; }
+  const nova = { lat:c.lat, lng:c.lng, precisao:'informada', fonte:'informada' };
+  try{
+    if(o.tipo==='lab'){ await labsSalvarPosUnidade({ id:o.id, ...nova }); LABS.pos[o.id] = { id:o.id, ...nova }; }
+    else if(o.tipo==='apoio'){ const { error } = await sb.from('labs_apoios').update(nova).eq('id', o.id); if(error) throw error; Object.assign(LABS.apoios.find(a=> a.id===o.id), nova); }
+    else if(o.tipo==='labx'){ const { error } = await sb.from('labs_laboratorios').update(nova).eq('id', o.id); if(error) throw error; Object.assign(LABS.labsExtra.find(a=> a.id===o.id), nova); }
+    else { const { error } = await sb.from('labs_parceiros').update({ ...nova, atualizado_em:new Date().toISOString(), atualizado_por:await labsUser() }).eq('parceiro', o.id); if(error) throw error; Object.assign(LABS.parceiros.find(p=> p.parceiro===o.id), nova); }
+    const chave = LABS.editando; LABS.modo = 'inicio'; LABS.editando = null; labsDesenharMapa(); labsDesenharPainel(); labsFocar(chave, 13);
+    labsAviso('✓ '+o.nome+': o mapa passa a usar as coordenadas informadas.');
+  }catch(e){ console.error(e); erro(labsErroBanco(e)); }
+}
+function labsAbrirAtrib(nome){   // abre a tela: os projetos do parceiro e o laboratório de cada um (rascunho até clicar em Salvar)
+  const p = LABS.parceiros.find(x=> x.parceiro===nome); if(!p) return;
+  LABS.msg = ''; LABS.modo = 'atrib'; if(LABS.mapa) LABS.mapa.closePopup();
+  if(!labsDadosProntos()){
+    LABS.rascunho = { parceiro:nome, pronto:false, atrib:{}, blocos:[], sujo:false, erro:'' };
+    if(typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome); }); }
+    labsDesenharPainel(); return;
+  }
+  const projs = labsProjetosDoParceiro(nome).map(x=> x.key), grupos = labsGrupos(p), atrib = {};
+  projs.forEach(k=> { atrib[k] = null; });
+  grupos.forEach(g=> (g.projetos || projs).forEach(k=> { if(k in atrib) atrib[k] = g.chave; }));
+  LABS.rascunho = { parceiro:nome, pronto:true, atrib, blocos:grupos.map(g=> g.chave), sujo:false, erro:'', tinha:grupos.length>0, novos: grupos.length ? projs.filter(k=> !atrib[k]) : [] };
+  labsDesenharPainel();
+}
+function labsTodosDestinos(){
+  return [ ...LABS_UNIDADES.map(u=> ({ chave:'laboratorio:'+u.id, nome:labsNomeUnidade(u)+' ('+u.uf+')', grupo:'Unidades do laboratório' })),
+           ...LABS.labsExtra.map(l=> ({ chave:'laboratorio:'+l.id, nome:l.nome+' ('+l.uf+')', grupo:'Laboratórios adicionados' })),
+           ...LABS.apoios.map(a=> ({ chave:'apoio:'+a.id, nome:a.nome+' ('+a.uf+')', grupo:'Pontos de apoio' })) ];
+}
+function labsAtribHtml(){
+  const r = LABS.rascunho, voltar = '<button type="button" class="labs-voltar" data-labs-acao="atrib-cancelar">← Voltar</button>';
+  if(!r) return voltar;
+  const cab = `${voltar}<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(r.parceiro)}"></span>${cgEscH(r.parceiro)}</h3><p class="labs-peq">Arraste a ficha de cada projeto para o laboratório que vai atendê-lo. Cada projeto vai para um laboratório só. Nada vale até clicar em Salvar.</p>`;
+  if(!r.pronto) return cab+'<p class="labs-status">⏳ Carregando os talhões e projetos deste parceiro…</p><button type="button" class="btn ghost" data-labs-acao="atrib-recarregar">Tentar de novo</button>';
+  const projs = labsProjetosDoParceiro(r.parceiro);
+  if(!projs.length) return cab+'<p class="labs-aviso">Este parceiro ainda não tem talhões em nenhum dos 5 projetos (Estruturação, Óxido de Magnésio, Vida no Solo, Ladrões, Máximas).</p>';
+  const ficha = k=>{ const pj = labsProjInfo(k), n = projs.find(x=> x.key===k).n; return `<div class="labs-ficha" draggable="true" data-projeto="${k}" style="border-left:4px solid ${pj.cor}"><b>${cgEscH(pj.label)}</b> <span class="labs-peq">${n} talhão(ões)</span>${r.novos.includes(k) ? ' <span class="labs-novo">novo</span>' : ''}</div>`; };
+  const em = ch=> projs.map(x=> x.key).filter(k=> (r.atrib[k] || null)===ch);
+  const blocos = r.blocos.map(ch=>{ const d = labsDestPorChave(ch), fs = em(ch); return `<div class="labs-bloco" data-destino="${cgEscH(ch)}"><div class="labs-bloco-t"><span class="labs-ponto" style="background:${d ? d.cor : '#999'}"></span><b>${cgEscH(d ? d.nome : ch)}</b><button type="button" class="labs-x" data-labs-acao="atrib-remover-bloco" data-destino="${cgEscH(ch)}" title="Tirar este laboratório (os projetos voltam para Sem laboratório)">✕</button></div><div class="labs-bloco-c">${fs.map(ficha).join('') || '<span class="labs-peq">Arraste um projeto para cá</span>'}</div></div>`; }).join('');
+  const sem = em(null), avisoSem = sem.length && (r.tinha || r.blocos.length) ? `<div class="labs-aviso">⚠ ${r.novos.length && sem.every(k=> r.novos.includes(k)) ? 'Projeto novo deste parceiro ainda sem laboratório' : 'Sem laboratório'}: ${sem.map(k=> cgEscH(labsProjInfo(k).label)).join(', ')}. Arraste para um laboratório.</div>` : '';
+  const livres = labsTodosDestinos().filter(d=> !r.blocos.includes(d.chave)), grupos = [...new Set(livres.map(d=> d.grupo))];
+  const select = `<select id="lbAddDest" class="labs-in"><option value="">➕ Adicionar laboratório de destino…</option>${grupos.map(gn=> `<optgroup label="${cgEscH(gn)}">${livres.filter(d=> d.grupo===gn).map(d=> `<option value="${cgEscH(d.chave)}">${cgEscH(d.nome)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  return `${cab}${select}${blocos}<div class="labs-bloco labs-bloco-sem" data-destino=""><div class="labs-bloco-t"><b>Sem laboratório</b></div><div class="labs-bloco-c">${sem.map(ficha).join('') || '<span class="labs-peq">Nenhum projeto aqui</span>'}</div>${avisoSem}</div><div id="labsFormErro" class="labs-erro">${cgEscH(r.erro || '')}</div><div class="labs-acoes-form"><button type="button" class="btn btn-preto" id="labsFormSalvar" data-labs-acao="atrib-salvar">💾 Salvar</button><button type="button" class="btn ghost" data-labs-acao="atrib-cancelar">Cancelar</button></div>`;
+}
+function labsAtribAdicionarDestino(valor){
+  const r = LABS.rascunho; if(!r || !r.pronto || !valor || r.blocos.includes(valor)) return;
+  r.blocos.push(valor);
+  if(r.blocos.length===1) labsProjetosDoParceiro(r.parceiro).forEach(x=> { if(!r.atrib[x.key]) r.atrib[x.key] = valor; });   // o primeiro laboratório recebe todos os projetos que ainda estavam sem
+  r.sujo = true; labsDesenharPainel();
+}
+function labsAtribRemoverBloco(ch){
+  const r = LABS.rascunho; if(!r) return;
+  r.blocos = r.blocos.filter(x=> x!==ch); Object.keys(r.atrib).forEach(k=> { if(r.atrib[k]===ch) r.atrib[k] = null; });
+  r.sujo = true; labsDesenharPainel();
+}
+function labsAtribMover(k, ch){   // arrastar a ficha do projeto para outro laboratório (ou para "Sem laboratório")
+  const r = LABS.rascunho; if(!r || !r.pronto || !(k in r.atrib)) return;
+  if(ch && !r.blocos.includes(ch)) return;
+  if((r.atrib[k] || null)===(ch || null)) return;
+  r.atrib[k] = ch || null; r.sujo = true; labsDesenharPainel();
+}
+async function labsSalvarAtrib(){
+  const r = LABS.rascunho; if(!r || !r.pronto) return;
+  const nome = r.parceiro, projs = labsProjetosDoParceiro(nome).map(x=> x.key), btn = document.getElementById('labsFormSalvar');
+  if(btn) btn.disabled = true;
+  try{
+    const quem = await labsUser(), agora = new Date().toISOString();
+    const linhas = projs.filter(k=> r.atrib[k]).map(k=>{ const ch = r.atrib[k], i = ch.indexOf(':'); return { parceiro:nome, projeto:k, destino_tipo:ch.slice(0,i), destino_id:ch.slice(i+1), atualizado_em:agora, atualizado_por:quem }; });
+    if(linhas.length){ const { error } = await sb.from('labs_atribuicoes').upsert(linhas, { onConflict:'parceiro,projeto' }); if(error) throw error; }
+    for(const a of LABS.atrib.filter(x=> x.parceiro===nome && !linhas.some(l=> l.projeto===x.projeto))){ const { error } = await sb.from('labs_atribuicoes').delete().eq('parceiro', nome).eq('projeto', a.projeto); if(error) throw error; }
+    const pr = LABS.parceiros.find(p=> p.parceiro===nome);
+    if(pr && (pr.atribuido_tipo || pr.atribuido_id)){ const { error } = await sb.from('labs_parceiros').update({ atribuido_tipo:null, atribuido_id:null }).eq('parceiro', nome); if(error) throw error; pr.atribuido_tipo = null; pr.atribuido_id = null; }   // a atribuição antiga (um laboratório só) é trocada pelas linhas por projeto
+    LABS.atrib = LABS.atrib.filter(a=> a.parceiro!==nome).concat(linhas);
+    const resumo = labsGrupos(pr).map(g=> g.dest.nome+' ('+(g.projetos||[]).map(k=> labsProjInfo(k).label).join(', ')+')').join('; ');
+    LABS.modo = 'inicio'; LABS.rascunho = null; labsDesenharMapa(); labsDesenharPainel();
+    labsAviso('✓ Atribuições de '+nome+' salvas'+(resumo ? ': '+resumo : ' (nenhum projeto com laboratório)')+'.');
+  }catch(e){ console.error(e); r.erro = labsErroBanco(e); if(btn) btn.disabled = false; labsDesenharPainel(); }
+}
+function labsDesenharPainel(){
+  const el = document.getElementById('labsPainel'); if(!el) return;
+  if(LABS.modo==='atrib'){ el.innerHTML = labsAtribHtml(); return; }
+  const info = (LABS.msg ? `<div class="${LABS.msgErro ? 'labs-erro' : 'labs-ok'}">${cgEscH(LABS.msg)}</div>` : '')+(LABS.progresso ? `<div class="labs-status">⏳ ${cgEscH(LABS.progresso)}</div>` : '');
+  if(LABS.modo==='parceiro-lista'){
+    const nomes = (typeof VG_PARCEIROS!=='undefined' ? VG_PARCEIROS : []).map(p=> p.v).filter(n=> n!=='Em aberto');
+    el.innerHTML = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Escolha o parceiro. Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`
+      + nomes.map(n=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${ja ? '📍 '+cgEscH(ja.cidade)+'/'+cgEscH(ja.uf) : 'sem ponto'}</span></button>`; }).join('');
+    return;
+  }
+  if(LABS.modo==='coord'){ el.innerHTML = labsCoordHtml(); return; }
+  if(LABS.modo==='parceiro-form'){ el.innerHTML = labsFormHtml('parceiro'); return; }
+  if(LABS.modo==='apoio-form'){ el.innerHTML = labsFormHtml('apoio'); return; }
+  if(LABS.modo==='lab-form'){ el.innerHTML = labsFormHtml('laboratorio'); return; }
+  const parcs = [...LABS.parceiros].sort((a,b)=> a.parceiro.localeCompare(b.parceiro,'pt-BR'));
+  el.innerHTML = `${info}<div class="labs-botoes"><button type="button" class="btn btn-preto" data-labs-acao="novo-parceiro">➕ Adicionar parceiro</button><button type="button" class="btn ghost" data-labs-acao="novo-apoio">➕ Adicionar ponto de apoio</button><button type="button" class="btn ghost" data-labs-acao="novo-lab">➕ Adicionar laboratório</button></div>
+    <div class="labs-leg"><span><i class="labs-lab" style="background:${LABS_COR_LAB}"></i> Unidade do laboratório</span><span><i class="labs-lab" style="background:${LABS_CORES_LAB[0]}"></i> Laboratório adicionado (cor à escolha)</span><span><i class="labs-apoio" style="background:${LABS_COR_APOIO}"></i> Ponto de apoio</span><span><i class="labs-parc" style="background:#9e9e9e"></i> Parceiro (cor da lista)</span><span><i class="labs-linha"></i> Atribuição</span></div>
+    <h3 class="labs-h">Parceiros no mapa (${parcs.length})</h3>${parcs.length ? parcs.map(p=>{ const gr = labsGrupos(p), d = gr.length===1 ? gr[0].dest : null; return `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('parc:'+p.parceiro)}"><span class="labs-ponto" style="background:${labsParcCor(p.parceiro)}"></span><span class="labs-item-t">${cgEscH(p.parceiro)}</span><span class="labs-item-s">${cgEscH(p.cidade)}/${cgEscH(p.uf)}${gr.length>1 ? ' → '+gr.length+' laboratórios' : d ? ' → '+cgEscH(d.nome) : ''}${labsSemLab(p).length ? ' · ⚠ projeto sem laboratório' : ''}${!labsParcVisivel(p) ? ' · oculto' : ''}</span></button>`; }).join('') : '<p class="labs-peq">Nenhum parceiro no mapa ainda.</p>'}
+    <h3 class="labs-h">Laboratórios adicionados (${LABS.labsExtra.length})</h3>${LABS.labsExtra.length ? LABS.labsExtra.map(l=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('labx:'+l.id)}"><span class="labs-ponto" style="background:${cgEscH(l.cor)}"></span><span class="labs-item-t">${cgEscH(l.nome)}</span><span class="labs-item-s">${cgEscH(l.cidade)}/${cgEscH(l.uf)}</span></button>`).join('') : '<p class="labs-peq">Nenhum laboratório adicionado ainda.</p>'}
+    <h3 class="labs-h">Pontos de apoio (${LABS.apoios.length})</h3>${LABS.apoios.length ? LABS.apoios.map(a=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('apoio:'+a.id)}"><span class="labs-ponto labs-ponto-ap"></span><span class="labs-item-t">${cgEscH(a.nome)}</span><span class="labs-item-s">${cgEscH(a.cidade)}/${cgEscH(a.uf)}</span></button>`).join('') : '<p class="labs-peq">Nenhum ponto de apoio ainda.</p>'}
+    <h3 class="labs-h">Unidades do laboratório (${LABS_UNIDADES.length})</h3>${LABS_UNIDADES.map(u=> `<button type="button" class="labs-item" data-labs-acao="focar" data-chave="${cgEscH('lab:'+u.id)}"><span class="labs-ponto labs-ponto-lab"></span><span class="labs-item-t">${cgEscH(labsNomeUnidade(u))}</span><span class="labs-item-s">${cgEscH(u.uf)} · ${labsRotPrec(labsUnidadePos(u).precisao)}${LABS.destOcultos.has('laboratorio:'+u.id) ? ' · oculto' : ''}</span></button>`).join('')}`;
+}
+function labsAcao(b){
+  const a = b.dataset.labsAcao;
+  if(a==='voltar'){ LABS.modo = 'inicio'; LABS.editando = null; LABS.msg = ''; LABS.rascunho = null; labsDesenharPainel(); }
+  else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; labsDesenharPainel(); }
+  else if(a==='novo-apoio'){ LABS.msg = ''; LABS.modo = 'apoio-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
+  else if(a==='novo-lab'){ LABS.msg = ''; LABS.modo = 'lab-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
+  else if(a==='editar-lab'){ LABS.msg = ''; LABS.editando = b.dataset.id; LABS.modo = 'lab-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
+  else if(a==='cor'){ const h = document.getElementById('lbCor'); if(h) h.value = b.dataset.cor; document.querySelectorAll('#labsPainel .labs-cor').forEach(x=> x.classList.toggle('sel', x===b)); }
+  else if(a==='escolher-parceiro' || a==='editar-parceiro'){ LABS.msg = ''; LABS.editando = b.dataset.parceiro; LABS.modo = 'parceiro-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
+  else if(a==='editar-apoio'){ LABS.msg = ''; LABS.editando = b.dataset.id; LABS.modo = 'apoio-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
+  else if(a==='salvar-parceiro') labsSalvarForm('parceiro');
+  else if(a==='salvar-apoio') labsSalvarForm('apoio');
+  else if(a==='salvar-laboratorio') labsSalvarForm('laboratorio');
+  else if(a==='focar') labsFocar(b.dataset.chave, 10);
+  else if(a==='dd-abrir'){ const k = b.dataset.dd; LABS.ddAberto = LABS.ddAberto===k ? null : k; LABS.ddBusca = ''; labsDesenharFiltro(); const bi = document.querySelector('#labsFiltro .labs-dd-busca'); if(bi) bi.focus(); }
+  else if(a==='dd-todos' || a==='dd-nenhum'){ const k = b.dataset.dd; document.querySelectorAll('#labsFiltro .labs-dd-item:not([hidden]) .labs-dd-cb[data-dd="'+k+'"]').forEach(cb=> labsDdAplicar(k, cb.dataset.chave, a==='dd-todos')); labsFiltroMudou(); }
+  else if(a==='filtro-limpar'){ LABS.parcOcultos.clear(); LABS.destOcultos.clear(); labsFiltroMudou(); }
+  else if(a==='enquadrar') labsEnquadrar();
+  else if(a==='ajustar') labsAjustar(b.dataset.chave);
+  else if(a==='coord'){ LABS.msg = ''; LABS.editando = b.dataset.chave; LABS.modo = 'coord'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
+  else if(a==='salvar-coord') labsSalvarCoord();
+  else if(a==='refazer'){
+    const pos = LABS.pos[b.dataset.id];
+    if(pos && (pos.fonte==='informada' || pos.fonte==='manual') && !confirm('Esta unidade tem a posição '+(pos.fonte==='informada' ? 'informada por coordenadas' : 'ajustada à mão')+'. Refazer a busca pelo endereço SUBSTITUI essa posição.\n\nContinuar?')) return;
+    if(LABS.modo==='coord'){ LABS.modo = 'inicio'; LABS.editando = null; labsDesenharPainel(); }
+    labsConferirUnidades(b.dataset.id);
+  }
+  else if(a==='atribuir-labs') labsAbrirAtrib(b.dataset.parceiro);
+  else if(a==='atrib-salvar') labsSalvarAtrib();
+  else if(a==='atrib-cancelar'){ if(LABS.rascunho && LABS.rascunho.sujo && !confirm('Descartar as mudanças de atribuição deste parceiro?')) return; LABS.modo = 'inicio'; LABS.rascunho = null; labsDesenharPainel(); }
+  else if(a==='atrib-remover-bloco') labsAtribRemoverBloco(b.dataset.destino);
+  else if(a==='atrib-recarregar') labsAbrirAtrib(LABS.rascunho ? LABS.rascunho.parceiro : null);
+  else if(a==='remover-parceiro') labsRemover('parceiro', b.dataset.parceiro);
+  else if(a==='remover-apoio') labsRemover('apoio', b.dataset.id);
+  else if(a==='remover-lab') labsRemover('lab', b.dataset.id);
+}
+async function labsAbrir(){   // chamada pelo menu: monta tudo na primeira vez; nas outras só ajusta o mapa ao tamanho da tela
+  if(LABS.iniciado){ if(LABS.mapa) setTimeout(()=> LABS.mapa.invalidateSize(), 50); return; }
+  LABS.iniciado = true;
+  const caixa = document.getElementById('labsMapa'); if(!caixa || typeof L==='undefined'){ LABS.iniciado = false; return; }
+  LABS.mapa = L.map(caixa, { scrollWheelZoom:true, zoomControl:true }).setView([-14.2,-51.9], 4);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Tiles © Esri' }).addTo(LABS.mapa);
+  L.control.scale({ imperial:false }).addTo(LABS.mapa);
+  LABS.camadas = L.layerGroup().addTo(LABS.mapa);
+  const painel = document.getElementById('labsPainel');
+  if(!caixa.dataset.labsLigado){   // os cliques são ligados UMA vez só (senão cada clique valeria em dobro e gravaria duplicado)
+    caixa.dataset.labsLigado = '1';
+    caixa.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
+    painel.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
+    painel.addEventListener('input', e=>{ if(e.target.id==='lbCep') e.target.value = labsFmtCep(e.target.value); });
+    const faixa = document.getElementById('labsFiltro');
+    if(faixa){
+      faixa.addEventListener('click', e=>{ const b = e.target.closest('[data-labs-acao]'); if(b) labsAcao(b); });
+      faixa.addEventListener('change', e=>{ const cb = e.target; if(cb && cb.classList && cb.classList.contains('labs-dd-cb')){ labsDdAplicar(cb.dataset.dd, cb.dataset.chave, cb.checked); labsFiltroMudou(); } });
+      faixa.addEventListener('input', e=>{ if(e.target.classList && e.target.classList.contains('labs-dd-busca')){ LABS.ddBusca = e.target.value; labsDdFiltrarBusca(); } });
+    }
+    document.addEventListener('mousedown', e=>{ if(LABS.ddAberto && !(e.target.closest && e.target.closest('#labsFiltro'))) labsFecharDd(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') labsFecharDd(); });
+    painel.addEventListener('change', e=>{ if(e.target.id==='lbAddDest') labsAtribAdicionarDestino(e.target.value); });
+    painel.addEventListener('dragstart', e=>{ const f = e.target.closest && e.target.closest('.labs-ficha'); if(!f) return; LABS.arrastando = f.dataset.projeto; try{ e.dataTransfer.setData('text/plain', f.dataset.projeto); e.dataTransfer.effectAllowed = 'move'; }catch(_){} });
+    painel.addEventListener('dragover', e=>{ const b = e.target.closest && e.target.closest('.labs-bloco'); if(b && LABS.arrastando){ e.preventDefault(); b.classList.add('alvo'); } });
+    painel.addEventListener('dragleave', e=>{ const b = e.target.closest && e.target.closest('.labs-bloco'); if(b) b.classList.remove('alvo'); });
+    painel.addEventListener('drop', e=>{ const b = e.target.closest && e.target.closest('.labs-bloco'); if(!b) return; e.preventDefault(); let k = LABS.arrastando; try{ k = e.dataTransfer.getData('text/plain') || k; }catch(_){} LABS.arrastando = null; labsAtribMover(k, b.dataset.destino || null); });
+    painel.addEventListener('dragend', ()=>{ LABS.arrastando = null; painel.querySelectorAll('.labs-bloco.alvo').forEach(x=> x.classList.remove('alvo')); });
+  }
+  setTimeout(()=> LABS.mapa.invalidateSize(), 50);
+  labsDesenharMapa(); labsDesenharPainel(); labsEnquadrar();
+  try{ await labsCarregar(); }catch(e){ console.error(e); LABS.semBanco = true; LABS.msg = labsErroBanco(e); LABS.msgErro = true; }
+  labsDesenharMapa(); labsDesenharPainel(); labsEnquadrar();
+  labsConferirUnidades();
+}
+async function labsRecarregar(){
+  if(!LABS.iniciado) return labsAbrir();
+  try{ await labsCarregar(); }catch(e){ console.error(e); LABS.semBanco = true; LABS.msg = labsErroBanco(e); LABS.msgErro = true; }
+  labsDesenharMapa(); labsDesenharPainel(); labsConferirUnidades();
+}
+window.labsAbrir = labsAbrir; window.labsRecarregar = labsRecarregar;
+window.labsDadosChegaram = ()=>{ if(!LABS.iniciado) return; labsDesenharMapa(); if(LABS.modo!=='atrib') labsDesenharPainel(); };   // os talhões chegaram: o hover e a tela de atribuição passam a saber os projetos de cada parceiro
+/* ===== FIM GESTÃO DE LABORATÓRIOS ===== */
 
 function abrirModalLadroesMaximasTalhao(rec){
   const modalRoot = document.getElementById('modalRoot');
@@ -12278,7 +12935,7 @@ const VG_CAMPO = ['vns','estr','maximas','ladroes'];
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
-  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' }, { v:'Forquimica', cor:'#0055ff' }, { v:'Chalyelson', cor:'#b70fff' }, { v:'Sumitomo', cor:'#af5a68' }, { v:'Denilson', cor:'#603959' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' }, { v:'Forquimica', cor:'#0055ff' }, { v:'Chalyelson', cor:'#b70fff' }, { v:'Sumitomo', cor:'#af5a68' }, { v:'Denilson', cor:'#603959' }, { v:'Dalcin', cor:'#810e55' }, { v:'Jorge Forquímica', cor:'#74743e' }, { v:'Augusto Forquímica', cor:'#8b2a04' },
   { v:'Em aberto', cor:'#757575' },
 ];
 const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
