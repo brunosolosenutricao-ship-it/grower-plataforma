@@ -11010,7 +11010,7 @@ const LABS_UNIDADES = [
   { id:'lab-assis-sp', cidade:'Assis', uf:'SP', rua:'Rua Sebastião Mendes de Brito', numero:'345', bairro:'Jardim Europa', cep:'19815-140', lat:-22.6619, lng:-50.4122 },
   { id:'lab-piracicaba-sp', cidade:'Piracicaba', uf:'SP', rua:'Rua Cezira Giovanoni Moretti', numero:'600', bairro:'Jd. Santa Rosa', complemento:'Box 2, Parque Tecnológico de Piracicaba', cep:'13414-157', lat:-22.7253, lng:-47.6492 },
 ];
-const LABS = { iniciado:false, mapa:null, camadas:null, marcadores:{}, linhas:[], semBanco:false, pos:{}, apoios:[], parceiros:[], modo:'inicio', editando:null, msg:'', msgErro:false, progresso:'', conferindo:false, cacheGeo:{}, ultimaBusca:0, parcOcultos:new Set(), labsExtra:[], semTabelaLabs:false, atrib:[], semTabelaAtrib:false, rascunho:null, arrastando:null, carregandoDados:false, destOcultos:new Set(), ddAberto:null, ddBusca:'' };
+const LABS = { iniciado:false, mapa:null, camadas:null, marcadores:{}, linhas:[], semBanco:false, pos:{}, apoios:[], parceiros:[], modo:'inicio', editando:null, msg:'', msgErro:false, progresso:'', conferindo:false, cacheGeo:{}, ultimaBusca:0, parcOcultos:new Set(), labsExtra:[], semTabelaLabs:false, atrib:[], semTabelaAtrib:false, rascunho:null, arrastando:null, carregandoDados:false, destOcultos:new Set(), ddAberto:null, ddBusca:'', parcTab:null, parcTabEstado:'', parcTabErro:'' };
 const labsNomeUnidade = u=> 'Unidade '+u.cidade;
 const labsEnderecoUnidade = u=> `${u.rua}, ${u.numero}${u.complemento ? ' – '+u.complemento : ''} – ${u.bairro} · ${u.cidade}/${u.uf} · CEP ${u.cep}`;
 const labsFmtCep = v=>{ const d = String(v||'').replace(/\D/g,'').slice(0,8); return d.length>5 ? d.slice(0,5)+'-'+d.slice(5) : d; };
@@ -11418,6 +11418,16 @@ async function labsSalvarCoord(){
     labsAviso('✓ '+o.nome+': o mapa passa a usar as coordenadas informadas.');
   }catch(e){ console.error(e); erro(labsErroBanco(e)); }
 }
+async function labsCarregarParcTabela(){   // os parceiros que o painel "Adicionar parceiro" oferece vêm DIRETO da tabela de talhões (quem tem pelo menos um talhão), não de uma lista fixa no código
+  LABS.parcTabEstado = 'carregando'; LABS.parcTabErro = '';
+  try{
+    const { data, error } = await fetchAllPaginated('talhoes', 'responsavel_parceiro', q=> q.not('responsavel_parceiro', 'is', null));
+    if(error) throw error;
+    const m = new Map(); (data || []).forEach(r=>{ const v = String(r.responsavel_parceiro || '').trim(); if(!v || v==='Em aberto') return; m.set(v, (m.get(v) || 0)+1); });   // vazio no banco = "Em aberto": não conta como parceiro
+    LABS.parcTab = [...m.entries()].map(([nome,qtd])=> ({ nome, qtd })).sort((a,b)=> a.nome.localeCompare(b.nome, 'pt-BR')); LABS.parcTabEstado = 'ok';
+  }catch(e){ console.error(e); LABS.parcTabEstado = 'erro'; LABS.parcTabErro = (e && e.message) || String(e); }
+  if(LABS.modo==='parceiro-lista') labsDesenharPainel();
+}
 function labsAbrirAtrib(nome){   // abre a tela: os projetos do parceiro e o laboratório de cada um (rascunho até clicar em Salvar)
   const p = LABS.parceiros.find(x=> x.parceiro===nome); if(!p) return;
   LABS.msg = ''; LABS.modo = 'atrib'; if(LABS.mapa) LABS.mapa.closePopup();
@@ -11491,9 +11501,15 @@ function labsDesenharPainel(){
   if(LABS.modo==='atrib'){ el.innerHTML = labsAtribHtml(); return; }
   const info = (LABS.msg ? `<div class="${LABS.msgErro ? 'labs-erro' : 'labs-ok'}">${cgEscH(LABS.msg)}</div>` : '')+(LABS.progresso ? `<div class="labs-status">⏳ ${cgEscH(LABS.progresso)}</div>` : '');
   if(LABS.modo==='parceiro-lista'){
-    const nomes = (typeof VG_PARCEIROS!=='undefined' ? VG_PARCEIROS : []).map(p=> p.v).filter(n=> n!=='Em aberto');
-    el.innerHTML = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Escolha o parceiro. Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`
-      + nomes.map(n=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${ja ? '📍 '+cgEscH(ja.cidade)+'/'+cgEscH(ja.uf) : 'sem ponto'}</span></button>`; }).join('');
+    const topo = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Só aparecem os parceiros que têm talhão na tabela (aba de projetos). Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`;
+    if(LABS.parcTabEstado==='erro'){ el.innerHTML = topo+`<div class="labs-erro">Não consegui ler os parceiros da tabela: ${cgEscH(LABS.parcTabErro)}</div><button type="button" class="btn ghost" data-labs-acao="novo-parceiro">Tentar de novo</button>`; return; }
+    if(LABS.parcTabEstado!=='ok' || !LABS.parcTab){ el.innerHTML = topo+'<p class="labs-status">⏳ Buscando os parceiros dos talhões…</p>'; return; }
+    const lista = LABS.parcTab, nomesTab = new Set(lista.map(x=> x.nome)), foraLista = n=> typeof VG_PARCEIROS!=='undefined' && !VG_PARCEIROS.some(p=> p.v===n);
+    const item = (n, sub)=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${sub} · ${ja ? '📍 '+cgEscH(ja.cidade)+'/'+cgEscH(ja.uf) : 'sem ponto'}</span></button>`; };
+    const semTalhao = LABS.parceiros.filter(p=> !nomesTab.has(p.parceiro));
+    el.innerHTML = topo
+      + (lista.length ? lista.map(x=> item(x.nome, x.qtd+(x.qtd===1 ? ' talhão' : ' talhões')+(foraLista(x.nome) ? ' · fora da lista' : ''))).join('') : '<div class="labs-aviso">Nenhum talhão tem parceiro cadastrado ainda.</div>')
+      + (semTalhao.length ? `<h3 class="labs-h">No mapa, mas sem talhão na tabela</h3><p class="labs-peq">Estes parceiros têm ponto no mapa, mas nenhum talhão aponta para eles hoje. Clique para editar; para tirar do mapa, use o popup do pino.</p>`+semTalhao.map(p=> item(p.parceiro, '⚠ sem talhão')).join('') : '');
     return;
   }
   if(LABS.modo==='coord'){ el.innerHTML = labsCoordHtml(); return; }
@@ -11511,7 +11527,7 @@ function labsDesenharPainel(){
 function labsAcao(b){
   const a = b.dataset.labsAcao;
   if(a==='voltar'){ LABS.modo = 'inicio'; LABS.editando = null; LABS.msg = ''; LABS.rascunho = null; labsDesenharPainel(); }
-  else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; labsDesenharPainel(); }
+  else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; LABS.parcTabEstado = 'carregando'; labsDesenharPainel(); labsCarregarParcTabela(); }
   else if(a==='novo-apoio'){ LABS.msg = ''; LABS.modo = 'apoio-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='novo-lab'){ LABS.msg = ''; LABS.modo = 'lab-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='editar-lab'){ LABS.msg = ''; LABS.editando = b.dataset.id; LABS.modo = 'lab-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
