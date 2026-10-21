@@ -3402,19 +3402,23 @@ const ESTR_ETAPAS = [
   { key:'pmg_planta', label:'PMG por planta', bloco:'R6/R7' },
 ];
 const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R1/R2':'#8a4f7d', 'R6/R7':'#6b7a3f' };
+// DESLOCAMENTO DE DAP (safra 2026.27): a soja está mais lenta que o padrão, então TODOS os estádios foram empurrados por este número de dias (V4 25→30, R1/R2 45→50...).
+// É a única conta: os DAPs abaixo são "DAP padrão + deslocamento", e as tabelas, o Cronograma, o Planejar, os Alertas e os PDFs leem daqui. Para mudar de novo, é só trocar este número (as tolerâncias não mudam).
+const DAP_DESLOCAMENTO = 5;
 const ESTR_BLOCO_DAP = {
-  'V4': { dap:25, faixa:3 },
-  'R1/R2': { dap:45, faixa:4 },
-  'R6/R7': { dap:105, faixa:5 },
+  'V4': { dap:25+DAP_DESLOCAMENTO, faixa:3 },
+  'R1/R2': { dap:45+DAP_DESLOCAMENTO, faixa:4 },
+  'R6/R7': { dap:105+DAP_DESLOCAMENTO, faixa:5 },
 };
 const ESTR_TIPO_MATERIAL_OPTIONS = ['Precoce','Médio','Tardio'];
 const ESTR_STATUS_PLANTIO_OPTIONS = ['Plantado','Estimativa'];
 
-// Coleta Foliar 2026.27 — coleta foliar (R1) padronizada em 45 DAP; Msg 1 = 7 dias antes (38 DAP); Msg 2 = 45 DAP; coleta prevista = 45 DAP
-const CF_DAP_COLETA = 45;
+// Coleta Foliar 2026.27 — coleta foliar (R1) padronizada em 45 DAP + o deslocamento da safra (hoje 50); Msg 1 = 7 dias antes; Msg 2 e coleta prevista = o mesmo DAP da coleta
+const OXC_DAP_COLETA = 45 + DAP_DESLOCAMENTO;   // Óxido: coleta foliar (Etapa 3)
+const CF_DAP_COLETA = 45 + DAP_DESLOCAMENTO;
 const CF_DAP_MSG1 = CF_DAP_COLETA - 7;
-const CF_DAP_MSG2 = 45;
-const CF_DAP_COLETA_PREVISTA = 45;
+const CF_DAP_MSG2 = 45 + DAP_DESLOCAMENTO;
+const CF_DAP_COLETA_PREVISTA = 45 + DAP_DESLOCAMENTO;
 const CF_MSG_OPTIONS = ['Pendente','Enviado'];
 const CF_COLETA_STATUS_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente'];
 function getCfEntry(key){
@@ -3505,10 +3509,10 @@ const VNS_ETAPAS = [   // label = nome mostrado no app; labelExcel = nome de ant
 const VNS_ETAPA_STATUS_OPTIONS = ['Pendente','Executado', STATUS_NAO_SE_APLICA];
 // prazo previsto de cada etapa: DAP (dias após o plantio) e janela de tolerância (± dias) — R1 padronizado em 45 DAP
 const VNS_ETAPA_PRAZO = {
-  etapa21_nematoides:{ dap:45, faixa:4 }, etapa21_bioas:{ dap:45, faixa:4 }, etapa21_metagenomica:{ dap:45, faixa:4 },
-  etapa22_aval_aerea:{ dap:45, faixa:4 }, etapa23_aval_raizes:{ dap:45, faixa:4 }, etapa3_analise_foliar:{ dap:45, faixa:4 },
-  etapa_r67_foto_planta:{ dap:105, faixa:5 }, etapa_r67_produtividade:{ dap:105, faixa:5 }, etapa_r67_pmg:{ dap:105, faixa:5 },
-  etapa4_produtividade:{ dap:130, faixa:5 }, etapa4_analise_graos:{ dap:130, faixa:5 }, etapa4_pmg:{ dap:130, faixa:5 },
+  etapa21_nematoides:{ dap:45+DAP_DESLOCAMENTO, faixa:4 }, etapa21_bioas:{ dap:45+DAP_DESLOCAMENTO, faixa:4 }, etapa21_metagenomica:{ dap:45+DAP_DESLOCAMENTO, faixa:4 },
+  etapa22_aval_aerea:{ dap:45+DAP_DESLOCAMENTO, faixa:4 }, etapa23_aval_raizes:{ dap:45+DAP_DESLOCAMENTO, faixa:4 }, etapa3_analise_foliar:{ dap:45+DAP_DESLOCAMENTO, faixa:4 },
+  etapa_r67_foto_planta:{ dap:105+DAP_DESLOCAMENTO, faixa:5 }, etapa_r67_produtividade:{ dap:105+DAP_DESLOCAMENTO, faixa:5 }, etapa_r67_pmg:{ dap:105+DAP_DESLOCAMENTO, faixa:5 },
+  etapa4_produtividade:{ dap:130+DAP_DESLOCAMENTO, faixa:5 }, etapa4_analise_graos:{ dap:130+DAP_DESLOCAMENTO, faixa:5 }, etapa4_pmg:{ dap:130+DAP_DESLOCAMENTO, faixa:5 },
 };
 // A Etapa 2.1 e a Etapa 4 se dividem em 3 avaliações cada: cada uma com o seu status, todas na MESMA data (uma coluna de data por bloco).
 // As demais etapas têm status e data próprios. A data de um bloco é gravada igual nas avaliações dele, então o resto do app lê cada uma como avaliação independente.
@@ -3552,13 +3556,13 @@ function getVnsEtapaEntry(key){
 }
 
 const LM_ESTAGIO_DAP = {
-  'V4': { dap:25, faixa:3 },
-  'R1/R2': { dap:45, faixa:4 },
-  'R4': { dap:70, faixa:5 },
-  'R5.4': { dap:93, faixa:4 },
-  'R6/R7': { dap:105, faixa:5 },
-  'R8': { dap:120, faixa:5 },
-  'Colheita': { dap:130, faixa:5 },
+  'V4': { dap:25+DAP_DESLOCAMENTO, faixa:3 },
+  'R1/R2': { dap:45+DAP_DESLOCAMENTO, faixa:4 },
+  'R4': { dap:70+DAP_DESLOCAMENTO, faixa:5 },
+  'R5.4': { dap:93+DAP_DESLOCAMENTO, faixa:4 },
+  'R6/R7': { dap:105+DAP_DESLOCAMENTO, faixa:5 },
+  'R8': { dap:120+DAP_DESLOCAMENTO, faixa:5 },
+  'Colheita': { dap:130+DAP_DESLOCAMENTO, faixa:5 },
 };
 function lmEstagioKey(estagio){ if(estagio==='R8') return 'r7r8'; if(estagio==='R1/R2') return 'r1'; /* chaves legadas: R7/R8 virou R8 e R1 virou R1/R2 só no nome — os dados já salvos continuam em *_r7r8 e *_r1 */ return estagio.replace(/[\/.]/g,'').toLowerCase(); } // 'R5.4'->'r54'
 // cor de cada bloco do Máximas/Ladrões — faixa sólida no cabeçalho, tom suave nas células e linha vertical onde o bloco começa
@@ -8580,7 +8584,7 @@ function renderOxidoConsumo(){
     if(!dataPlantio) return null;
     const d = new Date(dataPlantio + 'T00:00:00');
     if(isNaN(d.getTime())) return null;
-    d.setDate(d.getDate() + 45);
+    d.setDate(d.getDate() + OXC_DAP_COLETA);
     return d;
   }
   function fmtData(d){
@@ -9544,11 +9548,11 @@ function cgColetarPontos(projetos, ini, fim){
       const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
       ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info && entEstr[e.key+'_exec']!==STATUS_NAO_SE_APLICA) add(r,'estr',info.dap,e.label,e.bloco, entEstr[e.key+'_mes'], entEstr[e.key+'_exec']==='Feito'); });
     }
-    if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',45,'Coleta foliar prevista (Etapa 3)','45 DAP');
+    if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',OXC_DAP_COLETA,'Coleta foliar prevista (Etapa 3)',OXC_DAP_COLETA+' DAP');
     if(projetos.includes('cf') && r.cultura==='Soja'){
       add(r,'cf',CF_DAP_MSG1,'Mensagem de lembrete 1',CF_DAP_MSG1+' DAP');
-      add(r,'cf',CF_DAP_MSG2,'Mensagem de lembrete 2','45 DAP');
-      add(r,'cf',CF_DAP_COLETA_PREVISTA,'Coleta foliar','45 DAP');
+      add(r,'cf',CF_DAP_MSG2,'Mensagem de lembrete 2',CF_DAP_MSG2+' DAP');
+      add(r,'cf',CF_DAP_COLETA_PREVISTA,'Coleta foliar',CF_DAP_COLETA_PREVISTA+' DAP');
     }
   });
   return out;
@@ -12274,7 +12278,7 @@ const VG_CAMPO = ['vns','estr','maximas','ladroes'];
 // Responsabilidade/Parceiro: um valor por talhão, guardado em talhoes.responsavel_parceiro (vazio no banco = "Em aberto")
 const VG_PARCEIROS = [
   { v:'Grower', cor:'#2d4a1f' }, { v:'Cerrado', cor:'#8d5524' }, { v:'Humberto', cor:'#d81b60' }, { v:'Equipe fazenda', cor:'#5e35b1' },
-  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' }, { v:'Forquimica', cor:'#0055ff' },
+  { v:'Fortgreen', cor:'#00838f' }, { v:'Emerson', cor:'#ef6c00' }, { v:'Gabriel', cor:'#1565c0' }, { v:'Edimilson', cor:'#c62828' }, { v:'Marcus', cor:'#6a7b00' }, { v:'Maico', cor:'#1a237e' }, { v:'Sérgio', cor:'#8e24aa' }, { v:'Matheus', cor:'#2e7d32' }, { v:'Daniel MSInt', cor:'#02273c' }, { v:'Luiz Souza Agro+', cor:'#61050e' }, { v:'Andre Assmann', cor:'#da0b9c' }, { v:'Pabline Simbiose', cor:'#a659a1' }, { v:'Forquimica', cor:'#0055ff' }, { v:'Chalyelson', cor:'#b70fff' },
   { v:'Em aberto', cor:'#757575' },
 ];
 const vgParceiroCor = v=> (VG_PARCEIROS.find(p=> p.v===(v||'Em aberto')) || VG_PARCEIROS[VG_PARCEIROS.length-1]).cor;
@@ -12293,7 +12297,7 @@ async function carregarParceiros(records){
 const RF_PROJ_ORDEM = ['maximas','ladroes','estr','vns','oxc'];
 const RF_SAFRA = '2026/27';
 const RF_JANELA = 7;   // só como reserva, se um marco vier sem tolerância
-const RF_OXC_DAP = 45;
+const RF_OXC_DAP = OXC_DAP_COLETA;
 const RF_OXC_FEITO = ['Coletado','No laboratório','Laudo recebido'];
 const RF_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const RF_PRINC = {
@@ -12301,7 +12305,7 @@ const RF_PRINC = {
   ladroes:[['Componentes produtivos','R6/R7','altura final, nós, ramos, vagens por classe e grãos falhados'],['Produtividade e PMG','Colheita','pesagem dos grãos e peso de mil grãos']],
   estr:[['Altura, foto e ground cover','V4','medidas e registro visual das plantas'],['Altura, fotos e ground cover','R1/R2','medidas e registro visual das plantas'],['Vagens, hastes e nós','R6/R7','contagem por planta, produtividade e PMG por planta']],
   vns:[['Coleta de solo (nematoides, BioAs e metagenômica), fotos e análise foliar','R1/R2','amostras de solo, fotos da parte aérea e das raízes e folhas pra análise'],['Foto, produtividade e PMG por planta','R6/R7','registro da planta inteira e resultado por planta'],['Produtividade, análise de grãos e PMG','Colheita','resultados do talhão na colheita']],
-  oxc:[['Coleta foliar','45 DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
+  oxc:[['Coleta foliar',OXC_DAP_COLETA+' DAP','Etapa 3 do acompanhamento do Óxido de Magnésio']],
 };
 function rfHexRgb(h){ let x = String(h).replace('#',''); if(x.length===3) x = x.split('').map(c=>c+c).join(''); const n = parseInt(x,16); return [n>>16&255, n>>8&255, n&255]; }
 function rfMistura(cor,a){ const [r,g,b] = rfHexRgb(cor); return [Math.round(255+(r-255)*a), Math.round(255+(g-255)*a), Math.round(255+(b-255)*a)]; }
@@ -12386,7 +12390,7 @@ function rfPrincipais(r,k){
 
 function rfGerarPdf(cliente, fazenda, projetosSel, extra){   // extra (só no export do planejamento): { doc, talhoes:[{rec,projs,visitas}], nota, tituloPagina, subtituloPagina }
   const { jsPDF } = window.jspdf;
-  const W=1400, H=990, M=28, K=1.1, LEFT=244, LAB=128, HORIZ=140;
+  const W=1400, H=990, M=28, K=1.1, LEFT=244, LAB=128, HORIZ=150;
   const CW=W-2*M, RX=M+LEFT+12, RW=CW-LEFT-28, TLW=RW-LAB-18, PXD=TLW/HORIZ;
   const novo = ()=> new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
   const doc = (extra && extra.doc) || novo(); const sc = doc.internal.pageSize.getWidth()/W;
