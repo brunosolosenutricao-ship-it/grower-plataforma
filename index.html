@@ -13410,11 +13410,28 @@ const labsIcone = (tipo, cor)=>{ const t = (tipo==='lab' || tipo==='labx') ? 18 
   html: tipo==='lab' ? `<span class="labs-lab" style="background:${LABS_COR_LAB}"></span>` : tipo==='labx' ? `<span class="labs-lab" style="background:${cor}"></span>` : tipo==='apoio' ? `<span class="labs-apoio" style="background:${LABS_COR_APOIO}"></span>` : `<span class="labs-parc" style="background:${cor}"></span>` }); };
 const labsProjKeys = ()=> typeof VG_VISIVEIS!=='undefined' ? VG_VISIVEIS.map(p=> p.key) : ['estr','oxc','vns','ladroes','maximas'];   // os projetos da Visão Geral: a MESMA lista (VG_VISIVEIS) que a tabela principal dela usa
 const labsListaProj = ()=>{ const n = labsProjKeys().map(k=> labsProjInfo(k).label); return n.length>1 ? n.slice(0,-1).join(', ')+' e '+n[n.length-1] : n.join(''); };
-const labsProjInfo = k=> (typeof VG_PROJETOS!=='undefined' ? VG_PROJETOS.find(p=> p.key===k) : null) || { key:k, label:k, cor:'#757575' };
+// Vida no Solo tem três grupos de análise que vão para laboratórios diferentes: nematoides (NemaLab Rio Verde), BioAs e folha (qualquer Solos e Plantas) e metagenômica (Biome 4 All).
+// Na tela de atribuição o projeto 'vns' vira estas três caixinhas; elas são gravadas em labs_atribuicoes como projeto 'vns-nematoides', 'vns-bioas' e 'vns-biome'.
+const LABS_VNS_SUB = [
+  { key:'vns-nematoides', label:'Vida no Solo (Nematoides)', analises:'Solo para nematoides' },
+  { key:'vns-bioas', label:'Vida no Solo (BioAs e Folha)', analises:'Solo para análise biológica (BioAs) e análise foliar' },
+  { key:'vns-biome', label:'Vida no Solo (Metagenômica)', analises:'Solo para análise metagenômica (Biome 4 All)' },
+];
+const labsSubVns = k=> LABS_VNS_SUB.find(s=> s.key===k) || null;
+const labsExpandeVns = keys=> keys.flatMap(k=> k==='vns' ? LABS_VNS_SUB.map(s=> s.key) : [k]);
+const labsAtribKeys = ()=> labsExpandeVns(labsProjKeys());
+const labsProjBase = k=> (typeof VG_PROJETOS!=='undefined' ? VG_PROJETOS.find(p=> p.key===k) : null) || { key:k, label:k, cor:'#757575' };
+const labsProjInfo = k=>{ const s = labsSubVns(k); return s ? { ...labsProjBase('vns'), key:k, label:s.label, analises:s.analises } : labsProjBase(k); };
+const LABS_VNS_TODAS = 'Vida no Solo (todas as análises)';
+function labsRotulos(keys){   // rótulos dos projetos de um laboratório; as três fichas do Vida no Solo juntas no mesmo laboratório viram um rótulo só
+  const todas = LABS_VNS_SUB.every(s=> keys.includes(s.key)), out = [];
+  keys.forEach(k=>{ const r = labsSubVns(k) && todas ? LABS_VNS_TODAS : labsProjInfo(k).label; if(!out.includes(r)) out.push(r); });
+  return out;
+}
 const labsDadosProntos = ()=> typeof RECORDS!=='undefined' && RECORDS.length>0;
 function labsProjetosDoParceiro(nome){   // projetos em que ele tem talhão: o parceiro é gravado em cada talhão, e cada talhão sabe em quais projetos participa
   const recs = (typeof RECORDS!=='undefined' ? RECORDS : []).filter(r=> (String(r.responsavel_parceiro || '').trim() || 'Em aberto')===nome);
-  return labsProjKeys().map(k=> ({ key:k, n:recs.filter(r=> rfParticipa(r,k)).length })).filter(x=> x.n>0);
+  return labsProjKeys().map(k=> ({ key:k, n:recs.filter(r=> rfParticipa(r,k)).length })).filter(x=> x.n>0).flatMap(x=> x.key==='vns' ? LABS_VNS_SUB.map(s=> ({ key:s.key, n:x.n })) : [x]);   // o Vida no Solo aparece como as três caixinhas
 }
 function labsResolverDestino(tipo, id){   // laboratório (unidade fixa ou adicionado) ou ponto de apoio -> nome, posição e cor
   if(tipo==='laboratorio'){
@@ -13426,10 +13443,11 @@ function labsResolverDestino(tipo, id){   // laboratório (unidade fixa ou adici
 }
 const labsDestPorChave = ch=>{ const i = String(ch).indexOf(':'); return labsResolverDestino(String(ch).slice(0,i), String(ch).slice(i+1)); };
 function labsGrupos(p){   // um grupo por laboratório de destino: { chave, dest, projetos:[...] }. A atribuição antiga (um laboratório só) vale para todos os projetos do parceiro
-  const g = new Map(), linhas = LABS.atrib.filter(a=> a.parceiro===p.parceiro);
+  const g = new Map(), bruto = LABS.atrib.filter(a=> a.parceiro===p.parceiro), temSub = bruto.some(a=> labsSubVns(a.projeto));
+  const linhas = bruto.flatMap(a=> a.projeto==='vns' ? (temSub ? [] : LABS_VNS_SUB.map(s=> ({ ...a, projeto:s.key }))) : [a]);   // linha antiga 'vns' = as três caixinhas no mesmo laboratório
   linhas.forEach(a=>{ const ch = a.destino_tipo+':'+a.destino_id; if(!g.has(ch)) g.set(ch, { chave:ch, tipo:a.destino_tipo, id:a.destino_id, projetos:[] }); g.get(ch).projetos.push(a.projeto); });
   if(!linhas.length && p.atribuido_tipo && p.atribuido_id) g.set(p.atribuido_tipo+':'+p.atribuido_id, { chave:p.atribuido_tipo+':'+p.atribuido_id, tipo:p.atribuido_tipo, id:p.atribuido_id, projetos: labsDadosProntos() ? labsProjetosDoParceiro(p.parceiro).map(x=> x.key) : null });
-  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? labsProjKeys().filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
+  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? labsAtribKeys().filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
 }
 function labsSemLab(p){   // projetos do parceiro sem laboratório. Só vale quando ele já tem alguma atribuição: aí é projeto novo e merece o aviso
   if(!labsDadosProntos()) return [];
@@ -13449,7 +13467,7 @@ function labsInfoApoio(a){ return `<b>${cgEscH(a.nome)}</b> <span class="labs-pe
 function labsInfoLabx(l){ return `<b>${cgEscH(l.nome)}</b> <span class="labs-peq">(laboratório)</span><br>${l.endereco ? cgEscH(l.endereco)+'<br>' : ''}${cgEscH(labsCidUf(l))}${l.cep ? '<br>CEP '+cgEscH(l.cep) : ''}${labsContatoHtml('labx',l.id)}<br><span class="labs-peq">Posição ${labsRotPrec(l.precisao)}</span>`; }
 function labsInfoParc(p){
   const gr = labsGrupos(p), sem = labsSemLab(p);
-  const lista = gr.length ? gr.map(g=> '→ <b>'+cgEscH(g.dest.nome)+'</b>: '+(g.projetos ? g.projetos.map(k=> cgEscH(labsProjInfo(k).label)).join(', ') : 'todos os projetos')).join('<br>') : '<b>—</b>';
+  const lista = gr.length ? gr.map(g=> '→ <b>'+cgEscH(g.dest.nome)+'</b>: '+(g.projetos ? labsRotulos(g.projetos).map(cgEscH).join(', ') : 'todos os projetos')).join('<br>') : '<b>—</b>';
   return `<b>${cgEscH(p.parceiro)}</b><br>${cgEscH(labsCidUf(p))}${p.cep ? ' · CEP '+cgEscH(p.cep) : ''}<br>Tem correio na cidade: <b>${p.tem_correio ? 'Sim' : 'Não'}</b><br>Atribuído a: ${lista}${sem.length ? '<br><span class="labs-aviso-i">⚠ Sem laboratório: '+sem.map(k=> cgEscH(labsProjInfo(k).label)).join(', ')+'</span>' : ''}<br><span class="labs-peq">Posição ${labsRotPrec(p.precisao)}</span>`;
 }
 function labsPopup(tipo, o){
@@ -13785,7 +13803,7 @@ function labsDadosDestino(g){   // nome, linhas do endereço, posição e o obje
 // posição confiável (no endereço, informada ou ajustada à mão): o link abre o ponto exato; senão o Google procura pelo texto do endereço
 const labsLinkEnvio = d=> ['endereço','informada','manual'].includes(d.pos.precisao) ? labsLinkPosicao(d.pos.lat, d.pos.lng) : labsLinkEndereco(d.tipoLink, d.obj);
 function labsPlanoEnvio(p){
-  const grupos = labsGrupos(p).map(g=>({ d:labsDadosDestino(g), projetos: g.projetos ? g.projetos.map(k=> labsProjInfo(k)) : [{ label:'Todos os projetos', cor:'#223c2c' }] })).filter(x=> x.d);
+  const grupos = labsGrupos(p).map(g=>({ d:labsDadosDestino(g), projetos: g.projetos ? labsRotulos(g.projetos).map((r, i, arr)=> ({ label:r, cor:(r===LABS_VNS_TODAS ? labsProjBase('vns') : labsProjInfo(g.projetos.find(k=> labsProjInfo(k).label===r) || g.projetos[0])).cor })) : [{ label:'Todos os projetos', cor:'#223c2c' }] })).filter(x=> x.d);
   return { parceiro:p.parceiro, uf:p.uf, cidade:p.cidade, grupos, sem:labsSemLab(p).map(k=> labsProjInfo(k)) };
 }
 const labsLinhasContato = d=>{ const c = d.contato || {}; return [['Telefone', c.telefone], ['E-mail', c.email], ['Chave PIX', c.pix]].filter(l=> l[1]); };   // só o que existe
@@ -13942,7 +13960,7 @@ function labsTodosDestinos(){
 function labsAtribHtml(){
   const r = LABS.rascunho, voltar = '<button type="button" class="labs-voltar" data-labs-acao="atrib-cancelar">← Voltar</button>';
   if(!r) return voltar;
-  const cab = `${voltar}<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(r.parceiro)}"></span>${cgEscH(r.parceiro)}</h3><p class="labs-peq">Arraste a ficha de cada projeto para o laboratório que vai atendê-lo. Cada projeto vai para um laboratório só. Nada vale até clicar em Salvar.</p>`;
+  const cab = `${voltar}<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(r.parceiro)}"></span>${cgEscH(r.parceiro)}</h3><p class="labs-peq">Arraste a ficha de cada projeto para o laboratório que vai atendê-lo. Cada projeto vai para um laboratório só; o Vida no Solo tem três fichas (nematoides, BioAs e folha, metagenômica), cada uma pode ir para um laboratório diferente. Nada vale até clicar em Salvar.</p>`;
   if(!r.pronto) return cab+'<p class="labs-status">⏳ Carregando os talhões e projetos deste parceiro…</p><button type="button" class="btn ghost" data-labs-acao="atrib-recarregar">Tentar de novo</button>';
   const projs = labsProjetosDoParceiro(r.parceiro);
   if(!projs.length) return cab+'<p class="labs-aviso">Este parceiro ainda não tem talhões em nenhum dos '+labsProjKeys().length+' projetos ('+labsListaProj()+').</p>';
@@ -13983,7 +14001,7 @@ async function labsSalvarAtrib(){
     const pr = LABS.parceiros.find(p=> p.parceiro===nome);
     if(pr && (pr.atribuido_tipo || pr.atribuido_id)){ const { error } = await sb.from('labs_parceiros').update({ atribuido_tipo:null, atribuido_id:null }).eq('parceiro', nome); if(error) throw error; pr.atribuido_tipo = null; pr.atribuido_id = null; }   // a atribuição antiga (um laboratório só) é trocada pelas linhas por projeto
     LABS.atrib = LABS.atrib.filter(a=> a.parceiro!==nome).concat(linhas);
-    const resumo = labsGrupos(pr).map(g=> g.dest.nome+' ('+(g.projetos||[]).map(k=> labsProjInfo(k).label).join(', ')+')').join('; ');
+    const resumo = labsGrupos(pr).map(g=> g.dest.nome+' ('+labsRotulos(g.projetos||[]).join(', ')+')').join('; ');
     LABS.modo = 'inicio'; LABS.rascunho = null; labsDesenharMapa(); labsDesenharPainel();
     labsAviso('✓ Atribuições de '+nome+' salvas'+(resumo ? ': '+resumo : ' (nenhum projeto com laboratório)')+'.');
   }catch(e){ console.error(e); r.erro = labsErroBanco(e); if(btn) btn.disabled = false; labsDesenharPainel(); }
