@@ -17436,44 +17436,72 @@ function renderColetaFoliar(){
 
 /* ---------------- ABA REGENERA — base própria, separada da Alimentação principal ---------------- */
 let REGENERA_RECORDS = [];
+let regeneraTreemapChart = null;   // gráfico de área afetada (treemap) da metade direita; é destruído antes de cada nova tela para não acumular
 const REGENERA_SIM_NAO = ['Sim','Não'];
-const REGENERA_ETAPA_STATUS_OPTIONS = ['Pendente','Executado'];
-const REGENERA_ETAPAS = [
-  { key:'etapa1_plantio', label:'Etapa 1 – Plantio/Aplicação', dap:0, faixa:3 },
-  { key:'etapa21_coleta_solo', label:'Etapa 2.1 – Coleta de solo (R1/R2)', dap:45, faixa:4 },
-  { key:'etapa22_aval_aerea', label:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)', dap:45, faixa:4 },
-  { key:'etapa23_aval_raizes', label:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)', dap:45, faixa:4 },
-  { key:'etapa3_analise_foliar', label:'Etapa 3 – Análise foliar (R1/R2)', dap:45, faixa:4 },
-  { key:'etapa4_pos_colheita', label:'Etapa 4 – Análises pós colheita', dap:130, faixa:5 },
+// Acompanhamento do Regenera = o MESMO desenho do Vida no Solo (R1/R2 com 6 avaliações e uma data; R6/R7 e Colheita com 3 avaliações e uma data cada), mais a Etapa 1 (Plantio/Aplicação), que o Regenera já usava.
+// Tudo fica na base própria do Regenera (tabela regenera_talhoes, coluna "etapas"): status e data de cada avaliação e também status do plantio, tipo de teste, participação e status de compra.
+const REGENERA_ETAPA_STATUS_OPTIONS = VNS_ETAPA_STATUS_OPTIONS;
+const REGENERA_ETAPAS = [ { key:'etapa1_plantio', label:'Etapa 1 – Plantio/Aplicação', dap:0, faixa:3 }, ...VNS_ETAPAS.map(e=> ({ key:e.key, label:e.label, dap:VNS_ETAPA_PRAZO[e.key].dap, faixa:VNS_ETAPA_PRAZO[e.key].faixa })) ];
+const REGENERA_BLOCOS = [ { estagio:'Etapa 1', titulo:'Plantio/Aplicação', keys:['etapa1_plantio'] }, ...VNS_BLOCOS ];
+const REGENERA_PRAZO = Object.fromEntries(REGENERA_ETAPAS.map(e=> [e.key, { dap:e.dap, faixa:e.faixa }]));
+const REGENERA_CAB_ESTAGIOS = REGENERA_BLOCOS.reduce((gs,b)=>{ let g = gs[gs.length-1]; if(!g || g.estagio!==b.estagio){ g = { estagio:b.estagio, blocos:[], cols:0 }; gs.push(g); } g.blocos.push(b); g.cols += b.keys.length+1; return gs; }, []).map(g=> ({ ...g, semTitulo: g.blocos.every(b=> !b.titulo) }));
+const REGENERA_COLUNAS_ETAPAS = REGENERA_BLOCOS.reduce((s,b)=> s+b.keys.length+1, 0);   // um status por avaliação + uma data por bloco
+const REGENERA_BLOCO_COR = { 'Etapa 1':'#2d4a1f', ...VNS_BLOCO_COR };
+const REGENERA_TIPOS_TESTE = ['Faixa','Lado a lado','Área total'], REGENERA_STATUS_COMPRA = ['Comprado','Não comprado','Em negociação'];
+// Nematoides e doenças de solo: os mesmos 9 patógenos da Alimentação do Vida no Solo, cada um Sim/Não por talhão (gravados em "etapas", na base própria do Regenera). Sim = vermelho, Não = verde.
+const REGENERA_PATOGENOS = [
+  { key:'nematoide_lesoes_radiculares', label:'Lesões radiculares', grupo:'nema' }, { key:'nematoide_galhas', label:'Galhas', grupo:'nema' }, { key:'nematoide_cisto', label:'Cisto', grupo:'nema' }, { key:'nematoide_reniforme', label:'Reniforme', grupo:'nema' }, { key:'nematoide_espiralado', label:'Espiralado', grupo:'nema' },
+  { key:'doenca_fusarium', label:'Fusarium', grupo:'doenca' }, { key:'doenca_macrophomina', label:'Macrophomina', grupo:'doenca' }, { key:'doenca_mofo_branco', label:'Mofo Branco', grupo:'doenca' }, { key:'doenca_rhizoctonia', label:'Rhizoctonia', grupo:'doenca' },
 ];
+const regeneraEstiloPat = v=> v==='Sim' ? 'background:#fde0dc;color:#b3261e;' : v==='Não' ? 'background:#dff3e4;color:#1e7a3c;' : 'background:#fff;color:var(--ink-soft);';
 function getRegeneraEtapasEntry(rec){
-  const defaults = {};
-  REGENERA_ETAPAS.forEach(e=>{ defaults[e.key] = 'Pendente'; defaults[e.key+'_data'] = null; });
-  const salvo = (rec && rec.etapas) || {};
-  return {...defaults, ...salvo};
+  const salvo = (rec && rec.etapas) || {}, out = { ...salvo };
+  out.status_plantio = salvo.status_plantio ?? ''; out.tipo_teste = salvo.tipo_teste ?? ''; out.participacao = salvo.participacao ?? 'Sim'; out.status_compra = salvo.status_compra ?? '';
+  REGENERA_PATOGENOS.forEach(p=>{ out[p.key] = salvo[p.key] ?? ''; });
+  REGENERA_ETAPAS.forEach(e=>{
+    const leg = VNS_LEGADO[e.key];   // etapa que foi dividida (coleta de solo e pós-colheita): o que estava salvo na chave antiga vale para as novas até o próximo Salvar da linha
+    out[e.key] = salvo[e.key] ?? (leg ? salvo[leg] : null) ?? 'Pendente';
+    out[e.key+'_data'] = salvo[e.key+'_data'] ?? (leg ? salvo[leg+'_data'] : null) ?? null;
+  });
+  return out;
 }
 function regeneraDataPrevista(dataPlantio, dap){
   if(!dataPlantio) return '';
   const d = new Date(dataPlantio+'T00:00:00'); d.setDate(d.getDate()+dap);
   return d.toISOString().slice(0,10);
 }
+// só vale guardar uma data que a pessoa realmente escolheu: igual à previsão (plantio + DAP) ou apagada = guarda vazio, e a tabela segue a previsão
+function regeneraNormalizarData(rec, campo, valor, exec){
+  const m = /^(.*)_data$/.exec(campo || '');
+  if(!m) return valor;
+  if(!valor) return null;
+  if(exec) return valor;   // Executado: é a data da execução e vale mesmo igual à prevista
+  const prazo = REGENERA_PRAZO[m[1]];
+  if(!prazo || !rec || !rec.data_plantio) return valor;
+  return valor===regeneraDataPrevista(rec.data_plantio, prazo.dap) ? null : valor;
+}
 async function salvarRegeneraEtapaCampo(id, campo, valor, el){
   const rec = REGENERA_RECORDS.find(r=>r.id===id);
   if(!rec){ if(el){ el.style.outline='2px solid var(--red)'; setTimeout(()=>el.style.outline='',1500);} return; }
-  const etapas = { ...getRegeneraEtapasEntry(rec), [campo]: valor };
+  const atual = getRegeneraEtapasEntry(rec), etapas = { ...(rec.etapas || {}), ...atual };   // mantém o que já estava salvo (inclusive chaves antigas)
+  const lista = Array.isArray(campo) ? campo : [campo];   // data de bloco: o mesmo valor vai pras datas de todas as avaliações dele
+  lista.forEach(k=>{ etapas[k] = valor; });
+  const bloco = Array.isArray(campo) ? null : REGENERA_BLOCOS.find(b=> b.keys.includes(campo)), outros = bloco ? bloco.keys.filter(k=> k!==campo) : [];
+  const naEtapa = !!bloco && valor===STATUS_NAO_SE_APLICA && outros.every(k=> atual[k]===STATUS_NAO_SE_APLICA);   // todas "não se aplica": sem data
+  const eraExec = !!bloco && atual[campo]==='Executado' && valor!=='Executado' && !outros.some(k=> atual[k]==='Executado');   // voltou de Executado e nenhuma outra do bloco está executada: a data de execução é limpa
+  if(naEtapa || eraExec) bloco.keys.forEach(k=>{ etapas[k+'_data'] = null; });
   const { error } = await sb.from('regenera_talhoes').update({ etapas }).eq('id', id);
   if(error){ console.error(error); if(el){ el.style.outline='2px solid var(--red)'; setTimeout(()=>el.style.outline='',2000);} return; }
   rec.etapas = etapas;
   if(el){ el.style.outline='2px solid var(--lime)'; setTimeout(()=>el.style.outline='',900); }
 }
 async function salvarRegeneraEtapasLinha(id, entry){
-  const { error } = await sb.from('regenera_talhoes').update({ etapas: entry }).eq('id', id);
-  if(!error){
-    const rec = REGENERA_RECORDS.find(r=>r.id===id);
-    if(rec) rec.etapas = entry;
-  }
+  const rec = REGENERA_RECORDS.find(r=>r.id===id), etapas = { ...((rec && rec.etapas) || {}), ...entry };
+  const { error } = await sb.from('regenera_talhoes').update({ etapas }).eq('id', id);
+  if(!error && rec) rec.etapas = etapas;
   return { error };
 }
+
 const REGENERA_CAMPOS = [
   { key:'cliente', label:'Cliente', tipo:'texto', obrigatorio:true },
   { key:'fazenda', label:'Fazenda', tipo:'texto', obrigatorio:true },
@@ -17486,10 +17514,6 @@ const REGENERA_CAMPOS = [
   { key:'cultura', label:'Cultura', tipo:'texto' },
   { key:'data_plantio', label:'Data de Plantio', tipo:'data' },
   { key:'variedade', label:'Variedade', tipo:'texto' },
-  { key:'nematoides', label:'Nematoides', tipo:'select', opcoes:REGENERA_SIM_NAO },
-  { key:'descricao_nematoides', label:'Descrição Nematoides', tipo:'texto' },
-  { key:'doencas_solo', label:'Doenças de solo', tipo:'select', opcoes:REGENERA_SIM_NAO },
-  { key:'descricao_doencas', label:'Descrição Doenças', tipo:'texto' },
   { key:'nematicida_biologico', label:'Nematicida biológico', tipo:'texto' },
   { key:'fungicida_biologico', label:'Fungicida biológico', tipo:'texto' },
   { key:'fungicida_quimico', label:'Fungicida químico', tipo:'texto' },
@@ -17522,6 +17546,7 @@ function getRegeneraDefaults(){
 function renderRegenera(){
   const container = document.getElementById('tab-regenera');
   if(!container) return;
+  if(regeneraTreemapChart){ try{ regeneraTreemapChart.destroy(); }catch(e){} regeneraTreemapChart = null; }
 
   if(!state.regeneraFiltroEstado) Object.assign(state, getRegeneraDefaults());
 
@@ -17550,18 +17575,25 @@ function renderRegenera(){
   const areaTotal = filtrados.reduce((a,r)=>a+(Number(r.area)||0),0);
   const areaPorEstado = {};
   filtrados.forEach(r=>{ if(!r.estado) return; areaPorEstado[r.estado] = (areaPorEstado[r.estado]||0) + (Number(r.area)||0); });
+  // área afetada por patógeno: soma a área do talhão quando o patógeno é "Sim" (Não e vazio não somam); a porcentagem é essa soma sobre a ÁREA TOTAL dos talhões filtrados
+  // (por isso as porcentagens não somam 100%: um talhão pode ter mais de um patógeno)
+  const dadosTreemap = grupo => REGENERA_PATOGENOS.filter(p=> p.grupo===grupo).map(p=>{
+    const area = filtrados.filter(r=> getRegeneraEtapasEntry(r)[p.key]==='Sim').reduce((a,r)=> a+(Number(r.area)||0), 0);
+    return { label:p.label, key:p.key, area, pct: areaTotal>0 ? area/areaTotal*100 : 0 };
+  }).filter(x=> x.area>0).sort((x,y)=> y.area-x.area);
   const comCoordenada = filtrados.filter(r=> r.latitude!=null && r.longitude!=null && !isNaN(Number(r.latitude)) && !isNaN(Number(r.longitude)));
 
-  function montarChecklist(id, opcoes, selecionados){
-    return `
-    <div class="fitem">
-      <label>${id.label}</label>
-      <div class="checklist" id="${id.elId}">
-        ${opcoes.map(o=>`<label class="checklist-item"><input type="checkbox" value="${encodeURIComponent(o)}" ${selecionados.has(o)?'checked':''}> ${o}</label>`).join('')}
-      </div>
-      <div class="ms-actions"><button data-todos="${id.elId}">Marcar todos</button><button data-limpar="${id.elId}">Limpar</button></div>
-    </div>`;
+  function montarDropdown(cfg, opcoes, selecionados){   // filtro em dropdown dentro do cartão do mapa; fica aberto depois de escolher (a tela é refeita e reabre onde estava)
+    const n = selecionados.size, aberto = state.regeneraDdAberto===cfg.id;
+    return `<div class="regdd" data-dd="${cfg.id}">
+      <button type="button" class="regdd-btn${n?' ativo':''}" aria-haspopup="true" aria-expanded="${aberto?'true':'false'}">${cfg.label}: ${n ? n+' de '+opcoes.length : 'todos'} ▾</button>
+      <div class="regdd-pop" ${aberto?'':'hidden'}>
+        <input type="search" class="regdd-busca" placeholder="Buscar…" aria-label="Buscar em ${cfg.label}" value="${cgEscH(aberto ? (state.regeneraDdBusca||'') : '')}">
+        <div class="regdd-acoes"><button type="button" data-todos>Marcar todos</button><button type="button" data-limpar>Limpar</button></div>
+        <div class="regdd-lista">${opcoes.map(o=>`<label class="regdd-item"><input type="checkbox" value="${encodeURIComponent(o)}" ${selecionados.has(o)?'checked':''}> <span>${cgEscH(o)}</span></label>`).join('')}</div>
+      </div></div>`;
   }
+  const algumFiltro = state.regeneraFiltroEstado.size + state.regeneraFiltroCliente.size + state.regeneraFiltroCultura.size > 0;
 
   container.innerHTML = `
   <style>
@@ -17570,11 +17602,31 @@ function renderRegenera(){
     .regenera-kpi .v{font-size:26px;font-weight:800;color:var(--ink);}
     .regenera-kpi .l{font-size:10px;color:var(--ink-soft);margin-top:3px;}
     .regenera-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;}
-    .regenera-filtros{display:flex;gap:16px;flex-wrap:wrap;}
-    .regenera-filtros .checklist{max-height:120px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;min-width:160px;}
-    .regenera-mapa-pills{display:flex;gap:6px;margin-bottom:8px;}
-    .regenera-mapa-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
-    .regenera-mapa-pill.active{background:#2d4a1f;color:#fff;border-color:#2d4a1f;}
+    .regenera-grade{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;margin-bottom:12px;align-items:start;}   /* mapa na metade esquerda; a direita fica livre para o que vier */
+    .regenera-grade>.regenera-card{margin-bottom:0;}
+    .regenera-direita:empty{display:none;}
+    @media (max-width:900px){ .regenera-grade{grid-template-columns:minmax(0, 1fr);} }
+    .regenera-mapa-topo{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-bottom:8px;}
+    .regenera-mapa-pills{display:flex;gap:6px;}
+    .regdd{position:relative;}
+    .regdd-btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;white-space:nowrap;}
+    .regdd-btn.ativo{background:#e3eed3;border-color:#7fa653;color:#223c2c;}
+    .regdd-pop{position:absolute;left:0;top:calc(100% + 4px);z-index:1200;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(26,32,25,.18);padding:8px;min-width:220px;max-width:300px;}
+    .regdd-pop[hidden]{display:none;}
+    .regdd-busca{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:12px;}
+    .regdd-acoes{display:flex;gap:6px;margin-bottom:6px;}
+    .regdd-acoes button{flex:1;font-size:11px;padding:4px 6px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-family:inherit;}
+    .regdd-lista{max-height:220px;overflow-y:auto;}
+    .regdd-item{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;border-radius:6px;cursor:pointer;}
+    .regdd-item:hover{background:#f0f2e6;} .regdd-item[hidden]{display:none;}
+    .regdd-limpa{border:0;background:transparent;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
+    .regenera-mapa-pill,.regenera-tm-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+    .regenera-mapa-pill.active,.regenera-tm-pill.active{background:#2d4a1f;color:#fff;border-color:#2d4a1f;}
+    .regenera-direita{display:flex;}
+    .regenera-direita>.regenera-card{flex:1;min-width:0;margin-bottom:0;}
+    .regenera-tm-base{font-size:11px;color:var(--ink-soft);}
+    .regenera-treemap-quadro{height:420px;position:relative;}
+    .reg-ocultar-pat .reg-pat{display:none;}   /* esconde os 9 campos de nematoides e doenças (cabeçalho e linhas) */
     .reg-freeze{position:sticky !important;background:var(--paper);z-index:2;box-shadow:2px 0 4px rgba(0,0,0,.08);}
     thead .reg-freeze{z-index:4;}
     tbody .reg-freeze{background:#fff;}
@@ -17591,43 +17643,62 @@ function renderRegenera(){
     <div class="regenera-kpi"><div class="v">${areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha</div><div class="l">Área total do projeto</div></div>
   </div>
 
-  <div class="regenera-card">
-    <h3 style="margin:0 0 10px;">🔍 Filtros</h3>
-    <div class="regenera-filtros">
-      ${montarChecklist({label:'Estado', elId:'regEstadoChk'}, estadosDisp, state.regeneraFiltroEstado)}
-      ${montarChecklist({label:'Cliente', elId:'regClienteChk'}, clientesDisp, state.regeneraFiltroCliente)}
-      ${montarChecklist({label:'Cultura', elId:'regCulturaChk'}, culturasDisp, state.regeneraFiltroCultura)}
+  <div class="regenera-grade">
+    <div class="regenera-card regenera-mapa-card">
+      <h3 style="margin:0 0 8px;">🗺️ Mapa</h3>
+      <div class="regenera-mapa-topo">
+        <div class="regenera-mapa-pills">
+          <button class="regenera-mapa-pill ${(state.regeneraMapaModo||'area')==='area'?'active':''}" data-mapa-modo="area">Área do projeto</button>
+          <button class="regenera-mapa-pill ${state.regeneraMapaModo==='talhoes'?'active':''}" data-mapa-modo="talhoes">Talhões</button>
+        </div>
+        ${montarDropdown({ id:'regEstado', label:'Estado' }, estadosDisp, state.regeneraFiltroEstado)}
+        ${montarDropdown({ id:'regCliente', label:'Cliente' }, clientesDisp, state.regeneraFiltroCliente)}
+        ${montarDropdown({ id:'regCultura', label:'Cultura' }, culturasDisp, state.regeneraFiltroCultura)}
+        ${algumFiltro ? '<button type="button" class="regdd-limpa" id="regLimpaFiltros">✕ Limpar filtros</button>' : ''}
+      </div>
+      <div id="regeneraLeafletMap" style="height:420px;border-radius:8px;"></div>
     </div>
-  </div>
-
-  <div class="regenera-card">
-    <h3 style="margin:0 0 8px;">🗺️ Mapa</h3>
-    <div class="regenera-mapa-pills">
-      <button class="regenera-mapa-pill ${(state.regeneraMapaModo||'area')==='area'?'active':''}" data-mapa-modo="area">Área do projeto</button>
-      <button class="regenera-mapa-pill ${state.regeneraMapaModo==='talhoes'?'active':''}" data-mapa-modo="talhoes">Talhões</button>
+    <div class="regenera-direita" id="regeneraDireita">
+      <div class="regenera-card regenera-treemap-card">
+        <h3 style="margin:0 0 8px;">🐛🍂 Área afetada por nematoides e doenças</h3>
+        <div class="regenera-mapa-topo">
+          <div class="regenera-mapa-pills">
+            <button type="button" class="regenera-tm-pill ${(state.regeneraTreemapModo||'nematoide')==='nematoide'?'active':''}" data-tm-modo="nematoide">🐛 Nematoides</button>
+            <button type="button" class="regenera-tm-pill ${state.regeneraTreemapModo==='doenca'?'active':''}" data-tm-modo="doenca">🍂 Doenças de solo</button>
+          </div>
+          <span class="regenera-tm-base" title="Soma da área dos talhões com Sim naquele patógeno, dividida pela área total dos talhões filtrados">% sobre ${areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha (área total)</span>
+        </div>
+        <div class="regenera-treemap-quadro"><canvas id="regeneraTreemap"></canvas></div>
+      </div>
     </div>
-    <div id="regeneraLeafletMap" style="height:420px;border-radius:8px;"></div>
   </div>
 
   <div class="regenera-card full-card">
-    <h3 style="margin:0 0 8px;">📋 Talhões (${filtrados.length})</h3>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 8px;">
+      <h3 style="margin:0;">📋 Talhões (${filtrados.length})</h3>
+      <button type="button" class="btn ghost" id="regTogglePat" aria-controls="regTabela" aria-pressed="${state.regeneraOcultaPat?'true':'false'}">${state.regeneraOcultaPat ? '👁️ Expor blocos de doenças' : '🙈 Ocultar blocos de doenças'}</button>
+    </div>
     <div class="table-scroll" data-topscroll="1">
-      <table>
+      <table id="regTabela" class="${state.regeneraOcultaPat ? 'reg-ocultar-pat' : ''}">
         <thead><tr>
-          <th class="reg-freeze reg-freeze-1">Cliente</th><th class="reg-freeze reg-freeze-2">Fazenda</th><th class="reg-freeze reg-freeze-3">Estado</th><th class="reg-freeze reg-freeze-4">Cidade</th><th class="reg-freeze reg-freeze-5">Talhão</th><th>Latitude</th><th>Longitude</th><th>Área</th><th>Cultura</th><th>Data de Plantio</th><th>Variedade</th>
-          <th>Nematoides</th><th>Descrição Nematoides</th><th>Doenças de solo</th><th>Descrição Doenças</th>
-          <th>Nematicida biológico</th><th>Fungicida biológico</th><th>Fungicida químico</th><th>Nematicida químico</th>
-          ${REGENERA_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
-          <th class="reg-freeze-r1">Salvar</th><th class="reg-freeze-r2">Ações</th>
-        </tr>
-        <tr>
-          <th colspan="19"></th>
-          ${REGENERA_ETAPAS.map(()=>`<th>Status</th><th>Data</th>`).join('')}
-          <th class="reg-freeze-r1"></th><th class="reg-freeze-r2"></th>
+          <th rowspan="3" class="reg-freeze reg-freeze-1">Cliente</th><th rowspan="3" class="reg-freeze reg-freeze-2">Fazenda</th><th rowspan="3" class="reg-freeze reg-freeze-3">Estado</th><th rowspan="3" class="reg-freeze reg-freeze-4">Cidade</th><th rowspan="3" class="reg-freeze reg-freeze-5">Talhão</th>
+          <th rowspan="3">Latitude</th><th rowspan="3">Longitude</th><th rowspan="3">Área</th><th rowspan="3">Cultura</th><th rowspan="3">Data de Plantio</th><th rowspan="3">Variedade</th>
+          <th rowspan="3">Status do Plantio</th><th rowspan="3">Tipo de teste</th>
+          <th colspan="5" rowspan="2" class="reg-pat" style="background:#8a5a2b;color:#fff;">Nematoides</th><th colspan="4" rowspan="2" class="reg-pat" style="background:#6b7a3f;color:#fff;">Doenças de solo</th>
+          <th rowspan="3">Participação no projeto</th><th rowspan="3">Status de compra</th>
+          ${REGENERA_CAB_ESTAGIOS.map(g=>`<th colspan="${g.cols}" ${g.semTitulo ? 'rowspan="2"' : ''} style="background:${REGENERA_BLOCO_COR[g.estagio]||'#6b7a3f'};color:#fff;">${g.estagio}</th>`).join('')}
+          <th rowspan="3" class="reg-freeze-r1">Salvar</th><th rowspan="3" class="reg-freeze-r2">Ações</th>
+        </tr><tr>
+          ${REGENERA_CAB_ESTAGIOS.filter(g=>!g.semTitulo).map(g=> g.blocos.map(b=>`<th colspan="${b.keys.length+1}">${b.titulo||''}</th>`).join('')).join('')}
+        </tr><tr>
+          ${REGENERA_PATOGENOS.map(p=>`<th class="reg-pat">${p.label}</th>`).join('')}
+          ${REGENERA_BLOCOS.map(b=> b.keys.map(k=> b.keys.length>1 ? `<th>Status<br><span style="font-weight:400;font-size:10px;">${VNS_ETAPAS.find(e=>e.key===k).sub}</span></th>` : '<th>Status</th>').join('') + '<th>Data</th>').join('')}
         </tr></thead>
         <tbody>
           ${filtrados.map(r=>{
-            const etapasEntry = getRegeneraEtapasEntry(r);
+            const ee = getRegeneraEtapasEntry(r);
+            const selSimples = (campo, opcoes, atual, estilo)=> `<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${campo}" style="font-weight:700;${estilo||''}"><option value="" ${!atual?'selected':''}>—</option>${opcoes.map(o=>`<option value="${o}" ${atual===o?'selected':''}>${o}</option>`).join('')}</select></td>`;
+            const corCompra = ee.status_compra==='Comprado'?'#2ecc71':ee.status_compra==='Não comprado'?'#e74c3c':ee.status_compra==='Em negociação'?'#e67e22':'var(--ink-soft)';
             return `<tr>
             <td class="reg-freeze reg-freeze-1">${r.cliente||''}</td><td class="reg-freeze reg-freeze-2">${r.fazenda||''}</td><td class="reg-freeze reg-freeze-3">${r.estado||''}</td><td class="reg-freeze reg-freeze-4">${r.cidade||''}</td><td class="reg-freeze reg-freeze-5">${r.talhao||''}</td>
             <td class="mono-td">${r.latitude??''}</td><td class="mono-td">${r.longitude??''}</td>
@@ -17635,10 +17706,20 @@ function renderRegenera(){
             <td>${r.cultura||''}</td>
             <td>${r.data_plantio?new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR'):''}</td>
             <td>${r.variedade||''}</td>
-            <td>${r.nematoides||''}</td><td>${r.descricao_nematoides||''}</td>
-            <td>${r.doencas_solo||''}</td><td>${r.descricao_doencas||''}</td>
-            <td>${r.nematicida_biologico||''}</td><td>${r.fungicida_biologico||''}</td><td>${r.fungicida_quimico||''}</td><td>${r.nematicida_quimico||''}</td>
-            ${REGENERA_ETAPAS.map(e=>`<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}" data-cor-status="${e.key}" data-cor-faixa="${e.faixa}">${REGENERA_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${etapasEntry[e.key]===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input type="date" class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${e.key}_data" data-cor-data="${e.key}" value="${etapasEntry[e.key+'_data']||regeneraDataPrevista(r.data_plantio,e.dap)}"></td>`).join('')}
+            ${selSimples('status_plantio', ['Plantado','Estimativa'], ee.status_plantio, `background:${ee.status_plantio==='Plantado'?'#c8e6c9':ee.status_plantio==='Estimativa'?'#fff3b0':'#fff'};`)}
+            ${selSimples('tipo_teste', REGENERA_TIPOS_TESTE, ee.tipo_teste)}
+            ${REGENERA_PATOGENOS.map(p=>`<td class="reg-pat"><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${p.key}" style="font-weight:700;${regeneraEstiloPat(ee[p.key])}"><option value="" ${!ee[p.key]?'selected':''}>—</option>${REGENERA_SIM_NAO.map(o=>`<option value="${o}" ${ee[p.key]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')}
+            <td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="participacao" style="font-weight:700;color:${ee.participacao==='Sim'?'#2ecc71':'var(--ink-soft)'};">${REGENERA_SIM_NAO.map(o=>`<option value="${o}" ${ee.participacao===o?'selected':''}>${o}</option>`).join('')}</select></td>
+            ${selSimples('status_compra', REGENERA_STATUS_COMPRA, ee.status_compra, `color:${corCompra};`)}
+            ${REGENERA_BLOCOS.map(b=>{
+              const uid = b.keys[0], prazo = REGENERA_PRAZO[uid], prev = regeneraDataPrevista(r.data_plantio, prazo.dap);
+              const algumExec = b.keys.some(k=> ee[k]==='Executado');
+              const dtsBloco = b.keys.filter(k=> ee[k+'_data']), dataSalva = dtsBloco.length ? ee[dtsBloco[0]+'_data'] : '', dif = new Set(dtsBloco.map(k=> ee[k+'_data'])).size>1;   // datas diferentes dentro do bloco: mostra a primeira, avisa, e só troca quando a pessoa escolher uma data
+              const difTxt = dif ? 'Datas diferentes neste bloco: '+dtsBloco.map(k=> new Date(ee[k+'_data']+'T00:00:00').toLocaleDateString('pt-BR')+' ('+REGENERA_ETAPAS.find(e=>e.key===k).label+')').join(', ')+'. Escolha uma data para igualar todas.' : '';
+              const valor = dataSalva || (algumExec ? '' : prev);
+              return b.keys.map(k=>`<td><select class="cell-input regenera-etapa-input" data-reg-id="${r.id}" data-reg-campo="${k}" data-cor-status="${uid}" data-cor-faixa="${prazo.faixa}">${REGENERA_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${ee[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
+                + `<td><input type="date" class="cell-input regenera-etapa-input${dif?' dt-div':''}" data-reg-id="${r.id}" data-reg-campo="${uid}_data" data-reg-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" data-orig="${valor}" data-dif="${dif?1:0}" data-dif-txt="${cgEscH(difTxt)}" ${dif?`title="${cgEscH(difTxt)}"`:''} value="${valor}"></td>`;
+            }).join('')}
             <td class="reg-freeze-r1" style="white-space:nowrap;">
               <button class="row-save regenera-etapa-save-btn" data-reg-id="${r.id}">💾 Salvar</button>
               <span class="regenera-etapa-msg" data-reg-msg-id="${r.id}"></span>
@@ -17648,31 +17729,33 @@ function renderRegenera(){
               <button class="row-edit-btn regenera-del-btn" data-id="${r.id}" title="Excluir">🗑️</button>
             </td>
           </tr>`;
-          }).join('') || `<tr><td colspan="${19+REGENERA_ETAPAS.length*2+2}">Nenhum talhão com esse filtro.</td></tr>`}
+          }).join('') || `<tr><td colspan="${24+REGENERA_COLUNAS_ETAPAS+2}">Nenhum talhão com esse filtro.</td></tr>`}
         </tbody>
       </table>
     </div>
   </div>
   `;
 
-  function ligarChecklist(elId, targetSet){
-    const box = container.querySelector('#'+elId);
-    box.addEventListener('change', ()=>{
-      targetSet.clear();
-      box.querySelectorAll('input[type=checkbox]:checked').forEach(cb=> targetSet.add(decodeURIComponent(cb.value)));
-      renderRegenera();
-    });
-    const btnTodos = container.querySelector(`[data-todos="${elId}"]`);
-    const btnLimpar = container.querySelector(`[data-limpar="${elId}"]`);
-    if(btnTodos) btnTodos.addEventListener('click', ()=>{
-      box.querySelectorAll('input[type=checkbox]').forEach(cb=>{ cb.checked = true; targetSet.add(decodeURIComponent(cb.value)); });
-      renderRegenera();
-    });
-    if(btnLimpar) btnLimpar.addEventListener('click', ()=>{ targetSet.clear(); renderRegenera(); });
+  const conjuntoDd = { regEstado:state.regeneraFiltroEstado, regCliente:state.regeneraFiltroCliente, regCultura:state.regeneraFiltroCultura };
+  const fecharDd = ()=>{ container.querySelectorAll('.regdd-pop').forEach(p=>{ p.hidden = true; }); container.querySelectorAll('.regdd-btn').forEach(b=> b.setAttribute('aria-expanded','false')); state.regeneraDdAberto = null; };
+  container.querySelectorAll('.regdd').forEach(dd=>{
+    const id = dd.dataset.dd, conj = conjuntoDd[id], btn = dd.querySelector('.regdd-btn'), pop = dd.querySelector('.regdd-pop'), busca = dd.querySelector('.regdd-busca');
+    const filtrarItens = ()=>{ const q = busca.value.trim().toLowerCase(); dd.querySelectorAll('.regdd-item').forEach(it=>{ it.hidden = !!q && !it.textContent.toLowerCase().includes(q); }); };
+    filtrarItens();
+    btn.addEventListener('click', ()=>{ const abrir = pop.hidden; fecharDd(); if(abrir){ pop.hidden = false; btn.setAttribute('aria-expanded','true'); state.regeneraDdAberto = id; state.regeneraDdBusca = ''; busca.value = ''; filtrarItens(); busca.focus(); } });
+    busca.addEventListener('input', ()=>{ state.regeneraDdBusca = busca.value; filtrarItens(); });
+    dd.querySelector('.regdd-lista').addEventListener('change', ()=>{ conj.clear(); dd.querySelectorAll('.regdd-lista input:checked').forEach(cb=> conj.add(decodeURIComponent(cb.value))); state.regeneraDdAberto = id; renderRegenera(); });
+    dd.querySelector('[data-todos]').addEventListener('click', ()=>{ dd.querySelectorAll('.regdd-item:not([hidden]) input').forEach(cb=> conj.add(decodeURIComponent(cb.value))); state.regeneraDdAberto = id; renderRegenera(); });
+    dd.querySelector('[data-limpar]').addEventListener('click', ()=>{ conj.clear(); state.regeneraDdAberto = id; renderRegenera(); });
+  });
+  const limpaTudo = container.querySelector('#regLimpaFiltros');
+  if(limpaTudo) limpaTudo.addEventListener('click', ()=>{ state.regeneraFiltroEstado.clear(); state.regeneraFiltroCliente.clear(); state.regeneraFiltroCultura.clear(); state.regeneraDdAberto = null; renderRegenera(); });
+  if(!window.__regDdOuvindo){   // clicar fora ou apertar Esc fecha o dropdown aberto (registrado uma vez só)
+    window.__regDdOuvindo = true;
+    const fechar = ()=>{ const t = document.getElementById('tab-regenera'); if(t){ t.querySelectorAll('.regdd-pop').forEach(p=>{ p.hidden = true; }); t.querySelectorAll('.regdd-btn').forEach(b=> b.setAttribute('aria-expanded','false')); } state.regeneraDdAberto = null; };
+    document.addEventListener('pointerdown', e=>{ if(!e.target.closest('.regdd')) fechar(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') fechar(); });
   }
-  ligarChecklist('regEstadoChk', state.regeneraFiltroEstado);
-  ligarChecklist('regClienteChk', state.regeneraFiltroCliente);
-  ligarChecklist('regCulturaChk', state.regeneraFiltroCultura);
 
   container.querySelectorAll('.regenera-mapa-pill').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -17680,22 +17763,46 @@ function renderRegenera(){
       renderRegenera();
     });
   });
+  const btnPat = container.querySelector('#regTogglePat');
+  if(btnPat) btnPat.addEventListener('click', ()=>{   // mostra/oculta os 9 campos sem refazer a tabela (não perde nada do que está na tela)
+    state.regeneraOcultaPat = !state.regeneraOcultaPat;
+    container.querySelector('#regTabela').classList.toggle('reg-ocultar-pat', state.regeneraOcultaPat);
+    btnPat.textContent = state.regeneraOcultaPat ? '👁️ Expor blocos de doenças' : '🙈 Ocultar blocos de doenças';
+    btnPat.setAttribute('aria-pressed', state.regeneraOcultaPat ? 'true' : 'false');
+  });
   container.querySelectorAll('.regenera-etapa-input').forEach(el=>{
     el.addEventListener('change', ()=>{
-      salvarRegeneraEtapaCampo(el.dataset.regId, el.dataset.regCampo, el.value || null, el);
+      const campo = el.dataset.regCampo, rec = REGENERA_RECORDS.find(r=>r.id===el.dataset.regId);
+      if(campo==='status_plantio') el.style.background = el.value==='Plantado' ? '#c8e6c9' : el.value==='Estimativa' ? '#fff3b0' : '#fff';
+      if(campo==='status_compra') el.style.color = el.value==='Comprado' ? '#2ecc71' : el.value==='Não comprado' ? '#e74c3c' : el.value==='Em negociação' ? '#e67e22' : 'var(--ink-soft)';
+      if(campo==='participacao') el.style.color = el.value==='Sim' ? '#2ecc71' : 'var(--ink-soft)';
+      if(REGENERA_PATOGENOS.some(p=> p.key===campo)) el.style.cssText = 'font-weight:700;'+regeneraEstiloPat(el.value);   // Sim vermelho, Não verde
+      const valor = regeneraNormalizarData(rec, campo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são gravadas (a de execução é)
+      const salvando = salvarRegeneraEtapaCampo(el.dataset.regId, el.dataset.regGrupo ? el.dataset.regGrupo.split(',').map(k=>k+'_data') : campo, valor, el);   // data de bloco: grava a mesma nas avaliações dele
+      if(REGENERA_PATOGENOS.some(p=> p.key===campo)) salvando.then(()=> montarTreemapRegenera());   // o treemap acompanha o que foi marcado
+      if(el.dataset.regGrupo){ el.classList.remove('dt-div'); el.removeAttribute('title'); el.dataset.dif = '0'; el.dataset.orig = el.value; }   // a pessoa escolheu: as datas do bloco ficam iguais
     });
   });
   container.querySelectorAll('.regenera-etapa-save-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.dataset.regId;
+      const id = btn.dataset.regId, rec = REGENERA_RECORDS.find(r=>r.id===id);
       const msgEl = container.querySelector(`.regenera-etapa-msg[data-reg-msg-id="${id}"]`);
-      const entry = {};
-      container.querySelectorAll(`.regenera-etapa-input[data-reg-id="${id}"]`).forEach(el=>{ entry[el.dataset.regCampo] = el.value || null; });
+      const entry = { ...getRegeneraEtapasEntry(rec) };   // começa pelo que já está salvo
+      container.querySelectorAll(`.regenera-etapa-input[data-reg-id="${id}"]`).forEach(el=>{
+        if(el.dataset.regGrupo){
+          if(el.dataset.dif==='1' && el.value===el.dataset.orig) return;   // datas diferentes e a pessoa não mexeu: cada avaliação fica com a data que já tinha
+          const v = regeneraNormalizarData(rec, el.dataset.regCampo, el.value || null, dataEhExecucao(el));
+          el.dataset.regGrupo.split(',').forEach(k=>{ entry[k+'_data'] = v; });
+          return;
+        }
+        entry[el.dataset.regCampo] = el.value || null;
+      });
       const textoOriginal = btn.textContent;
       btn.disabled = true; btn.textContent = '⏳ Salvando…';
       if(msgEl) msgEl.textContent = '';
       const { error } = await salvarRegeneraEtapasLinha(id, entry);
       btn.disabled = false; btn.textContent = textoOriginal;
+      if(!error) montarTreemapRegenera();
       if(msgEl){
         if(error){ msgEl.textContent = '✕ Erro ao salvar — tente de novo'; msgEl.style.color = 'var(--red)'; }
         else { msgEl.textContent = '✓ Salvo com sucesso'; msgEl.style.color = 'var(--lime)'; }
@@ -17716,6 +17823,46 @@ function renderRegenera(){
     REGENERA_RECORDS = REGENERA_RECORDS.filter(r=>r.id!==rec.id);
     renderRegenera();
   }));
+
+  const COR_PAT = { nematoide_lesoes_radiculares:'#6b3f7a', nematoide_galhas:'#2c4a7a', nematoide_cisto:'#5c7a3f', nematoide_reniforme:'#b8352a', nematoide_espiralado:'#2e6e76', doenca_fusarium:'#b8352a', doenca_macrophomina:'#8a5a4a', doenca_mofo_branco:'#2e6e76', doenca_rhizoctonia:'#6b3f7a' };
+  const fmtPctRg = v=> v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%', fmtHaRg = v=> v.toLocaleString('pt-BR',{maximumFractionDigits:1})+' ha';
+  function montarTreemapRegenera(){   // refaz só o treemap (não mexe no mapa nem nos dropdowns)
+    const cv = container.querySelector('#regeneraTreemap'), quadro = container.querySelector('.regenera-treemap-quadro'); if(!cv || !quadro) return;
+    const modo = state.regeneraTreemapModo==='doenca' ? 'doenca' : 'nematoide';
+    if(regeneraTreemapChart){ try{ regeneraTreemapChart.destroy(); }catch(e){} regeneraTreemapChart = null; }
+    container.querySelectorAll('.regenera-tm-pill').forEach(b=> b.classList.toggle('active', b.dataset.tmModo===modo));
+    quadro.querySelectorAll('.regenera-tm-vazio').forEach(e=> e.remove());
+    const dados = dadosTreemap(modo==='doenca' ? 'doenca' : 'nema');
+    if(!dados.length){
+      cv.style.display = 'none';
+      quadro.insertAdjacentHTML('beforeend', `<p class="sub-sm regenera-tm-vazio" style="text-align:center;margin-top:30px;">Nenhum talhão com "Sim" ${modo==='doenca' ? 'em doenças de solo' : 'em nematoides'} ainda. Marque Sim na tabela e o gráfico aparece aqui.</p>`);
+      return;
+    }
+    cv.style.display = '';
+    const porLabel = {}; dados.forEach(d=>{ porLabel[d.label] = d; });
+    try{
+      regeneraTreemapChart = new Chart(cv.getContext('2d'), {
+        type: 'treemap',
+        data: { datasets: [{
+          tree: dados, key: 'area', groups: ['label'],
+          backgroundColor: (ctx)=> ctx.type==='data' ? ((porLabel[ctx.raw.g] && COR_PAT[porLabel[ctx.raw.g].key]) || '#6b3f7a') : 'transparent',
+          borderWidth: 2, borderColor: '#fbfaf4', spacing: 1,
+          labels: { display: true, color: '#fff', align: 'center', font: { size: 12, weight: '700' },
+            formatter: (ctx)=>{ const d = porLabel[ctx.raw.g]; return d ? [d.label, fmtPctRg(d.pct), fmtHaRg(d.area)] : [ctx.raw.g || '']; } },
+        }] },
+        options: { responsive:true, maintainAspectRatio:false, animation:{ duration:850, easing:'easeOutQuart' },
+          plugins:{ legend:{ display:false }, datalabels:{ display:false },
+            tooltip:{ callbacks:{ label:(ctx)=>{ const d = porLabel[ctx.raw.g]; return d ? `${d.label}: ${fmtPctRg(d.pct)} da área (${fmtHaRg(d.area)})` : ''; } } } },
+        },
+      });
+    }catch(err){
+      console.error('Erro ao montar o treemap do Regenera:', err);
+      cv.style.display = 'none';
+      quadro.insertAdjacentHTML('beforeend', '<p class="sub-sm regenera-tm-vazio" style="text-align:center;margin-top:30px;">⚠️ Erro ao montar este gráfico.</p>');
+    }
+  }
+  container.querySelectorAll('.regenera-tm-pill').forEach(btn=> btn.addEventListener('click', ()=>{ state.regeneraTreemapModo = btn.dataset.tmModo; montarTreemapRegenera(); }));
+  montarTreemapRegenera();
 
   const modoMapaRegenera = state.regeneraMapaModo || 'area';
   if(modoMapaRegenera==='talhoes'){
