@@ -6183,6 +6183,7 @@ async function carregarDadosDoSupabase(){
     pct = Math.max(0, Math.min(100, Math.round(pct)));
     document.querySelectorAll('.load-progress-fill').forEach(el=> el.style.width = pct+'%');
     document.querySelectorAll('.load-progress-text').forEach(el=> el.textContent = pct+'%');
+window.__cargaPct = pct; document.querySelectorAll('.labs-carga').forEach(el=> el.setAttribute('aria-valuenow', pct));   // a tela de Gestão de Laboratórios desenha a mesma barra enquanto espera os talhões
   }
   atualizarProgresso(0);
   const loadingEl = document.getElementById('dashMgLoading');
@@ -6327,7 +6328,7 @@ async function carregarDadosDoSupabase(){
           .select('talhao_id, dados').eq('projeto_id', projetoIdCf).in('talhao_id', bloco);
         if(!errDCf && dadosCf) dadosCf.forEach(d=>{ dadosMapCf[d.talhao_id] = d.dados || {}; });
       }
-      atualizarProgresso(15 + ((i+CHUNK_IDS) / Math.max(ids.length,1)) * 75);
+      atualizarProgresso(15 + (Math.min(i+CHUNK_IDS, ids.length) / Math.max(ids.length,1)) * 75);   // o último bloco não passa de 90% (antes passava e a barra voltava para trás)
     }
     atualizarProgresso(90);
 
@@ -13408,7 +13409,7 @@ const labsUnidadePos = u=>{ const o = LABS.pos[u.id]; return o ? { lat:o.lat, ln
 const labsParcCor = nome=> (typeof vgParceiroCor==='function' ? vgParceiroCor(nome) : '#757575');
 const labsIcone = (tipo, cor)=>{ const t = (tipo==='lab' || tipo==='labx') ? 18 : 24; return L.divIcon({ className:'labs-pino', iconSize:[t,t], iconAnchor:[t/2,t/2], popupAnchor:[0,-t/2], tooltipAnchor:[0,-t/2],
   html: tipo==='lab' ? `<span class="labs-lab" style="background:${LABS_COR_LAB}"></span>` : tipo==='labx' ? `<span class="labs-lab" style="background:${cor}"></span>` : tipo==='apoio' ? `<span class="labs-apoio" style="background:${LABS_COR_APOIO}"></span>` : `<span class="labs-parc" style="background:${cor}"></span>` }); };
-const labsProjKeys = ()=> typeof VG_VISIVEIS!=='undefined' ? VG_VISIVEIS.map(p=> p.key) : ['estr','oxc','vns','ladroes','maximas'];   // os projetos da Visão Geral: a MESMA lista (VG_VISIVEIS) que a tabela principal dela usa
+const labsProjKeys = ()=> (typeof VG_VISIVEIS!=='undefined' ? VG_VISIVEIS.map(p=> p.key) : ['estr','oxc','vns','ladroes','maximas']).filter(k=> k!=='estr');   // a Estruturação não tem análise de laboratório: fica de fora do mapa, das atribuições e da exportação   // os projetos da Visão Geral: a MESMA lista (VG_VISIVEIS) que a tabela principal dela usa
 const labsListaProj = ()=>{ const n = labsProjKeys().map(k=> labsProjInfo(k).label); return n.length>1 ? n.slice(0,-1).join(', ')+' e '+n[n.length-1] : n.join(''); };
 // Vida no Solo tem três grupos de análise que vão para laboratórios diferentes: nematoides (NemaLab Rio Verde), BioAs e folha (qualquer Solos e Plantas) e metagenômica (Biome 4 All).
 // Na tela de atribuição o projeto 'vns' vira estas três caixinhas; elas são gravadas em labs_atribuicoes como projeto 'vns-nematoides', 'vns-bioas' e 'vns-biome'.
@@ -13428,6 +13429,10 @@ function labsRotulos(keys){   // rótulos dos projetos de um laboratório; as tr
   keys.forEach(k=>{ const r = labsSubVns(k) && todas ? LABS_VNS_TODAS : labsProjInfo(k).label; if(!out.includes(r)) out.push(r); });
   return out;
 }
+const labsBarraHtml = texto=>{   // a mesma barra da Central (classes load-progress-*): o contador da carga atualiza o tamanho e o número sozinho
+  const p = Math.max(0, Math.min(100, Math.round(window.__cargaPct || 0)));
+  return `<div class="labs-carga" role="progressbar" aria-label="Carregando os talhões" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><p class="labs-status">⏳ ${texto}</p><div class="load-progress-track" style="width:100%;max-width:100%;margin:8px 0 4px;"><div class="load-progress-fill" style="width:${p}%;"></div></div><p class="load-progress-text">${p}%</p></div>`;
+};
 const labsDadosProntos = ()=> typeof RECORDS!=='undefined' && RECORDS.length>0;
 function labsProjetosDoParceiro(nome){   // projetos em que ele tem talhão: o parceiro é gravado em cada talhão, e cada talhão sabe em quais projetos participa
   const recs = (typeof RECORDS!=='undefined' ? RECORDS : []).filter(r=> (String(r.responsavel_parceiro || '').trim() || 'Em aberto')===nome);
@@ -13447,7 +13452,7 @@ function labsGrupos(p){   // um grupo por laboratório de destino: { chave, dest
   const linhas = bruto.flatMap(a=> a.projeto==='vns' ? (temSub ? [] : LABS_VNS_SUB.map(s=> ({ ...a, projeto:s.key }))) : [a]);   // linha antiga 'vns' = as três caixinhas no mesmo laboratório
   linhas.forEach(a=>{ const ch = a.destino_tipo+':'+a.destino_id; if(!g.has(ch)) g.set(ch, { chave:ch, tipo:a.destino_tipo, id:a.destino_id, projetos:[] }); g.get(ch).projetos.push(a.projeto); });
   if(!linhas.length && p.atribuido_tipo && p.atribuido_id) g.set(p.atribuido_tipo+':'+p.atribuido_id, { chave:p.atribuido_tipo+':'+p.atribuido_id, tipo:p.atribuido_tipo, id:p.atribuido_id, projetos: labsDadosProntos() ? labsProjetosDoParceiro(p.parceiro).map(x=> x.key) : null });
-  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? labsAtribKeys().filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest);
+  return [...g.values()].map(x=> ({ ...x, projetos: x.projetos ? labsAtribKeys().filter(k=> x.projetos.includes(k)) : null, dest:labsResolverDestino(x.tipo, x.id) })).filter(x=> x.dest && (x.projetos===null || x.projetos.length));   // grupo que só tinha projeto que saiu da lista (Estruturação) some
 }
 function labsSemLab(p){   // projetos do parceiro sem laboratório. Só vale quando ele já tem alguma atribuição: aí é projeto novo e merece o aviso
   if(!labsDadosProntos()) return [];
@@ -13926,7 +13931,7 @@ function labsExpHtml(){
 async function labsCarregarParcTabela(atualizar){   // quem o painel "Adicionar parceiro" oferece: só parceiros com talhão em algum dos 5 projetos, lido dos talhões carregados do banco (nada de lista fixa no código)
   LABS.parcTabEstado = 'carregando'; LABS.parcTabErro = '';
   try{
-    if((atualizar || !labsDadosProntos()) && typeof carregarDadosDoSupabase==='function') await carregarDadosDoSupabase();   // lê de novo as tabelas (talhões e dados dos projetos)
+    if((atualizar || !labsDadosProntos()) && typeof carregarDadosDoSupabase==='function'){ window.__cargaPct = 0; await carregarDadosDoSupabase(); }   // lê de novo as tabelas (talhões e dados dos projetos)
     if(!labsDadosProntos()) throw new Error('Os talhões ainda não carregaram.');
     const por = new Map();
     RECORDS.forEach(r=>{
@@ -13943,7 +13948,7 @@ function labsAbrirAtrib(nome, jaTentou){   // abre a tela: os projetos do parcei
   LABS.msg = ''; LABS.modo = 'atrib'; if(LABS.mapa) LABS.mapa.closePopup();
   if(!labsDadosProntos()){
     LABS.rascunho = { parceiro:nome, pronto:false, atrib:{}, blocos:[], sujo:false, erro:'' };
-    if(!jaTentou && typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome, true); }); }
+    if(!jaTentou && typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; window.__cargaPct = 0; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome, true); }); }
     labsDesenharPainel(); return;
   }
   const projs = labsProjetosDoParceiro(nome).map(x=> x.key), grupos = labsGrupos(p), atrib = {};
@@ -13961,7 +13966,7 @@ function labsAtribHtml(){
   const r = LABS.rascunho, voltar = '<button type="button" class="labs-voltar" data-labs-acao="atrib-cancelar">← Voltar</button>';
   if(!r) return voltar;
   const cab = `${voltar}<h3 class="labs-h"><span class="labs-ponto" style="background:${labsParcCor(r.parceiro)}"></span>${cgEscH(r.parceiro)}</h3><p class="labs-peq">Arraste a ficha de cada projeto para o laboratório que vai atendê-lo. Cada projeto vai para um laboratório só; o Vida no Solo tem três fichas (nematoides, BioAs e folha, metagenômica), cada uma pode ir para um laboratório diferente. Nada vale até clicar em Salvar.</p>`;
-  if(!r.pronto) return cab+'<p class="labs-status">⏳ Carregando os talhões e projetos deste parceiro…</p><button type="button" class="btn ghost" data-labs-acao="atrib-recarregar">Tentar de novo</button>';
+  if(!r.pronto) return cab+''+labsBarraHtml('Carregando os talhões e projetos deste parceiro…')+'<button type="button" class="btn ghost" data-labs-acao="atrib-recarregar">Tentar de novo</button>';
   const projs = labsProjetosDoParceiro(r.parceiro);
   if(!projs.length) return cab+'<p class="labs-aviso">Este parceiro ainda não tem talhões em nenhum dos '+labsProjKeys().length+' projetos ('+labsListaProj()+').</p>';
   const ficha = k=>{ const pj = labsProjInfo(k), n = projs.find(x=> x.key===k).n; return `<div class="labs-ficha" draggable="true" data-projeto="${k}" style="border-left:4px solid ${pj.cor}"><b>${cgEscH(pj.label)}</b> <span class="labs-peq">${n} talhão(ões)</span>${r.novos.includes(k) ? ' <span class="labs-novo">novo</span>' : ''}</div>`; };
@@ -14014,7 +14019,7 @@ function labsDesenharPainel(){
   if(LABS.modo==='parceiro-lista'){
     const topo = `<button type="button" class="labs-voltar" data-labs-acao="voltar">← Voltar</button><h3 class="labs-h">Adicionar parceiro</h3><p class="labs-peq">Só aparecem os parceiros que têm talhão em algum dos ${labsProjKeys().length} projetos (${labsListaProj()}), os mesmos da Visão Geral. Cada parceiro tem um ponto só: quem já está no mapa abre para editar.</p>`;
     if(LABS.parcTabEstado==='erro'){ el.innerHTML = topo+`<div class="labs-erro">Não consegui ler os parceiros: ${cgEscH(LABS.parcTabErro)}</div><button type="button" class="btn ghost" data-labs-acao="parc-atualizar">Tentar de novo</button>`; return; }
-    if(LABS.parcTabEstado!=='ok' || !LABS.parcTab){ el.innerHTML = topo+'<p class="labs-status">⏳ Buscando os parceiros dos talhões…</p>'; return; }
+    if(LABS.parcTabEstado!=='ok' || !LABS.parcTab){ el.innerHTML = topo+labsBarraHtml('Buscando os parceiros dos talhões…'); return; }
     const lista = LABS.parcTab, nomesTab = new Set(lista.map(x=> x.nome)), foraLista = n=> typeof VG_PARCEIROS!=='undefined' && !VG_PARCEIROS.some(p=> p.v===n);
     const item = (n, sub, dica)=>{ const ja = LABS.parceiros.find(p=> p.parceiro===n); return `<button type="button" class="labs-item" data-labs-acao="escolher-parceiro" data-parceiro="${cgEscH(n)}" title="${cgEscH(dica || '')}"><span class="labs-ponto" style="background:${labsParcCor(n)}"></span><span class="labs-item-t">${cgEscH(n)}</span><span class="labs-item-s">${sub} · ${ja ? '📍 '+cgEscH(labsCidUf(ja)) : 'sem ponto'}</span></button>`; };
     const semTalhao = LABS.parceiros.filter(p=> !nomesTab.has(p.parceiro));
