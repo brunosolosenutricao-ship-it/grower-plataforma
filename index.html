@@ -2500,6 +2500,7 @@ var qrcode = function() {
   input.dt-br{min-width:118px;padding-right:26px !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");background-repeat:no-repeat;background-position:right 6px center;background-size:15px;}
   input.dt-br.dt-invalida{outline:2px solid var(--red);}
 .dt-exec-vazia{outline:2px solid #e0a200 !important;outline-offset:-2px;background:#fff8e1 !important;}
+.dt-div{outline:2px dashed #d9730d !important;outline-offset:-2px;background:#fff1e0 !important;}   /* as avaliações do bloco têm datas diferentes: nada é trocado até a pessoa escolher uma data */
   .alim-fbtn{border:none;background:transparent;color:inherit;opacity:.55;cursor:pointer;font-size:10px;line-height:1;padding:2px 4px;margin-left:3px;border-radius:4px;vertical-align:middle;}
   .alim-fbtn:hover{opacity:1;background:rgba(0,0,0,.10);}
   .alim-fbtn.ativo{opacity:1;background:#111;color:#fff;}
@@ -5541,7 +5542,7 @@ function recolorirStatusData(el, mudouStatus){
     }
     const falta = algumExec && !dt.disabled && !dt.value;   // Executado sem a data real
     dt.classList.toggle('dt-exec-vazia', falta);
-    dt.title = falta ? 'Executado sem data: informe a data real da execução' : '';
+    dt.title = falta ? 'Executado sem data: informe a data real da execução' : (dt.dataset.dif==='1' ? (dt.dataset.difTxt||'') : '');
   }
   sels.forEach(sel=>{   // a data pode ter mudado: repinta todos os status que dependem dela
     const e = estiloStatusPorData(sel.value, dt ? dt.value : '', sel.dataset.corFaixa!==undefined);
@@ -5759,6 +5760,9 @@ const ESTR_ETAPAS = [
   { key:'pmg_planta', label:'PMG por planta', bloco:'R6/R7' },
 ];
 const ESTR_BLOCO_COR = { 'V4':'#2c4a7a', 'R1/R2':'#8a4f7d', 'R6/R7':'#6b7a3f' };
+// Uma data só por bloco (V4, R1/R2, R6/R7): é a data da coleta e vale para todas as avaliações do bloco (grava igual em cada uma, então o resto do app lê cada avaliação como antes). A execução (status) continua por avaliação.
+const ESTR_BLOCOS = ['V4','R1/R2','R6/R7'].map((b,i)=> ({ bloco:b, uid:'bl'+i, etapas:ESTR_ETAPAS.filter(e=> e.bloco===b) }));
+const estrDatasTxt = (entry, bl)=> bl.etapas.filter(e=> entry[e.key+'_mes']).map(e=> new Date(entry[e.key+'_mes']+'T00:00:00').toLocaleDateString('pt-BR')+' ('+e.label+')').join(', ');
 // DESLOCAMENTO DE DAP (safra 2026.27): a soja está mais lenta que o padrão, então TODOS os estádios foram empurrados por este número de dias (V4 25→30, R1/R2 45→50...).
 // É a única conta: os DAPs abaixo são "DAP padrão + deslocamento", e as tabelas, o Cronograma, o Planejar, os Alertas e os PDFs leem daqui. Para mudar de novo, é só trocar este número (as tolerâncias não mudam).
 const DAP_DESLOCAMENTO = 5;
@@ -5854,9 +5858,9 @@ const VNS_ETAPAS = [   // label = nome mostrado no app; labelExcel = nome de ant
   { key:'etapa21_nematoides', label:'Solo para nematoides', labelExcel:'Etapa 2.1 – Solo para nematoides', sub:'Solo para nematoides' },
   { key:'etapa21_bioas', label:'Solo para análise biológica (BioAs)', labelExcel:'Etapa 2.1 – Solo para análise biológica (BioAs)', sub:'Solo para análise biológica (BioAs)' },
   { key:'etapa21_metagenomica', label:'Solo para análise metagenômica', labelExcel:'Etapa 2.1 – Solo para análise metagenômica', sub:'Solo para análise metagenômica' },
-  { key:'etapa22_aval_aerea', label:'Avaliação fotográfica (Parte Aérea)', labelExcel:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)' },
-  { key:'etapa23_aval_raizes', label:'Avaliação fotográfica (Raízes)', labelExcel:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)' },
-  { key:'etapa3_analise_foliar', label:'Análise foliar', labelExcel:'Etapa 3 – Análise foliar (R1/R2)' },
+  { key:'etapa22_aval_aerea', label:'Avaliação fotográfica (Parte Aérea)', labelExcel:'Etapa 2.2 – Avaliação fotográfica (Parte Aérea - R1/R2)', sub:'Avaliação fotográfica (Parte Aérea)' },
+  { key:'etapa23_aval_raizes', label:'Avaliação fotográfica (Raízes)', labelExcel:'Etapa 2.3 – Avaliação fotográfica (Raízes - R1/R2)', sub:'Avaliação fotográfica (Raízes)' },
+  { key:'etapa3_analise_foliar', label:'Análise foliar', labelExcel:'Etapa 3 – Análise foliar (R1/R2)', sub:'Análise foliar' },
   { key:'etapa_r67_foto_planta', label:'Foto da planta inteira (pano azul)', labelExcel:'Foto da planta inteira (pano azul)', sub:'Foto da planta inteira (pano azul)' },
   { key:'etapa_r67_produtividade', label:'Produtividade por planta', labelExcel:'Produtividade por planta', sub:'Produtividade por planta' },
   { key:'etapa_r67_pmg', label:'PMG por planta', labelExcel:'PMG por planta', sub:'PMG por planta' },
@@ -5872,12 +5876,11 @@ const VNS_ETAPA_PRAZO = {
   etapa_r67_foto_planta:{ dap:105+DAP_DESLOCAMENTO, faixa:5 }, etapa_r67_produtividade:{ dap:105+DAP_DESLOCAMENTO, faixa:5 }, etapa_r67_pmg:{ dap:105+DAP_DESLOCAMENTO, faixa:5 },
   etapa4_produtividade:{ dap:130+DAP_DESLOCAMENTO, faixa:5 }, etapa4_analise_graos:{ dap:130+DAP_DESLOCAMENTO, faixa:5 }, etapa4_pmg:{ dap:130+DAP_DESLOCAMENTO, faixa:5 },
 };
-// A Etapa 2.1 e a Etapa 4 se dividem em 3 avaliações cada: cada uma com o seu status, todas na MESMA data (uma coluna de data por bloco).
-// As demais etapas têm status e data próprios. A data de um bloco é gravada igual nas avaliações dele, então o resto do app lê cada uma como avaliação independente.
+// Cada bloco tem um status por avaliação e UMA data só (R1/R2: 6 avaliações; R6/R7 e Colheita: 3 cada).
+// A data de um bloco é gravada igual nas avaliações dele, então o resto do app lê cada uma como avaliação independente.
 // O cabeçalho da tabela tem o bloco do estádio (R1/R2, Colheita) em cima e, abaixo, o título de cada etapa. A Colheita não tem título de etapa (o nome do bloco já diz).
 const VNS_BLOCOS = [
-  { estagio:'R1/R2', titulo:'Coleta de solo', keys:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica'] },
-  { estagio:'R1/R2', keys:['etapa22_aval_aerea'] }, { estagio:'R1/R2', keys:['etapa23_aval_raizes'] }, { estagio:'R1/R2', keys:['etapa3_analise_foliar'] },
+  { estagio:'R1/R2', keys:['etapa21_nematoides','etapa21_bioas','etapa21_metagenomica','etapa22_aval_aerea','etapa23_aval_raizes','etapa3_analise_foliar'] },   // 6 avaliações no mesmo dia: uma data só pro bloco (sem título, como o R6/R7 e a Colheita)
   { estagio:'R6/R7', keys:['etapa_r67_foto_planta','etapa_r67_produtividade','etapa_r67_pmg'] },   // 3 avaliações, uma data pro bloco (sem título, como a Colheita)
   { estagio:'Colheita', keys:['etapa4_produtividade','etapa4_analise_graos','etapa4_pmg'] },
 ];
@@ -10594,18 +10597,18 @@ function renderEstruturacao(){
               if(e.bloco && ultimo && ultimo.bloco===e.bloco) ultimo.qtd++;
               else grupos.push({ bloco: e.bloco||null, qtd:1 });
             });
-            return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd*2}" style="background:${ESTR_BLOCO_COR[g.bloco]||'#6b7a3f'};color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd*2}"></th>`).join('');
+            return grupos.map(g=> g.bloco ? `<th colspan="${g.qtd+1}" style="background:${ESTR_BLOCO_COR[g.bloco]||'#6b7a3f'};color:#fff;">${g.bloco}</th>` : `<th colspan="${g.qtd+1}"></th>`).join('');
           })()}
           <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;"></th>
         </tr></thead>
         <thead><tr>
           <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Cultivar</th><th>Data de Plantio</th><th>Status do Plantio</th><th>Ciclo</th><th>Tipo de material</th>
-          ${ESTR_ETAPAS.map(e=>`<th colspan="2">${e.label}</th>`).join('')}
+          ${ESTR_BLOCOS.map(bl=> bl.etapas.map(e=>`<th>${e.label}</th>`).join('')+'<th></th>').join('')}
           <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
         </tr></thead>
         <thead><tr>
           <th class="lm-freeze lm-freeze-1"></th><th class="lm-freeze lm-freeze-2"></th><th class="lm-freeze lm-freeze-3"></th><th></th><th></th><th></th><th></th><th></th>
-          ${ESTR_ETAPAS.map(()=>`<th>Data</th><th>Execução</th>`).join('')}
+          ${ESTR_BLOCOS.map(bl=> bl.etapas.map(()=>'<th>Execução</th>').join('')+'<th>Data do bloco</th>').join('')}
           <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;"></th>
         </tr></thead>
         <tbody>
@@ -10630,16 +10633,18 @@ function renderEstruturacao(){
               </select></td>
               <td><input type="text" inputmode="numeric" class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="ciclo" value="${entry.ciclo!=null?entry.ciclo:''}" placeholder="—" style="width:50px;"></td>
               <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="tipo_material"><option value="" ${!entry.tipo_material?'selected':''}>—</option>${ESTR_TIPO_MATERIAL_OPTIONS.map(o=>`<option value="${o}" ${entry.tipo_material===o?'selected':''}>${o}</option>`).join('')}</select></td>
-              ${ESTR_ETAPAS.map(e=>`
-                <td><input type="date" class="cell-input estr-acomp-input estr-acomp-data" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_mes" data-cor-data="${e.key}" data-prevista="${dataPrevistaEstrStr(e.bloco)}" value="${entry[e.key+'_mes']||(entry[e.key+'_exec']==='Feito'?'':dataPrevistaEstrStr(e.bloco))}"></td>
-                <td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${e.key}" data-cor-faixa="${(ESTR_BLOCO_DAP[e.bloco]||{}).faixa||0}">${EXECUCAO_OPTIONS_ESTR.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>
-              `).join('')}
+              ${ESTR_BLOCOS.map(bl=>{
+                const dts = bl.etapas.map(e=> entry[e.key+'_mes']).filter(Boolean), dataSalva = dts[0] || '', dif = new Set(dts).size>1;   // datas diferentes dentro do bloco: mostra a primeira, avisa, e só troca quando a pessoa escolher uma data
+                const algumFeito = bl.etapas.some(e=> entry[e.key+'_exec']==='Feito'), prev = dataPrevistaEstrStr(bl.bloco), faixa = (ESTR_BLOCO_DAP[bl.bloco]||{}).faixa||0, valor = dataSalva || (algumFeito ? '' : prev), difTxt = dif ? 'Datas diferentes neste bloco: '+estrDatasTxt(entry,bl)+'. Escolha uma data para igualar todas.' : '';
+                return bl.etapas.map(e=>`<td><select class="cell-input estr-acomp-input" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${e.key}_exec" data-cor-status="${bl.uid}" data-cor-faixa="${faixa}">${EXECUCAO_OPTIONS_ESTR.map(o=>`<option value="${o}" ${entry[e.key+'_exec']===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
+                  + `<td><input type="date" class="cell-input estr-acomp-input estr-acomp-data${dif?' dt-div':''}" data-estr-key="${encodeURIComponent(key)}" data-estr-campo="${bl.etapas[0].key}_mes" data-estr-grupo="${bl.etapas.map(e=>e.key+'_mes').join(',')}" data-cor-data="${bl.uid}" data-prevista="${prev}" data-orig="${valor}" data-dif="${dif?1:0}" data-dif-txt="${cgEscH(difTxt)}" ${dif?`title="${cgEscH(difTxt)}"`:''} value="${valor}"></td>`;
+              }).join('')}
               <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
                 <button class="row-save estr-acomp-save-btn" data-estr-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(ANX_ESTR, r.id)}
                 <span class="estr-acomp-msg" data-estr-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${8+ESTR_ETAPAS.length*2+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
+          }).join('') || `<tr><td colspan="${8+ESTR_ETAPAS.length+ESTR_BLOCOS.length+1}">Nenhum talhão com Área do projeto preenchida.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -10684,12 +10689,14 @@ function renderEstruturacao(){
         ESTR_ETAPAS.forEach(e=>{ state.estrAcomp[key][e.key+'_mes'] = null; state.estrAcomp[key][e.key+'_exec'] = 'Pendente'; });
       }
       const eraExecEs = /_exec$/.test(campo) && getEstrAcompEntry(key)[campo]==='Feito' && valor!=='Feito';   // voltou de Feito: a data de execução é limpa
-      state.estrAcomp[key][campo] = valor;
+      const campos = el.dataset.estrGrupo ? el.dataset.estrGrupo.split(',') : [campo];   // data de bloco: grava a mesma em todas as avaliações dele
+      campos.forEach(cp=> { state.estrAcomp[key][cp] = valor; });
+      if(el.dataset.estrGrupo){ el.classList.remove('dt-div'); el.removeAttribute('title'); el.dataset.dif = '0'; el.dataset.orig = el.value; }   // a pessoa escolheu: as datas do bloco ficam iguais
       if(/_exec$/.test(campo) && (valor===STATUS_NAO_SE_APLICA || eraExecEs)) state.estrAcomp[key][campo.replace(/_exec$/,'_mes')] = null;
       if(campo==='status_plantio'){
         el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff';
       }
-      salvarEstrAcompCampo(key, campo, valor, el);
+      salvarEstrAcompCampo(key, campos.length>1 ? campos : campo, valor, el);
     });
   });
   anxLigar(container, ANX_ESTR);
@@ -10700,6 +10707,11 @@ function renderEstruturacao(){
       const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
       const entry = getEstrAcompEntry(key);
       container.querySelectorAll(`.estr-acomp-input[data-estr-key="${btn.dataset.estrKey}"]`).forEach(el=>{
+        if(el.dataset.estrGrupo){
+          if(el.dataset.dif==='1' && el.value===el.dataset.orig) return;   // datas diferentes e a pessoa não mexeu: cada avaliação fica com a data que já tinha
+          const vb = estrNormalizarData(rec, el.dataset.estrCampo, el.value || null, dataEhExecucao(el));
+          el.dataset.estrGrupo.split(',').forEach(cp=>{ entry[cp] = vb; }); return;
+        }
         entry[el.dataset.estrCampo] = estrNormalizarData(rec, el.dataset.estrCampo, el.value || null, dataEhExecucao(el));
       });
       if(!state.estrAcomp[key]) state.estrAcomp[key] = {};
@@ -11802,21 +11814,22 @@ const CG_CONTEXTOS = {
 // ---------- Distribuição inteligente do Planejar ----------
 const CG_PLANO_UM_ESTADO_POR_DIA = true;     // regra inicial: um estado por dia (pra permitir mais de um, é só trocar aqui)
 const CG_PLANO_MAX_POR_PROJETO_DIA = 3;      // até 3 pills de CADA projeto por dia (com 4 projetos, até 12 no dia)
+const CG_PLANO_PROJETOS_LIVRES = ['oxc'];    // projetos SEM essas duas regras (nem o limite por dia, nem um estado por dia): só respeitam a tolerância em volta da data prevista. Podem ser quantos forem e de vários estados no mesmo dia, e não contam para o estado nem para o limite dos outros projetos. Para liberar outro projeto, é só acrescentar a chave aqui.
 // grupos: pills [{id, projeto, estado, fazenda, dataStr, faixa}]; dias: dias úteis das semanas marcadas (aaaa-mm-dd, em ordem).
 // Cada pill só pode ir pra um dia dentro da tolerância do estádio dele (faixa) em torno da data prevista. Prioridade na escolha do dia:
 // 1) mesma fazenda no dia; 2) dia que já tem viagem (gasta menos dias); 3) dia vazio que ainda serve pra mais outros do mesmo estado; 4) o mais perto da data prevista.
 // Começa pelos pills com menos dias possíveis; se um pill não achar lugar, tenta tirar do caminho (uma troca) quem está bloqueando; no fim, tenta esvaziar dias.
 // cfg.fixos = { id: dia }: pills que já têm dia e NÃO se mexem (só ocupam lugar: contam pro estado e pro limite do dia).
 function cgDistribuirPlano(grupos, dias, cfg){
-  cfg = Object.assign({ umEstado:CG_PLANO_UM_ESTADO_POR_DIA, maxPorProjeto:CG_PLANO_MAX_POR_PROJETO_DIA }, cfg || {});
+  cfg = Object.assign({ umEstado:CG_PLANO_UM_ESTADO_POR_DIA, maxPorProjeto:CG_PLANO_MAX_POR_PROJETO_DIA, livres:CG_PLANO_PROJETOS_LIVRES }, cfg || {});
   const num = s=> Math.round(new Date(s+'T00:00:00').getTime()/86400000);
   const D = dias.map(d=>({ d, n:num(d), pills:[], estado:null, porProj:{} }));
-  const P = grupos.map(g=>({ id:g.id, projeto:g.projeto, fazenda:g.fazenda||'', estado:(String(g.estado||'').toUpperCase()||'—'), n:num(g.dataStr), faixa:Number.isFinite(g.faixa)?g.faixa:4, dia:null, fixo:false }));
+  const P = grupos.map(g=>({ id:g.id, projeto:g.projeto, fazenda:g.fazenda||'', estado:(String(g.estado||'').toUpperCase()||'—'), n:num(g.dataStr), faixa:Number.isFinite(g.faixa)?g.faixa:4, dia:null, fixo:false, livre:cfg.livres.includes(g.projeto) }));
   // cfg.apartirDe (aaaa-mm-dd): a distribuição nunca usa dia anterior a ele (dia que já passou); quem já está lá (fixo) continua.
   P.forEach(p=>{ p.candTodos = D.filter(x=> Math.abs(x.n-p.n) <= p.faixa); p.cand = p.candTodos.filter(x=> !cfg.apartirDe || x.d >= cfg.apartirDe); });
-  const cabe = (x,p)=> (!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) < cfg.maxPorProjeto;
-  const por = (x,p)=>{ x.pills.push(p); x.porProj[p.projeto] = (x.porProj[p.projeto]||0)+1; if(x.estado===null) x.estado = p.estado; p.dia = x; };
-  const tira = p=>{ const x = p.dia; x.pills = x.pills.filter(q=>q!==p); x.porProj[p.projeto]--; if(!x.pills.length){ x.estado = null; x.porProj = {}; } p.dia = null; };
+  const cabe = (x,p)=> p.livre || ((!cfg.umEstado || x.estado===null || x.estado===p.estado) && (x.porProj[p.projeto]||0) < cfg.maxPorProjeto);   // projeto livre cabe em qualquer dia da tolerância
+  const por = (x,p)=>{ x.pills.push(p); if(!p.livre){ x.porProj[p.projeto] = (x.porProj[p.projeto]||0)+1; if(x.estado===null) x.estado = p.estado; } p.dia = x; };   // pill de projeto livre não define o estado do dia nem conta no limite
+  const tira = p=>{ const x = p.dia; x.pills = x.pills.filter(q=>q!==p); if(!p.livre) x.porProj[p.projeto]--; if(!x.pills.some(q=>!q.livre)){ x.estado = null; x.porProj = {}; } p.dia = null; };
   P.forEach(p=>{ const d = cfg.fixos && cfg.fixos[p.id]; const x = d && D.find(y=>y.d===d); if(x){ p.fixo = true; por(x,p); } });   // quem já tem dia fica onde está
   const nota = (x,p)=>{
     const mesmaFaz = x.pills.some(q=>q.fazenda===p.fazenda && q.estado===p.estado) ? 1 : 0, usado = x.pills.length ? 1 : 0;
@@ -11834,7 +11847,7 @@ function cgDistribuirPlano(grupos, dias, cfg){
       const trocas = [], desfaz = ()=>{ trocas.reverse().forEach(([b,de])=>{ tira(b); por(de,b); }); };
       const mover = b=>{ if(b.fixo) return false; const alts = b.cand.filter(y=>y!==x && cabe(y,b)); if(!alts.length) return false; const y = melhor(b,alts).x; trocas.push([b,x]); tira(b); por(y,b); return true; };
       if(cfg.umEstado && x.estado!==null && x.estado!==p.estado){
-        if(x.pills.slice().every(mover) && cabe(x,p)){ por(x,p); return true; }
+        if(x.pills.filter(q=>!q.livre).every(mover) && cabe(x,p)){ por(x,p); return true; }   // só quem tem a regra precisa sair do caminho: pill de projeto livre fica
         desfaz();
       } else if((x.porProj[p.projeto]||0) >= cfg.maxPorProjeto){
         for(const b of x.pills.filter(q=>q.projeto===p.projeto && !q.fixo)){ if(mover(b) && cabe(x,p)){ por(x,p); return true; } desfaz(); }
@@ -12291,7 +12304,7 @@ function cgAbrirPlanejador(cfg){
         <div class="cp-resumo" id="cpResumo"></div></div>
         <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span>
           <button type="button" class="btn ghost" id="cpAddTalhao" title="Adiciona ao planejamento um talhão que ainda não está em nenhum planejamento (por exemplo, um talhão novo). O app põe nos dias e distribui só os adicionados.">➕ Adicionar talhão</button>
-          <button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button>
+          <button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. O Óxido de Magnésio não tem esses limites: só respeita a tolerância (pode ser quantos forem, de vários estados no mesmo dia). Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button>
           <button type="button" class="btn ghost" id="cpDistLista" title="Distribui só os talhões que estão na lista e deixa os que já têm dia onde estão.">Distribuir só os da lista</button>
           <label class="cp-fds" title="Por padrão a Distribuição inteligente usa só segunda a sexta. Marque pra ela usar também sábado e domingo. Arrastar à mão pro sábado ou domingo vale sempre."><input type="checkbox" id="cpFds"> Usar sáb. e dom. na distribuição</label>
           <button type="button" class="btn ghost" id="cpDesfazer" disabled>Desfazer distribuição</button>
@@ -12345,8 +12358,9 @@ function cgAbrirPlanejador(cfg){
       return `<div class="cp-sem"><div class="cp-semtit">Semana ${cgDataBr(it.dias[1]).slice(0,5)} – ${cgDataBr(it.dias[5]).slice(0,5)}</div><div class="cp-dias">` + it.dias.map((ds,i)=>{
         const l = grupos.filter(g=> colocado[g.id]===ds);
         const ufs = [...new Set(l.map(g=> String(g.estado||'—').toUpperCase()))], avisos = [];
-        if(CG_PLANO_UM_ESTADO_POR_DIA && ufs.length>1) avisos.push('mais de um estado no mesmo dia ('+ufs.join(', ')+')');
-        Object.keys(CG_PROJ).forEach(k=>{ const n = l.filter(g=>g.projeto===k).length; if(n>CG_PLANO_MAX_POR_PROJETO_DIA) avisos.push(n+' de '+CG_PROJ[k].label+' (o limite é '+CG_PLANO_MAX_POR_PROJETO_DIA+')'); });
+        const ufsRegra = [...new Set(l.filter(g=> !CG_PLANO_PROJETOS_LIVRES.includes(g.projeto)).map(g=> String(g.estado||'—').toUpperCase()))];   // projetos livres (Óxido) não entram nos avisos
+        if(CG_PLANO_UM_ESTADO_POR_DIA && ufsRegra.length>1) avisos.push('mais de um estado no mesmo dia ('+ufsRegra.join(', ')+')');
+        Object.keys(CG_PROJ).filter(k=> !CG_PLANO_PROJETOS_LIVRES.includes(k)).forEach(k=>{ const n = l.filter(g=>g.projeto===k).length; if(n>CG_PLANO_MAX_POR_PROJETO_DIA) avisos.push(n+' de '+CG_PROJ[k].label+' (o limite é '+CG_PLANO_MAX_POR_PROJETO_DIA+')'); });
         return `<div class="cp-dia${i===0||i===6?' fds':''}" data-dia="${ds}"><div class="cp-dh"><span>${DIAS7[i]} ${cgDataBr(ds).slice(0,5)}${ufs.length?' · <b>'+ufs.join('+')+'</b>':''}</span><span>${avisos.length?`<span class="cp-aviso" title="${cgEscH(avisos.join('; '))}">⚠</span> `:''}${l.length||''}</span></div>${l.map(g=>pillHtml(g,false)).join('')}${executados.filter(g=> g.dataStr===ds).map(exHtml).join('')}</div>`;
       }).join('') + '</div></div>';
     }).join('');
@@ -15226,9 +15240,11 @@ function renderVidaNoSolo(){
                   const uid = b.keys[0], prazo = VNS_ETAPA_PRAZO[uid], prev = vnsDataPrevista(r.data_plantio, prazo.dap);
                   const algumExec = b.keys.some(k=> r['vns_'+k]==='Executado');
                   const dataSalva = b.keys.map(k=> r['vns_'+k+'_data']).find(Boolean) || '';
+                  const dtsBloco = b.keys.filter(k=> r['vns_'+k+'_data']), dif = new Set(dtsBloco.map(k=> r['vns_'+k+'_data'])).size>1;   // datas diferentes dentro do bloco: mostra a primeira, avisa, e só troca quando a pessoa escolher uma data
+                  const difTxt = dif ? 'Datas diferentes neste bloco: '+dtsBloco.map(k=> new Date(r['vns_'+k+'_data']+'T00:00:00').toLocaleDateString('pt-BR')+' ('+VNS_ETAPAS.find(e=>e.key===k).label+')').join(', ')+'. Escolha uma data para igualar todas.' : '';
                   // um status por avaliação e UMA data pro bloco (a mesma data vale pras avaliações dele)
                   return b.keys.map(k=>`<td><select class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${k}" data-cor-status="${uid}" data-cor-faixa="${prazo.faixa}">${VNS_ETAPA_STATUS_OPTIONS.map(o=>`<option value="${o}" ${(r['vns_'+k]||'Pendente')===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
-                    + `<td><input type="date" class="cell-input vns-etapa-input" data-vns-talhao-id="${r.id}" data-vns-campo="${uid}_data" data-vns-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" value="${dataSalva||(algumExec?'':prev)}"></td>`;
+                    + `<td><input type="date" class="cell-input vns-etapa-input${dif?' dt-div':''}" data-vns-talhao-id="${r.id}" data-vns-campo="${uid}_data" data-vns-grupo="${b.keys.join(',')}" data-cor-data="${uid}" data-prevista="${prev}" data-orig="${dataSalva||(algumExec?'':prev)}" data-dif="${dif?1:0}" data-dif-txt="${cgEscH(difTxt)}" ${dif?`title="${cgEscH(difTxt)}"`:''} value="${dataSalva||(algumExec?'':prev)}"></td>`;
                 }).join('')}
                 <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
                   <button class="row-save vns-linha-save-btn" data-vns-talhao-id="${r.id}">💾 Salvar</button>${anxCelula(ANX_VNS, r.id)}
@@ -15313,6 +15329,7 @@ function renderVidaNoSolo(){
       const recCampo = RECORDS.find(r=>r.id===el.dataset.vnsTalhaoId) || SEM_AREA.find(r=>r.id===el.dataset.vnsTalhaoId);
       const valorEtapa = vnsNormalizarData(recCampo, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));
       salvarVnsEtapaCampo(el.dataset.vnsTalhaoId, el.dataset.vnsGrupo ? el.dataset.vnsGrupo.split(',').map(k=>k+'_data') : el.dataset.vnsCampo, valorEtapa, el);   // data de bloco: grava a mesma nas avaliações dele
+      if(el.dataset.vnsGrupo){ el.classList.remove('dt-div'); el.removeAttribute('title'); el.dataset.dif = '0'; el.dataset.orig = el.value; }   // a pessoa escolheu: as datas do bloco ficam iguais
     });
   });
   anxLigar(container, ANX_VNS);
@@ -15324,6 +15341,7 @@ function renderVidaNoSolo(){
       // Status de compra não é mais editável aqui — só na Alimentação; aqui só reforça o valor que já está lá
       const entry = { status_compra: recLinha ? (recLinha.vns_status_compra || null) : null };
       container.querySelectorAll(`.vns-etapa-input[data-vns-talhao-id="${talhaoId}"]`).forEach(el=>{
+        if(el.dataset.vnsGrupo && el.dataset.dif==='1' && el.value===el.dataset.orig){ el.dataset.vnsGrupo.split(',').forEach(k=>{ entry[k+'_data'] = recLinha ? (recLinha['vns_'+k+'_data'] ?? null) : null; }); return; }   // datas diferentes e a pessoa não mexeu: cada avaliação fica com a data que já tinha
         const v = vnsNormalizarData(recLinha, el.dataset.vnsCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
         if(el.dataset.vnsGrupo) el.dataset.vnsGrupo.split(',').forEach(k=>{ entry[k+'_data'] = v; }); else entry[el.dataset.vnsCampo] = v;
       });
@@ -16676,6 +16694,7 @@ function estrNormalizarData(rec, campo, valor, exec){
   return (et && valor===estrDataPrevistaBloco(rec, et.bloco)) ? null : valor;
 }
 async function salvarEstrAcompCampo(key, campoKey, valor, el){
+  const campos = Array.isArray(campoKey) ? campoKey : [campoKey]; if(campos.length===1) campoKey = campos[0];   // várias datas de uma vez = data de bloco (o campoKey fica só nos casos de um campo)
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
   if(!rec || !projetosIds['projeto-estruturacao']){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
@@ -16685,12 +16704,12 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
   if(campoKey==='ciclo') dados.ciclo_acomp = valor;
   if(campoKey==='tipo_material') dados.tipo_material_acomp = valor;
   if(campoKey==='status_plantio') dados.status_plantio_acomp = valor;
-  const eraExec = /_exec$/.test(campoKey) && rec['estr_acomp_'+campoKey]==='Feito' && valor!=='Feito';   // voltou de Feito pra Pendente: a data de execução é limpa
+  const unico = campos.length===1 ? campos[0] : null, eraExec = !!unico && /_exec$/.test(unico) && rec['estr_acomp_'+unico]==='Feito' && valor!=='Feito';   // voltou de Feito pra Pendente: a data de execução é limpa
   ESTR_ETAPAS.forEach(e=>{
-    dados['acomp_'+e.key+'_mes'] = campoKey===(e.key+'_mes') ? valor : (rec['estr_acomp_'+e.key+'_mes'] ?? null);
-    dados['acomp_'+e.key+'_exec'] = campoKey===(e.key+'_exec') ? valor : (rec['estr_acomp_'+e.key+'_exec'] ?? null);
+    dados['acomp_'+e.key+'_mes'] = campos.includes(e.key+'_mes') ? valor : (rec['estr_acomp_'+e.key+'_mes'] ?? null);
+    dados['acomp_'+e.key+'_exec'] = unico===(e.key+'_exec') ? valor : (rec['estr_acomp_'+e.key+'_exec'] ?? null);
     if(dados['acomp_'+e.key+'_exec']===STATUS_NAO_SE_APLICA) dados['acomp_'+e.key+'_mes'] = null;   // não se aplica: sem data
-    if(eraExec && campoKey===e.key+'_exec') dados['acomp_'+e.key+'_mes'] = null;
+    if(eraExec && unico===e.key+'_exec') dados['acomp_'+e.key+'_mes'] = null;
   });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -16702,8 +16721,8 @@ async function salvarEstrAcompCampo(key, campoKey, valor, el){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
     return;
   }
-  rec['estr_acomp_'+campoKey] = valor;
-  if(/_exec$/.test(campoKey) && (valor===STATUS_NAO_SE_APLICA || eraExec)) rec['estr_acomp_'+campoKey.replace(/_exec$/,'_mes')] = null;
+  campos.forEach(cp=>{ rec['estr_acomp_'+cp] = valor; });
+  if(unico && /_exec$/.test(unico) && (valor===STATUS_NAO_SE_APLICA || eraExec)) rec['estr_acomp_'+unico.replace(/_exec$/,'_mes')] = null;
   invalidarVisaoGeral();
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
 }
