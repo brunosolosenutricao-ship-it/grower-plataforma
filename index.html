@@ -5932,6 +5932,12 @@ function lmHexRgba(hex, a){ const n = parseInt(hex.slice(1),16); return 'rgba('+
 function lmBlocoInicio(ocs, oi){ return oi===0 || ocs[oi-1].blocoNum!==ocs[oi].blocoNum; }
 function lmEstCelula(ocs, oi, alfa){ const cor = LM_BLOCO_COR[ocs[oi].blocoNum]; return 'background:'+lmHexRgba(cor,alfa)+';'+(lmBlocoInicio(ocs,oi) ? 'border-left:3px solid '+cor+';' : ''); }
 
+// Acompanhamento por ESTÁGIO: dentro de cada estágio as avaliações têm cada uma o seu status, mas a DATA é uma só (vale para todas as avaliações do estágio,
+// que acontecem no mesmo dia). A data é gravada igual em cada avaliação, então Cronograma, Planejar, Alertas, Visão Geral, Excel e PDFs leem tudo como antes.
+const LM_ESTAGIOS_ORDEM = ['V4','R1/R2','R4','R5.4','R6/R7','R8','Colheita'];
+const LM_ESTAGIO_COR = { 'V4':'#2c4a7a', 'R1/R2':'#8a4f7d', 'R4':'#2e6e76', 'R5.4':'#8a5a4a', 'R6/R7':'#6b7a3f', 'R8':'#7a5b8a', 'Colheita':'#9a6a00' };
+function lmEstagios(ocs){ return LM_ESTAGIOS_ORDEM.map((e,i)=> ({ estagio:e, uid:'lme'+i, ocs:ocs.filter(o=> o.estagio===e) })).filter(g=> g.ocs.length).map(g=> ({ ...g, dap:g.ocs[0].dap, faixa:g.ocs[0].faixa })); }
+function lmIrmaosEstagio(campoKey){ const oc = LM_OCORRENCIAS_TODAS.find(o=> o.campoKey===campoKey); return oc ? LM_OCORRENCIAS_TODAS.filter(o=> o.estagio===oc.estagio) : []; }   // as avaliações do mesmo estágio (inclusive ela)
 // 4 blocos — cada avaliação lista em quais estádios ela ocorre (algumas ocorrem em vários)
 const LM_BLOCOS = [
   { num:1, label:'Nutrição e amostragem', itens:[
@@ -14921,27 +14927,21 @@ function renderLadroesMaximasMapa(){
 
     function montarTabelaAcompLm(titulo, cor, linhas, blocos){
       const ocorrencias = lmOcorrencias(blocos);
-      const totalCols = ocorrencias.length*2;
+      const estagios = lmEstagios(ocorrencias), totalCols = ocorrencias.length+estagios.length;   // um status por avaliação + uma data por estágio
       return `
       <div class="lm-card full-card" style="margin-top:12px;">
         <div class="anx-barra"><h3 style="margin:0;font-size:13px;color:${cor};">🗓️ Acompanhamento — ${titulo}</h3>${anxBarra(titulo==='Máximas' ? ANX_MAX : ANX_LAD)}</div>
-        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Data esperada = Data de Plantio + DAP do estádio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
+        <p style="font-size:10px;color:var(--ink-soft);margin:0 0 8px;">Segue o filtro de Cliente lá em cima · ${linhas.length} talhão(ões). Uma data só por estágio: vale para todas as avaliações dele. Data esperada = Data de Plantio + DAP do estágio. Esses campos moram só aqui, não aparecem na Alimentação.</p>
         <div class="table-scroll" data-topscroll="sempre">
           <table data-colfilter="lm-acomp-${String(titulo).replace(/\s+/g,'-')}">
             <thead>
             <tr>
-              <th rowspan="4" class="lm-freeze lm-freeze-1">Cliente</th><th rowspan="4" class="lm-freeze lm-freeze-2">Fazenda</th><th rowspan="4" class="lm-freeze lm-freeze-3">Talhão</th><th rowspan="4">Cultivar</th><th rowspan="4">Ciclo</th><th rowspan="4">Área (ha)</th><th rowspan="4">Consultor</th><th rowspan="4">Data de Plantio</th><th rowspan="4">Status do Plantio</th>
-              ${blocos.map(b=>`<th colspan="${b.itens.reduce((s,it)=>s+it.estagios.length,0)*2}" style="background:${LM_BLOCO_COR[b.num]};color:#fff;border-left:3px solid #fff;">Bloco ${b.num} — ${b.label}</th>`).join('')}
-              <th rowspan="4" class="lm-freeze-right lm-acomp-save-col">Salvar</th>
+              <th rowspan="2" class="lm-freeze lm-freeze-1">Cliente</th><th rowspan="2" class="lm-freeze lm-freeze-2">Fazenda</th><th rowspan="2" class="lm-freeze lm-freeze-3">Talhão</th><th rowspan="2">Cultivar</th><th rowspan="2">Ciclo</th><th rowspan="2">Área (ha)</th><th rowspan="2">Consultor</th><th rowspan="2">Data de Plantio</th><th rowspan="2">Status do Plantio</th>
+              ${estagios.map(g=>`<th colspan="${g.ocs.length+1}" style="background:${LM_ESTAGIO_COR[g.estagio]};color:#fff;border-left:3px solid #fff;">${g.estagio}<br><span style="font-weight:400;font-size:9px;opacity:.9;">${g.dap} DAP ±${g.faixa}</span></th>`).join('')}
+              <th rowspan="2" class="lm-freeze-right lm-acomp-save-col">Salvar</th>
             </tr>
             <tr>
-              ${blocos.flatMap(b=>b.itens.map((it,ii)=>`<th colspan="${it.estagios.length*2}" style="background:${lmHexRgba(LM_BLOCO_COR[b.num],.16)};${ii===0?`border-left:3px solid ${LM_BLOCO_COR[b.num]};`:''}">${it.label}</th>`)).join('')}
-            </tr>
-            <tr>
-              ${ocorrencias.map((oc,oi)=>`<th colspan="2" style="${lmEstCelula(ocorrencias,oi,.16)}">${oc.estagio}<br><span style="font-weight:400;font-size:8.5px;opacity:.8;">${oc.dap} DAP ±${oc.faixa}</span></th>`).join('')}
-            </tr>
-            <tr>
-              ${ocorrencias.map((oc,oi)=>`<th style="${lmEstCelula(ocorrencias,oi,.16)}">Status</th><th style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.16)};">Data</th>`).join('')}
+              ${estagios.map(g=> g.ocs.map((oc,i)=>`<th style="background:${lmHexRgba(LM_ESTAGIO_COR[g.estagio],.16)};${i===0?`border-left:3px solid ${LM_ESTAGIO_COR[g.estagio]};`:''}">${oc.avaliacaoLabel}</th>`).join('')+`<th style="background:${lmHexRgba(LM_ESTAGIO_COR[g.estagio],.3)};">Data do estágio</th>`).join('')}
             </tr>
             </thead>
             <tbody>
@@ -14962,7 +14962,13 @@ function renderLadroesMaximasMapa(){
                   <td>${r.consultor||''}</td>
                   <td class="mono-td">${r.data_plantio ? new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   <td><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="status_plantio" style="background:${r.max_status_plantio==='Plantado'?'#c8e6c9':r.max_status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;"><option value="" ${!r.max_status_plantio?'selected':''}>—</option><option value="Plantado" ${r.max_status_plantio==='Plantado'?'selected':''}>Plantado</option><option value="Estimativa" ${r.max_status_plantio==='Estimativa'?'selected':''}>Estimativa</option></select></td>
-                  ${ocorrencias.map((oc,oi)=>`<td style="${lmEstCelula(ocorrencias,oi,.06)}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${oc.campoKey}" data-cor-faixa="${oc.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td><td style="background:${lmHexRgba(LM_BLOCO_COR[oc.blocoNum],.06)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}_data" data-cor-data="${oc.campoKey}" data-prevista="${dataPrevistaStr(oc)}" value="${entry[oc.campoKey+'_data']||(entry[oc.campoKey]==='Executado'?'':dataPrevistaStr(oc))}"></td>`).join('')}
+                  ${estagios.map(g=>{
+                    const cor = LM_ESTAGIO_COR[g.estagio], dts = g.ocs.map(oc=> entry[oc.campoKey+'_data']).filter(Boolean), dataSalva = dts[0] || '', dif = new Set(dts).size>1;   // datas diferentes dentro do estágio: mostra a primeira, avisa, e só troca quando a pessoa escolher uma data
+                    const algumExec = g.ocs.some(oc=> entry[oc.campoKey]==='Executado'), prev = dataPrevistaStr(g.ocs[0]), valor = dataSalva || (algumExec ? '' : prev);
+                    const difTxt = dif ? 'Datas diferentes neste estágio: '+g.ocs.filter(oc=> entry[oc.campoKey+'_data']).map(oc=> new Date(entry[oc.campoKey+'_data']+'T00:00:00').toLocaleDateString('pt-BR')+' ('+oc.avaliacaoLabel+')').join(', ')+'. Escolha uma data para igualar todas.' : '';
+                    return g.ocs.map((oc,i)=>`<td style="background:${lmHexRgba(cor,.06)};${i===0?`border-left:3px solid ${cor};`:''}"><select class="cell-input lm-acomp-input" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${oc.campoKey}" data-cor-status="${g.uid}" data-cor-faixa="${g.faixa}">${LM_AVAL_OPTIONS.map(o=>`<option value="${o}" ${entry[oc.campoKey]===o?'selected':''}>${o}</option>`).join('')}</select></td>`).join('')
+                      + `<td style="background:${lmHexRgba(cor,.12)};"><input type="date" class="cell-input lm-acomp-input lm-acomp-data${dif?' dt-div':''}" data-lm-key="${encodeURIComponent(key)}" data-lm-campo="${g.ocs[0].campoKey}_data" data-lm-grupo="${g.ocs.map(oc=> oc.campoKey+'_data').join(',')}" data-cor-data="${g.uid}" data-prevista="${prev}" data-orig="${valor}" data-dif="${dif?1:0}" data-dif-txt="${cgEscH(difTxt)}" ${dif?`title="${cgEscH(difTxt)}"`:''} value="${valor}"></td>`;
+                  }).join('')}
                   <td class="lm-freeze-right lm-acomp-save-col" style="white-space:nowrap;">
                     <button class="row-save lm-acomp-save-btn" data-lm-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(titulo==='Máximas' ? ANX_MAX : ANX_LAD, r.id)}
                     <span class="lm-acomp-msg" data-lm-msg-key="${encodeURIComponent(key)}"></span>
@@ -15008,9 +15014,16 @@ function renderLadroesMaximasMapa(){
       }
       if(campo==='status_plantio') el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff';
       const eraExecLm = !/_data$/.test(campo) && campo!=='status_plantio' && getLmAcompEntry(key)[campo]==='Executado' && valor!=='Executado';   // voltou de Executado: a data de execução é limpa
-      state.lmAcomp[key][campo] = valor;
-      if(!/_data$/.test(campo) && campo!=='status_plantio' && (valor===STATUS_NAO_SE_APLICA || eraExecLm)) state.lmAcomp[key][campo+'_data'] = null;
-      salvarLmAcompCampo(key, campo, valor, el);
+      const grupo = el.dataset.lmGrupo ? el.dataset.lmGrupo.split(',') : null;   // data de estágio: grava a mesma em todas as avaliações dele
+      if(grupo) grupo.forEach(c=>{ state.lmAcomp[key][c] = valor; }); else state.lmAcomp[key][campo] = valor;
+      if(!grupo && !/_data$/.test(campo) && campo!=='status_plantio' && (valor===STATUS_NAO_SE_APLICA || eraExecLm)) state.lmAcomp[key][campo+'_data'] = null;
+      let limpar = [];   // a data do estágio some quando ele ficou sem nenhuma avaliação executada (voltou a Pendente) ou quando todas viraram "não se aplica"
+      if(!grupo && !/_data$/.test(campo) && campo!=='status_plantio'){
+        const irm = lmIrmaosEstagio(campo), st = getLmAcompEntry(key);
+        if(irm.every(o=> st[o.campoKey]===STATUS_NAO_SE_APLICA) || (eraExecLm && !irm.some(o=> st[o.campoKey]==='Executado'))){ limpar = irm.map(o=> o.campoKey+'_data'); limpar.forEach(c=>{ state.lmAcomp[key][c] = null; }); }
+      }
+      if(grupo){ el.classList.remove('dt-div'); el.removeAttribute('title'); el.dataset.dif = '0'; el.dataset.orig = el.value; }   // a pessoa escolheu: as datas do estágio ficam iguais
+      salvarLmAcompCampo(key, grupo || campo, valor, el, limpar);
     });
   });
   container.querySelectorAll('.lm-ciclo-input').forEach(el=>{
@@ -15029,8 +15042,14 @@ function renderLadroesMaximasMapa(){
       // Data igual à previsão (plantio + DAP) não é gravada: continua seguindo o plantio
       const entry = getLmAcompEntry(key);
       container.querySelectorAll(`.lm-acomp-input[data-lm-key="${btn.dataset.lmKey}"]`).forEach(el=>{
+        if(el.dataset.lmGrupo){
+          if(el.dataset.dif==='1' && el.value===el.dataset.orig) return;   // datas diferentes e a pessoa não mexeu: cada avaliação fica com a data que já tinha
+          const v = lmNormalizarData(rec, el.dataset.lmCampo, el.value || null, dataEhExecucao(el));
+          el.dataset.lmGrupo.split(',').forEach(c=>{ entry[c] = v; }); return;
+        }
         entry[el.dataset.lmCampo] = lmNormalizarData(rec, el.dataset.lmCampo, el.value || null, dataEhExecucao(el));   // datas que são só previsão não são mais gravadas (a de execução é)
       });
+      LM_OCORRENCIAS_TODAS.forEach(oc=>{ if(entry[oc.campoKey]===STATUS_NAO_SE_APLICA) entry[oc.campoKey+'_data'] = null; });   // não se aplica: sem data
       if(!state.lmAcomp[key]) state.lmAcomp[key] = {};
       Object.assign(state.lmAcomp[key], entry);
       const textoOriginal = btn.textContent;
@@ -17411,20 +17430,22 @@ function lmNormalizarData(rec, campo, valor, exec){
   if(exec) return valor;   // Executado: é a data da execução e vale mesmo igual à prevista
   return valor===lmDataPrevistaOc(rec, m[1]) ? null : valor;
 }
-async function salvarLmAcompCampo(key, campoKey, valor, el){
+async function salvarLmAcompCampo(key, campoKey, valor, el, limpar){
+  const campos = Array.isArray(campoKey) ? campoKey : [campoKey], unico = campos.length===1 ? campos[0] : null, limparSet = new Set(limpar || []);   // vários campos de uma vez = data de estágio
   const rec = RECORDS.find(r=> cronogramaKey(r)===key) || SEM_AREA.find(r=> cronogramaKey(r)===key);
   if(!rec || !projetosIds['maximas-produtividades']){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 1500); }
     return;
   }
   const dados = montarDadosMaxBase(rec);
-  if(campoKey==='status_plantio') dados.status_plantio = valor || null;   // Plantado / Estimativa (um campo por talhão no projeto Máximas/Ladrões)
-  const eraExec = campoKey!=='status_plantio' && !/_data$/.test(campoKey) && rec['max_aval_'+campoKey]==='Executado' && valor!=='Executado';   // voltou de Executado pra Pendente: a data de execução é limpa
+  if(unico==='status_plantio') dados.status_plantio = valor || null;   // Plantado / Estimativa (um campo por talhão no projeto Máximas/Ladrões)
+  const eraExec = !!unico && unico!=='status_plantio' && !/_data$/.test(unico) && rec['max_aval_'+unico]==='Executado' && valor!=='Executado';   // voltou de Executado pra Pendente: a data de execução é limpa
   LM_OCORRENCIAS_TODAS.forEach(oc=>{
-    dados['aval_'+oc.campoKey] = campoKey===oc.campoKey ? valor : (rec['max_aval_'+oc.campoKey] ?? null);
-    dados['aval_'+oc.campoKey+'_data'] = campoKey===(oc.campoKey+'_data') ? valor : (rec['max_aval_'+oc.campoKey+'_data'] ?? null);
+    dados['aval_'+oc.campoKey] = unico===oc.campoKey ? valor : (rec['max_aval_'+oc.campoKey] ?? null);
+    dados['aval_'+oc.campoKey+'_data'] = campos.includes(oc.campoKey+'_data') ? valor : (rec['max_aval_'+oc.campoKey+'_data'] ?? null);
+    if(limparSet.has(oc.campoKey+'_data')) dados['aval_'+oc.campoKey+'_data'] = null;   // o estágio ficou sem avaliação executada (ou todas "não se aplica"): sem data
     if(dados['aval_'+oc.campoKey]===STATUS_NAO_SE_APLICA) dados['aval_'+oc.campoKey+'_data'] = null;   // não se aplica: sem data
-    if(eraExec && campoKey===oc.campoKey) dados['aval_'+oc.campoKey+'_data'] = null;
+    if(eraExec && unico===oc.campoKey) dados['aval_'+oc.campoKey+'_data'] = null;
   });
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('dados_projeto').upsert({
@@ -17436,10 +17457,12 @@ async function salvarLmAcompCampo(key, campoKey, valor, el){
     if(el){ el.style.outline = '2px solid var(--red)'; setTimeout(()=> el.style.outline='', 2000); }
     return;
   }
-  if(campoKey==='status_plantio'){ rec.max_status_plantio = valor || null; }
+  if(unico==='status_plantio'){ rec.max_status_plantio = valor || null; }
   else {
-    rec['max_aval_'+campoKey] = valor;
-    if(valor===STATUS_NAO_SE_APLICA || eraExec) rec['max_aval_'+campoKey+'_data'] = null;
+    campos.forEach(c=>{ rec['max_aval_'+c] = valor; });
+    if(unico && !/_data$/.test(unico) && (valor===STATUS_NAO_SE_APLICA || eraExec)) rec['max_aval_'+unico+'_data'] = null;
+    limparSet.forEach(c=>{ rec['max_aval_'+c] = null; });
+    LM_OCORRENCIAS_TODAS.forEach(oc=>{ if(rec['max_aval_'+oc.campoKey]===STATUS_NAO_SE_APLICA) rec['max_aval_'+oc.campoKey+'_data'] = null; });   // o registro em memória fica igual ao que foi gravado
     invalidarVisaoGeral();
   }
   if(el){ el.style.outline = '2px solid var(--lime)'; setTimeout(()=> el.style.outline='', 900); }
