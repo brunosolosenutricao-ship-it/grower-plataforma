@@ -6181,7 +6181,14 @@ function processWorkbook(wb){
 }
 
 /* ============================= CARREGAMENTO VIA SUPABASE ============================= */
-async function carregarDadosDoSupabase(){
+let cargaEmAndamento = null;   // só pode haver UMA carga por vez. Antes, cada pedido (abrir uma aba, lista de parceiros, botão Atualizar) começava outra carga do zero enquanto a primeira ainda rodava: as barras de progresso se misturavam (sobe, volta, sobe...) e o trabalho era feito em dobro
+function carregarDadosDoSupabase(){
+  if(cargaEmAndamento) return cargaEmAndamento;   // já está carregando: quem pediu agora espera esta mesma carga
+  window.__cargaEmAndamento = true; window.__cargaPct = 0;
+  cargaEmAndamento = carregarDadosDoSupabaseExecutar().finally(()=>{ cargaEmAndamento = null; window.__cargaEmAndamento = false; });
+  return cargaEmAndamento;
+}
+async function carregarDadosDoSupabaseExecutar(){
   function atualizarProgresso(pct){
     pct = Math.max(0, Math.min(100, Math.round(pct)));
     document.querySelectorAll('.load-progress-fill').forEach(el=> el.style.width = pct+'%');
@@ -12164,7 +12171,7 @@ function cgDialogoPlano(cfg){
 
 // ---------- quadro Planejar (independente: abre do Cronograma ou de um card salvo) ----------
 function cgFecharPlanejador(){ const d = document.getElementById('cpDlg'); if(d) d.remove(); const o = document.getElementById('cgPlanOverlay'); if(o) o.remove(); document.removeEventListener('keydown', cgEscPlanejador); }
-function cgEscPlanejador(e){ if(e.key!=='Escape') return; const d = document.getElementById('cpDlg'); if(d){ d.remove(); return; } cgFecharPlanejador(); }
+function cgEscPlanejador(e){ if(e.key!=='Escape') return; if(document.getElementById('rtOv')) return; /* com a rota da semana aberta, o Esc fecha só ela */ const d = document.getElementById('cpDlg'); if(d){ d.remove(); return; } cgFecharPlanejador(); }
 // cfg: { semanas:[domingos], grupos:[{id,projeto,cliente,fazenda,talhao,estado,dataStr,faixa,statusPlantio,avaliacoes}], colocado:{id:dia}, motivos:{id:texto},
 //        plano:null|registro salvo, revisao:null|{grupos,colocado,motivos,saiu,mudaram}, info:'texto' }
 // ---- ADICIONAR TALHÃO a um planejamento (novo ou já salvo): lista só os talhões que ainda não estão em NENHUM planejamento; o app põe os escolhidos nas semanas e distribui só eles
@@ -12240,6 +12247,336 @@ function cgAbrirAdicionarTalhao(opt){
   ov.querySelector('#adAdicionar').addEventListener('click', ()=>{ if(!sel.size) return; const chaves = [...sel]; fechar(); opt.aoAdicionar(chaves); });
   desenhar();
 }
+/* ===== ROTAS DA SEMANA (🚗) — a rota de viagem de uma semana planejada: cidade de saída, melhor ordem, mapa, km por estrada e link do Google Maps =====
+   Fica só na tela (nada é gravado no planejamento): a cidade de saída é lembrada neste navegador e as cidades já localizadas também.
+   Cada DIA da semana vira uma rota (saída → talhões → volta). A volta de cada rota é editável e a saída do dia seguinte é a volta do dia anterior.
+   Dentro do mesmo dia dá para criar mais rotas ("+ Nova rota") e arrastar os talhões entre elas. Mexer aqui NÃO muda o dia de nenhum talhão no planejamento. */
+const RT_CORES = ['#1565c0','#c62828','#2e7d32','#6a1b9a','#ef6c00','#00838f','#ad1457','#5d4037'];
+const RT_FATOR_RETA = 1.3;        // sem resposta do serviço de rotas, os km por estrada são estimados: linha reta × 1,3 (e a tela avisa "estimado")
+const RT_MAX_PARADAS_LINK = 9;    // o link do Google Maps aceita até 9 paradas entre a saída e o destino
+const RT = { aberto:false, mapa:null, camada:null, ultimaBusca:0, esperaMs:1100, cacheRota:{}, seq:0, geoMem:null, arrasto:null, msg:'', rotulo:'', saida:null, candidatos:[], dias:[], token:0, voltaMsg:'' };
+window.__rt = RT;
+const rtNorm = s=> String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const rtRad = x=> x*Math.PI/180;
+function rtKm(a,b){ const R = 6371, dLa = rtRad(b.lat-a.lat), dLo = rtRad(b.lng-a.lng), s = Math.sin(dLa/2)**2+Math.cos(rtRad(a.lat))*Math.cos(rtRad(b.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.min(1,Math.sqrt(s))); }
+const rtFmtKm = km=> Math.round(km).toLocaleString('pt-BR');
+const rtUfDeEstado = est=>{ const n = rtNorm(est); return Object.keys(LABS_UF_NOME).find(u=> rtNorm(LABS_UF_NOME[u])===n) || ''; };
+// ---------- busca de cidades (OpenStreetMap / Nominatim), com as já localizadas guardadas neste navegador
+function rtGeoLer(){ if(RT.geoMem) return RT.geoMem; try{ RT.geoMem = JSON.parse(localStorage.getItem('gr_rt_geo_v1')||'{}') || {}; }catch(e){ RT.geoMem = {}; } return RT.geoMem; }
+function rtGeoGravar(){ try{ localStorage.setItem('gr_rt_geo_v1', JSON.stringify(RT.geoMem||{})); }catch(e){} }
+async function rtBuscar(q){
+  const qs = new URLSearchParams({ format:'jsonv2', countrycodes:'br', addressdetails:'1', 'accept-language':'pt-BR', limit:'5', q }).toString();
+  const espera = RT.esperaMs-(Date.now()-RT.ultimaBusca); if(espera>0) await new Promise(r=> setTimeout(r,espera));   // o Nominatim pede no máximo 1 busca por segundo
+  RT.ultimaBusca = Date.now();
+  const resp = await fetch('https://nominatim.openstreetmap.org/search?'+qs, { headers:{ 'Accept':'application/json' } });
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  return resp.json();
+}
+async function rtGeoCidade(cidade, uf){
+  const chave = rtNorm(cidade)+'|'+String(uf||'').toUpperCase(), mem = rtGeoLer(); if(mem[chave]) return mem[chave];
+  const est = LABS_UF_NOME[String(uf||'').toUpperCase()] || uf || '';
+  const res = await rtBuscar([cidade, est, 'Brasil'].filter(Boolean).join(', '));
+  const r = (res||[]).find(x=>{ const lat = Number(x.lat), lng = Number(x.lon); if(!Number.isFinite(lat) || !Number.isFinite(lng)) return false; const e = x.address && x.address.state; return !est || !e || rtNorm(e)===rtNorm(est); });
+  if(!r) return null;
+  const pos = { lat:Number(r.lat), lng:Number(r.lon) }; mem[chave] = pos; rtGeoGravar(); return pos;
+}
+async function rtCandidatos(texto){   // aceita "Sorriso" ou "Sorriso, MT"
+  let t = String(texto||'').trim(), uf = ''; const m = t.match(/^(.*?)\s*[,\/\-]\s*([A-Za-z]{2})$/);
+  if(m && LABS_UF_NOME[m[2].toUpperCase()]){ t = m[1].trim(); uf = m[2].toUpperCase(); }
+  const res = await rtBuscar([t, uf ? LABS_UF_NOME[uf] : '', 'Brasil'].filter(Boolean).join(', '));
+  const vistos = new Set();
+  return (res||[]).map(x=>{ const a = x.address || {}, nome = a.city || a.town || a.village || a.municipality || x.name || t, est = a.state || ''; return { nome, estado:est, uf:rtUfDeEstado(est), lat:Number(x.lat), lng:Number(x.lon), rotulo:nome+(est ? ' — '+est : '') }; })
+    .filter(c=>{ if(!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return false; const k = c.rotulo+'|'+c.lat.toFixed(2)+'|'+c.lng.toFixed(2); if(vistos.has(k)) return false; vistos.add(k); return true; });
+}
+// ---------- km por estrada (serviço OSRM); se ele não responder, estima pela linha reta
+async function rtRotaEstrada(pts){
+  if(pts.length<2) return { km:0, geom:pts.map(p=>[p.lat,p.lng]), estimado:false };
+  const chave = pts.map(p=> p.lat.toFixed(4)+','+p.lng.toFixed(4)).join(';'); if(RT.cacheRota[chave]) return RT.cacheRota[chave];
+  let res;
+  try{
+    const ctl = typeof AbortController!=='undefined' ? new AbortController() : null, t = ctl ? setTimeout(()=> ctl.abort(), 15000) : null;
+    const url = 'https://router.project-osrm.org/route/v1/driving/'+pts.map(p=> p.lng.toFixed(6)+','+p.lat.toFixed(6)).join(';')+'?overview=full&geometries=geojson';
+    const resp = await fetch(url, ctl ? { signal:ctl.signal } : {}); if(t) clearTimeout(t);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const j = await resp.json(), r0 = j && j.routes && j.routes[0]; if(!r0) throw new Error('sem rota');
+    res = { km:r0.distance/1000, geom:r0.geometry.coordinates.map(c=>[c[1],c[0]]), estimado:false };
+  }catch(e){
+    let km = 0; for(let i=1;i<pts.length;i++) km += rtKm(pts[i-1],pts[i]);
+    res = { km:km*RT_FATOR_RETA, geom:pts.map(p=>[p.lat,p.lng]), estimado:true };
+  }
+  RT.cacheRota[chave] = res; return res;
+}
+// ---------- melhor ordem: o caminho mais curto saída → paradas → volta (exato até 11 locais; acima disso, vizinho mais próximo + 2-opt)
+function rtMelhorOrdem(ini, fim, locs){
+  const n = locs.length; if(n<=1) return locs.map(l=>l.k);
+  if(n<=11){
+    const N = 1<<n, INF = 1e18, dp = Array.from({ length:N }, ()=> new Float64Array(n).fill(INF)), pai = Array.from({ length:N }, ()=> new Int16Array(n).fill(-1));
+    for(let i=0;i<n;i++) dp[1<<i][i] = rtKm(ini, locs[i]);
+    for(let m=1;m<N;m++) for(let j=0;j<n;j++){ if(!(m&(1<<j)) || dp[m][j]>=INF) continue; for(let k=0;k<n;k++){ if(m&(1<<k)) continue; const nm = m|(1<<k), v = dp[m][j]+rtKm(locs[j],locs[k]); if(v<dp[nm][k]){ dp[nm][k] = v; pai[nm][k] = j; } } }
+    let melhor = INF, ult = -1; for(let j=0;j<n;j++){ const v = dp[N-1][j]+rtKm(locs[j],fim); if(v<melhor){ melhor = v; ult = j; } }
+    const ordem = []; let m = N-1, j = ult; while(j>=0){ ordem.push(locs[j].k); const p = pai[m][j]; m &= ~(1<<j); j = p; }
+    return ordem.reverse();
+  }
+  const rest = locs.slice(), ord = []; let atual = ini;
+  while(rest.length){ let bi = 0, bd = Infinity; rest.forEach((l,i)=>{ const v = rtKm(atual,l); if(v<bd){ bd = v; bi = i; } }); atual = rest.splice(bi,1)[0]; ord.push(atual); }
+  let cam = [ini, ...ord, fim]; const custo = c=> c.slice(1).reduce((s,p,i)=> s+rtKm(c[i],p), 0);
+  let melhorou = true, guarda = 0;
+  while(melhorou && guarda++<50){ melhorou = false; for(let i=1;i<cam.length-2;i++) for(let j=i+1;j<cam.length-1;j++){ const novo = cam.slice(0,i).concat(cam.slice(i,j+1).reverse(), cam.slice(j+1)); if(custo(novo) < custo(cam)-1e-9){ cam = novo; melhorou = true; } } }
+  return cam.slice(1,-1).map(l=>l.k);
+}
+// ---------- montagem: uma linha por talhão (com os projetos dele naquele dia), uma rota por dia
+function rtLocKey(l){ return l.loc ? (l.loc.precisao==='coordenada' ? 'c:'+l.loc.lat.toFixed(4)+','+l.loc.lng.toFixed(4) : 'u:'+rtNorm(l.cidade)+'|'+l.estado) : 'sem:'+l.chave; }
+function rtMontarDias(grupos, colocado, diasSemana){
+  const porDia = {};
+  grupos.forEach(g=>{ const ds = colocado[g.id]; if(ds && diasSemana.includes(ds)) (porDia[ds] = porDia[ds] || []).push(g); });
+  return Object.keys(porDia).sort().map(ds=>{
+    const mapa = new Map();
+    porDia[ds].forEach(g=>{
+      const ch = [g.cliente,g.fazenda,g.talhao].join('|'); let r = mapa.get(ch);
+      if(!r){
+        const rec = RECORDS.find(x=> x.cliente===g.cliente && x.fazenda===g.fazenda && String(x.talhao)===String(g.talhao)) || {};
+        const lat = Number(rec.max_latitude), lng = Number(rec.max_longitude), exata = rec.max_latitude!=null && rec.max_longitude!=null && Number.isFinite(lat) && Number.isFinite(lng) && lat!==0 && lng!==0;
+        r = { chave:ch+'@'+ds, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:String(g.estado || rec.estado || '').toUpperCase(), cidade:rec.cidade || '', projetos:[], loc: exata ? { lat, lng, precisao:'coordenada' } : null };
+        mapa.set(ch,r);
+      }
+      if(!r.projetos.includes(g.projeto)) r.projetos.push(g.projeto);
+    });
+    return { ds, rotas:[ { id:++RT.seq, linhas:[...mapa.values()], volta:null, versao:0, km:null, geom:null, estimado:false, carregando:false, manual:false } ] };
+  });
+}
+const rtPontoVolta = rota=> rota.volta || RT.saida;
+function rtPontoSai(di){ if(di===0) return RT.saida; const ant = RT.dias[di-1], u = ant.rotas[ant.rotas.length-1]; return rtPontoVolta(u); }
+function rtSugerirRota(di, rota){
+  const ini = rtPontoSai(di), fim = rtPontoVolta(rota); if(!ini || !fim) return;
+  const grupos = new Map(), sem = [];
+  rota.linhas.forEach(l=>{ if(!l.loc){ sem.push(l); return; } const k = rtLocKey(l); if(!grupos.has(k)) grupos.set(k, { k, lat:l.loc.lat, lng:l.loc.lng, linhas:[] }); grupos.get(k).linhas.push(l); });
+  const ordem = rtMelhorOrdem(ini, fim, [...grupos.values()]), porNome = (a,b)=> (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{ numeric:true });
+  rota.linhas = ordem.flatMap(k=> grupos.get(k).linhas.sort(porNome)).concat(sem); rota.manual = false;
+}
+function rtPontosRota(di, rota){   // saída, cada local da sequência (sem repetir o mesmo local em seguida) e volta
+  const pts = [], add = p=>{ if(!p) return; const u = pts[pts.length-1]; if(u && Math.abs(u.lat-p.lat)<1e-5 && Math.abs(u.lng-p.lng)<1e-5) return; pts.push({ lat:p.lat, lng:p.lng }); };
+  add(rtPontoSai(di)); rota.linhas.forEach(l=>{ if(l.loc) add(l.loc); }); add(rtPontoVolta(rota)); return pts;
+}
+function rtParadas(rota){   // numera as paradas: linhas seguidas no mesmo local dividem o número
+  let n = 0, ant = null; return rota.linhas.map(l=>{ if(!l.loc) return { l, n:null }; const k = rtLocKey(l); if(k!==ant){ n++; ant = k; } return { l, n }; });
+}
+function rtAtualizarRotas(rotas){
+  rotas.forEach(rota=>{
+    const di = RT.dias.findIndex(d=> d.rotas.includes(rota)); if(di<0 || !RT.saida) return;
+    const v = ++rota.versao, pts = rtPontosRota(di, rota); rota.carregando = true; rota.km = null; rota.geom = null;
+    rtRotaEstrada(pts).then(res=>{ if(rota.versao!==v || !RT.aberto) return; rota.km = res.km; rota.geom = res.geom; rota.estimado = res.estimado; rota.carregando = false; rtAtualizarKms(); rtDesenharMapa(false); });
+  });
+  rtAtualizarKms();
+}
+// ---------- links do Google Maps (até 9 paradas por link; passando disso, vira "trecho 1, 2…")
+const rtTxtCidade = c=> c ? (c.nome+(c.uf||c.estado ? ', '+(c.uf||c.estado) : '')+', Brasil') : '';
+function rtNosGoogle(di, rota){
+  const nos = [rtTxtCidade(rtPontoSai(di))], vistos = []; 
+  rota.linhas.forEach(l=>{ if(!l.loc) return; const k = rtLocKey(l); if(vistos[vistos.length-1]===k) return; vistos.push(k); nos.push(l.loc.precisao==='coordenada' ? l.loc.lat.toFixed(6)+','+l.loc.lng.toFixed(6) : l.cidade+', '+l.estado+', Brasil'); });
+  nos.push(rtTxtCidade(rtPontoVolta(rota))); return nos;
+}
+function rtLinksGoogle(di, rota){
+  const nos = rtNosGoogle(di, rota), links = [], passo = RT_MAX_PARADAS_LINK+1, enc = encodeURIComponent; let s = 0;
+  while(s < nos.length-1){ const e = Math.min(s+passo, nos.length-1), seg = nos.slice(s,e+1), meio = seg.slice(1,-1);
+    links.push('https://www.google.com/maps/dir/?api=1&origin='+enc(seg[0])+'&destination='+enc(seg[seg.length-1])+(meio.length ? '&waypoints='+enc(meio.join('|')) : '')+'&travelmode=driving'); s = e; }
+  return links;
+}
+// ---------- totais
+function rtTotais(){
+  const tal = new Set(), ufs = new Set(), proj = new Set(); let km = 0, calc = true, est = false, paradas = 0;
+  RT.dias.forEach(d=> d.rotas.forEach(r=>{ r.linhas.forEach(l=>{ tal.add([l.cliente,l.fazenda,l.talhao].join('|')); if(l.estado) ufs.add(l.estado); l.projetos.forEach(p=> proj.add(p)); }); if(r.km==null) calc = false; else km += r.km; if(r.estimado) est = true; paradas += new Set(r.linhas.filter(l=>l.loc).map(rtLocKey)).size; }));
+  return { km, calc, estimado:est, talhoes:tal.size, estados:[...ufs].sort(), projetos:[...proj], dias:RT.dias.length, paradas };
+}
+// ---------- tela
+const RT_DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function rtCorRota(rota){ let i = 0; for(const d of RT.dias) for(const r of d.rotas){ if(r===rota) return RT_CORES[i%RT_CORES.length]; i++; } return RT_CORES[0]; }
+function rtChips(ps){ return ps.map(k=>{ const p = CG_PROJ[k]; return p ? `<span class="rt-chip" style="background:${p.cor};color:${p.txt}" title="${cgEscH(p.label)}">${cgEscH(p.s)}</span>` : ''; }).join(''); }
+function rtResumoHtml(){
+  const t = rtTotais(); if(!RT.dias.length) return '';
+  const km = !RT.saida ? '—' : (t.calc ? '≈ '+rtFmtKm(t.km)+' km' : 'calculando…');
+  return `<span><b id="rtKmTot">${km}</b> por estrada${t.calc && t.estimado ? ' <i title="O serviço de rotas não respondeu para alguma rota: o valor é estimado (linha reta × 1,3)">(estimado)</i>' : ''}</span><span><b>${t.talhoes}</b> ${t.talhoes===1?'talhão':'talhões'}</span><span><b>${t.dias}</b> ${t.dias===1?'dia':'dias'}</span><span>estados: <b>${t.estados.join(', ')||'—'}</b></span><span class="rt-chips">${rtChips(t.projetos)}</span>`;
+}
+function rtLinhaHtml(l, n, rota){
+  const exata = l.loc && l.loc.precisao==='coordenada', tag = !l.loc ? `<span class="rt-tag aviso" title="Não achei a cidade deste talhão: ele fica no fim da rota e fora do mapa">⚠ sem localização</span>` : (exata ? `<span class="rt-tag ok" title="Posição exata do talhão">📍 coordenada</span>` : `<span class="rt-tag aprox" title="O talhão não tem coordenada: a rota usa o centro da cidade">≈ cidade (aproximado)</span>`);
+  return `<div class="rt-l" draggable="true" data-chave="${cgEscH(l.chave)}" data-rota="${rota.id}"><span class="rt-n">${n==null?'—':n}</span><span class="rt-txt"><b>${cgEscH(l.fazenda)}</b> · ${cgEscH(l.talhao)} <small>${cgEscH(l.cliente)}</small><br><small>${cgEscH(l.cidade||'cidade não informada')}${l.estado?'/'+cgEscH(l.estado):''}</small></span><span class="rt-chips">${rtChips(l.projetos)}</span>${tag}</div>`;
+}
+function rtRotaHtml(di, dia, rota, ix){
+  const cor = rtCorRota(rota), sai = rtPontoSai(di), volta = rtPontoVolta(rota), paradas = rtParadas(rota), tem = dia.rotas.length>1;
+  const nl = rota.linhas.length, km = rota.km==null ? (RT.saida ? 'calculando…' : '—') : '≈ '+rtFmtKm(rota.km)+' km'+(rota.estimado?' (estimado)':'');
+  const links = RT.saida ? rtLinksGoogle(di, rota) : [];
+  const botoesG = links.length>1 ? links.map((u,i)=> `<button type="button" class="rt-b" data-acao="google" data-rota="${rota.id}" data-parte="${i}" title="Abrir este trecho no Google Maps (a rota passa de 9 paradas e foi dividida)">🗺️ Trecho ${i+1}</button>`).join('') : `<button type="button" class="rt-b" data-acao="google" data-rota="${rota.id}" data-parte="0" ${RT.saida && nl ? '' : 'disabled'}>🗺️ Google Maps</button>`;
+  return `<div class="rt-rota" data-rota="${rota.id}" style="border-left-color:${cor}">
+    <div class="rt-rh"><span class="rt-dot" style="background:${cor}"></span><b>Rota ${ix+1}</b><span class="rt-km" data-km="${rota.id}">${km}</span><span class="rt-esp"></span>
+      <button type="button" class="rt-b" data-acao="sugerir" data-rota="${rota.id}" ${RT.saida && nl ? '' : 'disabled'} title="Refaz a melhor ordem desta rota (desfaz o que você arrastou)">✨ Sugerir ordem</button>${botoesG}<button type="button" class="rt-b" data-acao="copiar" data-rota="${rota.id}" ${RT.saida && nl ? '' : 'disabled'} title="Copiar o link do Google Maps">🔗</button>${tem ? `<button type="button" class="rt-b rt-x" data-acao="remover" data-rota="${rota.id}" title="Remover esta rota (os talhões voltam para a primeira rota do dia)">✕</button>` : ''}</div>
+    <div class="rt-ext">Sai de: <b>${cgEscH(sai ? sai.nome+(sai.uf?'/'+sai.uf:'') : '—')}</b></div>
+    <div class="rt-lista" data-rota="${rota.id}" data-dia="${dia.ds}">${nl ? paradas.map(p=> rtLinhaHtml(p.l, p.n, rota)).join('') : '<div class="rt-vazio">Rota vazia: arraste talhões do mesmo dia para cá.</div>'}</div>
+    <div class="rt-ext">Volta para: <b>${cgEscH(volta ? volta.nome+(volta.uf?'/'+volta.uf:'') : '—')}</b> <input class="rt-volta-in" data-rota="${rota.id}" placeholder="outra cidade (ex.: Sinop, MT)" value=""><button type="button" class="rt-b" data-acao="volta" data-rota="${rota.id}">OK</button>${rota.volta ? `<button type="button" class="rt-b" data-acao="volta-limpa" data-rota="${rota.id}" title="Voltar para a cidade de saída">↩ saída</button>` : ''}</div>
+  </div>`;
+}
+function rtListaHtml(){
+  if(!RT.dias.length) return '<div class="rt-vazio">Nenhum talhão planejado nesta semana ainda. Distribua os talhões nos dias do quadro e abra a rota de novo.</div>';
+  return RT.dias.map((dia,di)=>{ const ufs = [...new Set(dia.rotas.flatMap(r=> r.linhas.map(l=>l.estado)).filter(Boolean))], n = new Set(dia.rotas.flatMap(r=> r.linhas.map(l=> l.chave))).size, d = new Date(dia.ds+'T00:00:00');
+    return `<div class="rt-dia"><div class="rt-dh"><b>${RT_DIAS[d.getDay()]} ${cgDataBr(dia.ds).slice(0,5)}</b>${ufs.length ? ' · '+ufs.join('+') : ''} · ${n} ${n===1?'talhão':'talhões'}<span class="rt-esp"></span><button type="button" class="rt-b" data-acao="nova" data-dia="${dia.ds}" title="Cria mais uma rota neste dia e deixa você arrastar talhões para ela">＋ Nova rota</button></div>${dia.rotas.map((r,i)=> rtRotaHtml(di, dia, r, i)).join('')}</div>`; }).join('');
+}
+function rtCandHtml(){
+  if(!RT.candidatos.length) return '';
+  return `<div class="rt-cand"><span>Qual destas?</span><select id="rtCand">${RT.candidatos.map((c,i)=> `<option value="${i}">${cgEscH(c.rotulo)}</option>`).join('')}</select><button type="button" class="rt-b" data-acao="usar-cand">Usar esta cidade</button></div>`;
+}
+function rtDesenhar(){
+  const ov = document.getElementById('rtOv'); if(!ov) return;
+  ov.querySelector('#rtTot').innerHTML = rtResumoHtml();
+  ov.querySelector('#rtMsg').innerHTML = RT.msg ? `<div class="rt-aviso">${cgEscH(RT.msg)}</div>` : '';
+  ov.querySelector('#rtCandBox').innerHTML = rtCandHtml();
+  ov.querySelector('#rtDias').innerHTML = rtListaHtml();
+  rtDesenharMapa(true);
+}
+function rtAtualizarKms(){   // atualiza só os números (sem refazer a lista, para não atrapalhar quem está digitando)
+  const ov = document.getElementById('rtOv'); if(!ov) return;
+  RT.dias.forEach(d=> d.rotas.forEach(r=>{ const el = ov.querySelector('[data-km="'+r.id+'"]'); if(el) el.textContent = r.km==null ? (RT.saida ? 'calculando…' : '—') : '≈ '+rtFmtKm(r.km)+' km'+(r.estimado?' (estimado)':''); }));
+  const t = ov.querySelector('#rtTot'); if(t) t.innerHTML = rtResumoHtml();
+}
+function rtDesenharMapa(ajustar){
+  if(!RT.mapa || !RT.camada) return; RT.camada.clearLayers(); const pts = [];
+  const pino = (p, html, classe, cor, titulo)=>{ const m = L.marker([p.lat,p.lng], { icon:L.divIcon({ className:'', html:`<div class="rt-pino ${classe}" style="--c:${cor}">${html}</div>`, iconSize:[26,26], iconAnchor:[13,13] }), title:titulo||'' }).addTo(RT.camada); pts.push([p.lat,p.lng]); return m; };
+  if(RT.saida) pino(RT.saida, '🏁', 'saida', '#111', 'Saída: '+RT.saida.rotulo);
+  RT.dias.forEach((dia,di)=> dia.rotas.forEach(rota=>{
+    const cor = rtCorRota(rota);
+    if(rota.geom && rota.geom.length>1) L.polyline(rota.geom, { color:cor, weight:4, opacity:.85, dashArray: rota.estimado ? '7 7' : null }).addTo(RT.camada);
+    const vistos = new Set();
+    rtParadas(rota).forEach(p=>{ if(!p.l.loc) return; const k = rtLocKey(p.l); if(vistos.has(k)) return; vistos.add(k);
+      const aqui = rota.linhas.filter(l=> l.loc && rtLocKey(l)===k), exata = p.l.loc.precisao==='coordenada';
+      pino(p.l.loc, p.n, exata ? '' : 'aprox', cor, aqui.map(l=> l.fazenda+' · '+l.talhao).join('\n')+(exata ? '' : '\n(posição aproximada: centro da cidade)')); });
+    const v = rotaVolta(rota); if(v && RT.saida && (Math.abs(v.lat-RT.saida.lat)>1e-5 || Math.abs(v.lng-RT.saida.lng)>1e-5)) pino(v, '⤺', 'volta', cor, 'Volta para: '+v.rotulo);
+  }));
+  function rotaVolta(r){ return r.volta || null; }
+  if(ajustar){ if(pts.length>1) RT.mapa.fitBounds(pts, { padding:[34,34], maxZoom:11, animate:false }); else if(pts.length===1) RT.mapa.setView(pts[0], 8, { animate:false }); else RT.mapa.setView([-14.2,-51.9], 4, { animate:false }); }
+}
+function rtFechar(){ const ov = document.getElementById('rtOv'); if(ov) ov.remove(); if(RT.mapa){ try{ RT.mapa.stop(); RT.mapa.remove(); }catch(e){} } RT.mapa = null; RT.camada = null; RT.aberto = false; RT.token++; document.removeEventListener('keydown', rtEsc); }
+function rtEsc(e){ if(e.key==='Escape') rtFechar(); }
+// ---------- ações
+async function rtIniciar(){   // localiza as cidades dos talhões, sugere a melhor ordem de cada rota e calcula os km
+  const tk = ++RT.token; if(!RT.saida) return;
+  const precisa = new Map(); RT.dias.forEach(d=> d.rotas.forEach(r=> r.linhas.forEach(l=>{ if(!l.loc && l.cidade) precisa.set(rtNorm(l.cidade)+'|'+l.estado, { cidade:l.cidade, uf:l.estado }); })));
+  let i = 0, falhou = 0;
+  for(const [k,v] of precisa){
+    i++; RT.msg = 'Localizando as cidades dos talhões ('+i+'/'+precisa.size+')…'; rtDesenhar();
+    try{ const pos = await rtGeoCidade(v.cidade, v.uf); if(tk!==RT.token) return; if(pos) RT.dias.forEach(d=> d.rotas.forEach(r=> r.linhas.forEach(l=>{ if(!l.loc && l.cidade && rtNorm(l.cidade)+'|'+l.estado===k) l.loc = { lat:pos.lat, lng:pos.lng, precisao:'cidade' }; }))); else falhou++; }
+    catch(e){ falhou++; if(tk!==RT.token) return; }
+  }
+  RT.msg = falhou ? 'Não consegui localizar '+falhou+(falhou===1?' cidade':' cidades')+': os talhões dela ficam no fim da rota (⚠ sem localização). Confira a internet e abra de novo.' : '';
+  RT.dias.forEach((d,di)=> d.rotas.forEach(r=> rtSugerirRota(di, r)));
+  rtDesenhar(); rtAtualizarRotas(RT.dias.flatMap(d=> d.rotas));
+}
+function rtRotaPorId(id){ for(const d of RT.dias){ const r = d.rotas.find(x=> x.id===id); if(r) return { dia:d, rota:r, di:RT.dias.indexOf(d) }; } return null; }
+function rtUsarSaida(c){ RT.saida = { nome:c.nome, uf:c.uf, estado:c.estado, lat:c.lat, lng:c.lng, rotulo:c.rotulo }; RT.candidatos = []; RT.msg = ''; try{ localStorage.setItem('gr_rt_saida_v1', JSON.stringify(RT.saida)); }catch(e){} const inp = document.getElementById('rtSaidaIn'); if(inp) inp.value = c.rotulo; rtIniciar(); }
+async function rtLocalizarSaida(){
+  const inp = document.getElementById('rtSaidaIn'), texto = inp ? inp.value.trim() : ''; if(!texto){ RT.msg = 'Digite a cidade de saída (pode incluir o estado, por exemplo: Sorriso, MT).'; rtDesenhar(); return; }
+  RT.msg = 'Procurando "'+texto+'"…'; RT.candidatos = []; rtDesenhar();
+  try{ const cs = await rtCandidatos(texto);
+    if(!cs.length){ RT.msg = 'Não achei "'+texto+'". Tente com o estado, por exemplo: '+texto+', MT.'; rtDesenhar(); return; }
+    if(cs.length===1){ rtUsarSaida(cs[0]); return; }
+    RT.candidatos = cs; RT.msg = 'Achei mais de uma cidade com esse nome: escolha a certa.'; rtDesenhar();
+  }catch(e){ RT.msg = 'Não consegui buscar a cidade agora (sem acesso ao serviço de endereços). Confira a internet e tente de novo.'; rtDesenhar(); }
+}
+async function rtDefinirVolta(id, texto){
+  const a = rtRotaPorId(id); if(!a) return;
+  if(!texto.trim()){ a.rota.volta = null; }
+  else { try{ const cs = await rtCandidatos(texto); if(!cs.length){ RT.msg = 'Não achei "'+texto+'" para a volta. Tente com o estado (ex.: Sinop, MT).'; rtDesenhar(); return; } const c = cs[0]; a.rota.volta = { nome:c.nome, uf:c.uf, estado:c.estado, lat:c.lat, lng:c.lng, rotulo:c.rotulo }; RT.msg = ''; }
+    catch(e){ RT.msg = 'Não consegui buscar a cidade agora. Confira a internet e tente de novo.'; rtDesenhar(); return; } }
+  const afet = [a.rota]; const prox = RT.dias[a.di+1]; if(prox) afet.push(...prox.rotas);   // a volta do último dia vira a saída do dia seguinte
+  if(!a.rota.manual) rtSugerirRota(a.di, a.rota); if(prox) prox.rotas.forEach(r=>{ if(!r.manual) rtSugerirRota(a.di+1, r); });
+  rtDesenhar(); rtAtualizarRotas(afet);
+}
+function rtMoverLinha(chave, srcId, dstId, idx){
+  const s = rtRotaPorId(srcId), d = rtRotaPorId(dstId); if(!s || !d) return;
+  if(s.dia!==d.dia){ RT.msg = 'Só dá para mover talhões entre rotas do mesmo dia. Para mudar o dia de um talhão, use o quadro do Planejar.'; rtDesenhar(); return; }
+  const i = s.rota.linhas.findIndex(l=> l.chave===chave); if(i<0) return;
+  const [linha] = s.rota.linhas.splice(i,1); let pos = idx==null ? d.rota.linhas.length : idx; if(s.rota===d.rota && i<pos) pos--;
+  d.rota.linhas.splice(Math.max(0,Math.min(pos,d.rota.linhas.length)), 0, linha); s.rota.manual = d.rota.manual = true; RT.msg = '';
+  rtDesenhar(); rtAtualizarRotas(s.rota===d.rota ? [d.rota] : [s.rota, d.rota]);
+}
+function rtAbrirLink(id, parte){ const a = rtRotaPorId(id); if(!a || !RT.saida) return; const u = rtLinksGoogle(a.di, a.rota)[parte||0]; if(u) window.open(u, '_blank', 'noopener'); }
+async function rtCopiarLink(id){ const a = rtRotaPorId(id); if(!a || !RT.saida) return; const txt = rtLinksGoogle(a.di, a.rota).join('\n'); try{ await navigator.clipboard.writeText(txt); RT.msg = '✓ Link do Google Maps copiado.'; }catch(e){ RT.msg = 'Não consegui copiar sozinho. Use o botão "Google Maps" e copie o endereço da barra do navegador.'; } rtDesenhar(); }
+function rtOnClick(e){
+  const b = e.target.closest && e.target.closest('[data-acao]'); if(!b) return; const ac = b.dataset.acao, id = Number(b.dataset.rota);
+  if(ac==='fechar') rtFechar();
+  else if(ac==='localizar') rtLocalizarSaida();
+  else if(ac==='usar-cand'){ const sel = document.getElementById('rtCand'); const c = RT.candidatos[Number(sel ? sel.value : 0)]; if(c) rtUsarSaida(c); }
+  else if(ac==='sugerir-tudo'){ RT.dias.forEach((d,di)=> d.rotas.forEach(r=> rtSugerirRota(di,r))); rtDesenhar(); rtAtualizarRotas(RT.dias.flatMap(d=> d.rotas)); }
+  else if(ac==='sugerir'){ const a = rtRotaPorId(id); if(a){ rtSugerirRota(a.di, a.rota); rtDesenhar(); rtAtualizarRotas([a.rota]); } }
+  else if(ac==='nova'){ const d = RT.dias.find(x=> x.ds===b.dataset.dia); if(d){ d.rotas.push({ id:++RT.seq, linhas:[], volta:null, versao:0, km:null, geom:null, estimado:false, carregando:false, manual:true }); rtDesenhar(); rtAtualizarRotas([d.rotas[d.rotas.length-1]]); } }
+  else if(ac==='remover'){ const a = rtRotaPorId(id); if(a && a.dia.rotas.length>1){ const prim = a.dia.rotas.find(r=> r!==a.rota); prim.linhas.push(...a.rota.linhas); prim.manual = true; a.dia.rotas.splice(a.dia.rotas.indexOf(a.rota),1); rtDesenhar(); rtAtualizarRotas([prim]); } }
+  else if(ac==='google') rtAbrirLink(id, Number(b.dataset.parte||0));
+  else if(ac==='copiar') rtCopiarLink(id);
+  else if(ac==='volta'){ const inp = b.parentElement.querySelector('.rt-volta-in'); rtDefinirVolta(id, inp ? inp.value : ''); }
+  else if(ac==='volta-limpa') rtDefinirVolta(id, '');
+}
+function cgAbrirRotas(cfg){
+  rtFechar(); RT.aberto = true; RT.rotulo = cfg.rotulo; RT.msg = ''; RT.candidatos = []; RT.dias = rtMontarDias(cfg.grupos, cfg.colocado, cfg.dias); RT.saida = null;
+  try{ const s = JSON.parse(localStorage.getItem('gr_rt_saida_v1')||'null'); if(s && Number.isFinite(s.lat) && Number.isFinite(s.lng)) RT.saida = s; }catch(e){}
+  const ov = document.createElement('div'); ov.id = 'rtOv'; ov.className = 'rt-ov';
+  ov.innerHTML = `<style>
+    .rt-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7400;display:flex;align-items:center;justify-content:center;padding:2.5vh 2vw;}
+    .rt-box{background:var(--paper,#fff);border-radius:14px;width:min(96vw,1320px);height:min(94vh,900px);display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4);overflow:hidden;}
+    .rt-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);}
+    .rt-top h3{margin:0;font-size:16px;} .rt-tot{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink-soft);} .rt-tot b{font-size:15px;color:var(--ink,#1a2019);}
+    .rt-esp{flex:1;} .rt-fechar{border:0;background:transparent;font-size:20px;cursor:pointer;}
+    .rt-corpo{flex:1;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(380px,.95fr);min-height:0;}
+    .rt-mapa{min-height:300px;position:relative;} #rtMapa{position:absolute;inset:0;}
+    .rt-painel{overflow:auto;padding:12px 14px;border-left:1px solid var(--line);}
+    .rt-saida{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;} .rt-saida label{font-size:12px;font-weight:700;} .rt-saida input{flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px;}
+    .rt-cand{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:12.5px;} .rt-cand select{border:1px solid var(--line);border-radius:8px;padding:6px;font-family:inherit;}
+    .rt-aviso{background:#fff3e0;border:1px solid #f0b36b;color:#7a4300;border-radius:8px;padding:6px 10px;font-size:12.5px;margin:6px 0;}
+    .rt-leg{font-size:11.5px;color:var(--ink-soft);margin:4px 0 10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+    .rt-dia{margin-bottom:14px;} .rt-dh{display:flex;align-items:center;gap:6px;font-size:13px;background:var(--bg,#f3f1e8);border-radius:8px;padding:6px 10px;margin-bottom:6px;}
+    .rt-rota{border:1px solid var(--line);border-left:5px solid #1565c0;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff;}
+    .rt-rh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;margin-bottom:4px;} .rt-dot{width:10px;height:10px;border-radius:50%;} .rt-km{font-weight:700;color:var(--ink,#1a2019);margin-left:4px;}
+    .rt-b{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 9px;font-family:inherit;font-size:12px;cursor:pointer;} .rt-b:hover:not(:disabled){background:var(--bg,#f3f1e8);} .rt-b:disabled{opacity:.45;cursor:default;} .rt-x{color:#c62828;}
+    .rt-ext{font-size:12px;color:var(--ink-soft);margin:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;} .rt-volta-in{border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-family:inherit;font-size:12px;min-width:170px;}
+    .rt-lista{display:flex;flex-direction:column;gap:4px;min-height:34px;border-radius:8px;padding:2px;} .rt-lista.drop{outline:2px dashed #2d4a1f;background:#f2f7ea;}
+    .rt-l{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fcfcf8;cursor:grab;font-size:12.5px;} .rt-l.arrastando{opacity:.4;} .rt-l small{color:var(--ink-soft);}
+    .rt-n{min-width:22px;height:22px;border-radius:50%;background:#2d4a1f;color:#fff;font-weight:700;font-size:11.5px;display:flex;align-items:center;justify-content:center;} .rt-txt{flex:1;min-width:0;}
+    .rt-chips{display:flex;gap:3px;flex-wrap:wrap;} .rt-chip{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;}
+    .rt-tag{font-size:10.5px;border-radius:999px;padding:1px 7px;white-space:nowrap;} .rt-tag.ok{background:#e3f1dc;color:#2d5a1a;} .rt-tag.aprox{background:#fff3cd;color:#7a5a00;border:1px dashed #c9a200;} .rt-tag.aviso{background:#fde0dc;color:#b3261e;}
+    .rt-vazio{font-size:12.5px;color:var(--ink-soft);padding:8px;text-align:center;border:1px dashed var(--line);border-radius:8px;}
+    .rt-pino{width:24px;height:24px;border-radius:50%;background:var(--c,#1565c0);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);box-sizing:border-box;}
+    .rt-pino.aprox{background:#fff;color:var(--c);border:3px dashed var(--c);} .rt-pino.saida{background:#111;font-size:12px;} .rt-pino.volta{border-radius:6px;}
+  </style>
+  <div class="rt-box" role="dialog" aria-modal="true" aria-label="Rota da semana">
+    <div class="rt-top"><h3>🚗 Rota da semana · ${cgEscH(cfg.rotulo)}</h3><div class="rt-tot" id="rtTot"></div><span class="rt-esp"></span><button type="button" class="rt-fechar" data-acao="fechar" aria-label="Fechar">✕</button></div>
+    <div class="rt-corpo"><div class="rt-mapa"><div id="rtMapa"></div></div>
+      <div class="rt-painel">
+        <div class="rt-saida"><label for="rtSaidaIn">Cidade de saída</label><input id="rtSaidaIn" placeholder="Ex.: Sorriso, MT" value="${cgEscH(RT.saida ? RT.saida.rotulo : '')}"><button type="button" class="rt-b" data-acao="localizar">Localizar</button><button type="button" class="rt-b" data-acao="sugerir-tudo" title="Refaz a melhor ordem de todas as rotas (desfaz o que você arrastou)">✨ Sugerir ordem de tudo</button></div>
+        <div id="rtCandBox"></div><div id="rtMsg"></div>
+        <div class="rt-leg"><span>● círculo cheio = posição exata do talhão</span><span>◌ círculo tracejado = centro da cidade (aproximado)</span><span>Km por estrada estimados: confirme no Google Maps.</span></div>
+        <div id="rtDias"></div>
+      </div></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) rtFechar(); });
+  ov.addEventListener('click', rtOnClick);
+  ov.addEventListener('keydown', e=>{ if(e.key==='Enter'){ const t = e.target; if(t.id==='rtSaidaIn'){ e.preventDefault(); rtLocalizarSaida(); } else if(t.classList && t.classList.contains('rt-volta-in')){ e.preventDefault(); rtDefinirVolta(Number(t.dataset.rota), t.value); } } });
+  ov.addEventListener('dragstart', e=>{ const l = e.target.closest && e.target.closest('.rt-l'); if(!l) return; RT.arrasto = { chave:l.dataset.chave, rota:Number(l.dataset.rota) }; try{ e.dataTransfer.setData('text/plain', l.dataset.chave); e.dataTransfer.effectAllowed = 'move'; }catch(x){} l.classList.add('arrastando'); });
+  ov.addEventListener('dragend', ()=>{ RT.arrasto = null; ov.querySelectorAll('.arrastando,.drop').forEach(x=> x.classList.remove('arrastando','drop')); });
+  ov.addEventListener('dragover', e=>{ const al = e.target.closest && e.target.closest('.rt-lista'); if(!al || !RT.arrasto) return; e.preventDefault(); al.classList.add('drop'); });
+  ov.addEventListener('dragleave', e=>{ const al = e.target.closest && e.target.closest('.rt-lista'); if(al && !al.contains(e.relatedTarget)) al.classList.remove('drop'); });
+  ov.addEventListener('drop', e=>{
+    const al = e.target.closest && e.target.closest('.rt-lista'); if(!al || !RT.arrasto) return; e.preventDefault();
+    const sobre = e.target.closest('.rt-l'); let idx = null;
+    if(sobre){ idx = [...al.querySelectorAll('.rt-l')].indexOf(sobre); const r = sobre.getBoundingClientRect(); if(e.clientY > r.top+r.height/2) idx++; }
+    const a = RT.arrasto; RT.arrasto = null; rtMoverLinha(a.chave, a.rota, Number(al.dataset.rota), idx);
+  });
+  document.addEventListener('keydown', rtEsc);
+  RT.mapa = L.map(ov.querySelector('#rtMapa'), { zoomControl:true }).setView([-14.2,-51.9], 4);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Tiles © Esri' }).addTo(RT.mapa);
+  RT.camada = L.layerGroup().addTo(RT.mapa);
+  setTimeout(()=>{ if(RT.mapa){ RT.mapa.invalidateSize(); rtDesenharMapa(true); } }, 80);
+  if(!RT.dias.length){ RT.msg = ''; rtDesenhar(); return; }
+  if(RT.saida){ rtDesenhar(); rtIniciar(); }
+  else { RT.msg = 'Digite a cidade de saída e clique em Localizar: o app sugere a melhor ordem e mostra a rota.'; rtDesenhar(); const inp = document.getElementById('rtSaidaIn'); if(inp) inp.focus(); }
+}
+RT.fn = { rtLinksGoogle, rtMelhorOrdem, rtKm, rtPontosRota };   // só para os testes automáticos
+window.cgAbrirRotas = cgAbrirRotas;
+
 function cgAbrirPlanejador(cfg){
   cgFecharPlanejador();
   const NOMES = ['dom','seg','ter','qua','qui','sex','sáb'], DIAS7 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -12284,7 +12621,9 @@ function cgAbrirPlanejador(cfg){
       .cp-leg{font-size:10.5px;color:var(--ink-soft);margin:2px 0 0 3px;}
       .cp-vazio{font-size:12px;color:var(--ink-soft);padding:8px 2px;}
       .cp-semanas{overflow:auto;min-width:0;min-height:0;}
-      .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;}
+      .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px;}
+      .cp-rota{border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;padding:2px 7px;}
+      .cp-rota:hover{background:var(--bg,#f3f1e8);}
       .cp-dias{display:grid;grid-template-columns:minmax(0,.7fr) repeat(5,minmax(0,1fr)) minmax(0,.7fr);gap:8px;margin-bottom:20px;}
       .cp-dia.fds{background:#f6f5ef;}
       .cp-dia{border:1px solid var(--line);border-radius:10px;min-height:110px;padding:6px;background:#fff;min-width:0;}
@@ -12354,8 +12693,8 @@ function cgAbrirPlanejador(cfg){
     subEl.textContent = plano && plano.subtitulo ? plano.subtitulo : 'Arraste cada talhão pro dia que quiser (arrastar funciona no computador) ou use a Distribuição inteligente. Só fica salvo se você clicar em Salvar planejamento.';
     const naLista = grupos.filter(g=> !(g.id in colocado));
     pool.innerHTML = `<div class="cp-ptit">A planejar (${naLista.length})</div>` + (naLista.length ? naLista.map(g=>pillHtml(g,true)).join('') : `<div class="cp-vazio">${grupos.length ? 'Tudo planejado ✓' : 'Nenhum talhão com avaliação nessas semanas'}</div>`);
-    semanasEl.innerHTML = intervalos.map(it=>{
-      return `<div class="cp-sem"><div class="cp-semtit">Semana ${cgDataBr(it.dias[1]).slice(0,5)} – ${cgDataBr(it.dias[5]).slice(0,5)}</div><div class="cp-dias">` + it.dias.map((ds,i)=>{
+    semanasEl.innerHTML = intervalos.map((it,ix)=>{
+      return `<div class="cp-sem"><div class="cp-semtit"><span>Semana ${cgDataBr(it.dias[1]).slice(0,5)} – ${cgDataBr(it.dias[5]).slice(0,5)}</span><button type="button" class="cp-rota" data-sem="${ix}" title="Planejar a rota de viagem desta semana (saída, melhor ordem, mapa e link do Google Maps)" aria-label="Rota da semana">🚗</button></div><div class="cp-dias">` + it.dias.map((ds,i)=>{
         const l = grupos.filter(g=> colocado[g.id]===ds);
         const ufs = [...new Set(l.map(g=> String(g.estado||'—').toUpperCase()))], avisos = [];
         const ufsRegra = [...new Set(l.filter(g=> !CG_PLANO_PROJETOS_LIVRES.includes(g.projeto)).map(g=> String(g.estado||'—').toUpperCase()))];   // projetos livres (Óxido) não entram nos avisos
@@ -12371,6 +12710,8 @@ function cgAbrirPlanejador(cfg){
     btnSalvar.hidden = !!plano; btnAtualizar.hidden = !plano; btnNovo.hidden = !plano;
     btnSalvar.disabled = btnAtualizar.disabled = btnNovo.disabled = !(nPlan + executados.filter(g=>g.itemOriginal).length);   // os executados de um planejamento salvo também contam: dá pra atualizar mesmo que só eles tenham sobrado
   };
+  ov.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('.cp-rota'); if(!b) return; const it = intervalos[Number(b.dataset.sem)]; if(!it) return;
+    cgAbrirRotas({ rotulo: cgDataBr(it.dias[1]).slice(0,5)+' – '+cgDataBr(it.dias[5]).slice(0,5), dias:it.dias, grupos, colocado }); });   // 🚗: abre a rota desta semana com o que está colocado nos dias
   // arrastar e soltar (computador): da lista pro dia, de um dia pra outro, ou de volta pra lista
   ov.addEventListener('dragstart', e=>{ const el = e.target.closest && e.target.closest('.cp-pill'); if(!el) return; e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('arrastando'); });
   ov.addEventListener('dragend', ()=>{ ov.querySelectorAll('.arrastando,.drop').forEach(x=> x.classList.remove('arrastando','drop')); });
@@ -13945,7 +14286,7 @@ function labsExpHtml(){
 async function labsCarregarParcTabela(atualizar){   // quem o painel "Adicionar parceiro" oferece: só parceiros com talhão em algum dos 5 projetos, lido dos talhões carregados do banco (nada de lista fixa no código)
   LABS.parcTabEstado = 'carregando'; LABS.parcTabErro = '';
   try{
-    if((atualizar || !labsDadosProntos()) && typeof carregarDadosDoSupabase==='function'){ window.__cargaPct = 0; await carregarDadosDoSupabase(); }   // lê de novo as tabelas (talhões e dados dos projetos)
+    if((atualizar || !labsDadosProntos()) && typeof carregarDadosDoSupabase==='function'){ await carregarDadosDoSupabase(); }   // se já há uma carga rodando, espera a mesma   // lê de novo as tabelas (talhões e dados dos projetos)
     if(!labsDadosProntos()) throw new Error('Os talhões ainda não carregaram.');
     const por = new Map();
     RECORDS.forEach(r=>{
@@ -13962,7 +14303,7 @@ function labsAbrirAtrib(nome, jaTentou){   // abre a tela: os projetos do parcei
   LABS.msg = ''; LABS.modo = 'atrib'; if(LABS.mapa) LABS.mapa.closePopup();
   if(!labsDadosProntos()){
     LABS.rascunho = { parceiro:nome, pronto:false, atrib:{}, blocos:[], sujo:false, erro:'' };
-    if(!jaTentou && typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; window.__cargaPct = 0; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome, true); }); }
+    if(!jaTentou && typeof carregarDadosDoSupabase==='function' && !LABS.carregandoDados){ LABS.carregandoDados = true; Promise.resolve(carregarDadosDoSupabase()).catch(e=> console.error(e)).then(()=>{ LABS.carregandoDados = false; if(LABS.modo==='atrib' && LABS.rascunho && LABS.rascunho.parceiro===nome) labsAbrirAtrib(nome, true); }); }
     labsDesenharPainel(); return;
   }
   const projs = labsProjetosDoParceiro(nome).map(x=> x.key), grupos = labsGrupos(p), atrib = {};
@@ -14063,8 +14404,8 @@ function labsAcao(b){
   else if(a==='exp-baixar') labsExpBaixar();
   else if(a==='exp-copiar-img') labsExpCopiarImg();
   else if(a==='exp-copiar-msg') labsExpCopiarMsg();
-  else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; LABS.parcTabEstado = 'carregando'; labsDesenharPainel(); labsCarregarParcTabela(); }
-  else if(a==='parc-atualizar'){ LABS.parcTabEstado = 'carregando'; labsDesenharPainel(); labsCarregarParcTabela(true); }
+  else if(a==='novo-parceiro'){ LABS.msg = ''; LABS.modo = 'parceiro-lista'; LABS.parcTabEstado = 'carregando'; if(!window.__cargaEmAndamento) window.__cargaPct = 0; labsDesenharPainel(); labsCarregarParcTabela(); }
+  else if(a==='parc-atualizar'){ LABS.parcTabEstado = 'carregando'; if(!window.__cargaEmAndamento) window.__cargaPct = 0; labsDesenharPainel(); labsCarregarParcTabela(true); }
   else if(a==='novo-apoio'){ LABS.msg = ''; LABS.modo = 'apoio-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='novo-lab'){ LABS.msg = ''; LABS.modo = 'lab-form'; LABS.editando = 'novo'; labsDesenharPainel(); }
   else if(a==='editar-lab'){ LABS.msg = ''; LABS.editando = b.dataset.id; LABS.modo = 'lab-form'; labsDesenharPainel(); if(LABS.mapa) LABS.mapa.closePopup(); }
