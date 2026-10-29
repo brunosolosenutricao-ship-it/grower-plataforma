@@ -17657,6 +17657,12 @@ const cfIsoLocal = d=> d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'
 const cfDM = iso=> iso.slice(8,10)+'/'+iso.slice(5,7);
 const cfDMA = iso=> iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4);
 const cfEmTxt = dias=> dias===0 ? 'hoje' : dias+' d';
+// PERÍODO DE COLETA: a data da coleta é a PREVISÃO do estágio; o talhão tem 7 dias para ser coletado, contando a data (dia 1 = a data, dia 7 = data + 6).
+// 'fut' = a data ainda vai chegar | 'per' = dentro do período de coleta | 'fora' = passou dos 7 dias (vermelho)
+const CF_PERIODO_DIAS = 7;
+const cfSituacao = dias=> dias>0 ? 'fut' : dias>=-(CF_PERIODO_DIAS-1) ? 'per' : 'fora';
+const CF_COR_SIT = { fut:['#8fd39a','#0f3d1d'], per:['#f1c40f','#3d3000'], fora:['#e74c3c','#ffffff'] };   // [fundo, texto]: verde = vai chegar, amarelo = dentro do período, vermelho = fora do período
+const cfSomaDias = (iso,n)=>{ const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return cfIsoLocal(d); };
 function cfListaBase(){ return RECORDS.filter(r=> r.cultura==='Soja' && r.data_plantio).sort((a,b)=> new Date(a.data_plantio) - new Date(b.data_plantio)); }
 // o que o painel, as listas, o PDF e a mensagem usam: todos os talhões de soja, ou só os que o filtro das colunas da tabela deixou visíveis
 function cfListaVisivel(){ const ids = state.cfIdsVisiveis; return ids ? cfListaBase().filter(r=> ids.has(r.id)) : cfListaBase(); }
@@ -17664,10 +17670,10 @@ function cfListaVisivel(){ const ids = state.cfIdsVisiveis; return ids ? cfLista
 // Os próximos 7 dias valem só para talhão ainda Pendente, pela "Data da coleta" da tabela (a prevista, se ninguém mexeu nela): de hoje até hoje+7; antes de hoje = em atraso.
 function cfCalcPainel(lista){
   const hoje = new Date(); hoje.setHours(0,0,0,0); const fim = new Date(hoje); fim.setDate(fim.getDate()+7);
-  const por = {}, uf = {}; let haTotal = 0, haCol = 0, nCol = 0, n7 = 0, ha7 = 0, nAt = 0;
+  const por = {}, uf = {}; let haTotal = 0, haCol = 0, nCol = 0, n7 = 0, ha7 = 0, nFora = 0;
   lista.forEach(r=>{
     const nome = r.consultor || 'Sem consultor', area = Number(r.area)||0, st = r.cf_coleta_status || 'Pendente';
-    const p = por[nome] = por[nome] || { nome, col:0, ha:0, etapas:CF_COLETA_STATUS_OPTIONS.map(()=>0), outros:0, prox:[], atras:[] };
+    const p = por[nome] = por[nome] || { nome, col:0, ha:0, etapas:CF_COLETA_STATUS_OPTIONS.map(()=>0), outros:0, prox:[], per:[], fora:[] };
     haTotal += area;
     const i = CF_COLETA_STATUS_OPTIONS.indexOf(st); if(i>=0) p.etapas[i]++; else p.outros++;   // status fora da lista (não deveria existir): conta à parte, só para o total fechar
     if(st!=='Pendente'){
@@ -17676,13 +17682,14 @@ function cfCalcPainel(lista){
     } else {
       const data = r.cf_coleta_data || cfDataPrevista(r.data_plantio, CF_DAP_COLETA_PREVISTA);
       const dias = Math.round((new Date(data+'T00:00:00') - hoje)/86400000), it = { r, data, dias, area };
-      if(dias<0){ p.atras.push(it); nAt++; } else if(dias<=7){ p.prox.push(it); n7++; ha7 += area; }
+      const sit = cfSituacao(dias);   // a coletar = dentro do período + os que chegam nos próximos 7 dias; fora do período fica à parte (vermelho)
+      if(sit==='fora'){ p.fora.push(it); nFora++; } else if(sit==='per'){ p.per.push(it); n7++; ha7 += area; } else if(dias<=7){ p.prox.push(it); n7++; ha7 += area; }
     }
   });
   const ordem = (a,b)=> a.data.localeCompare(b.data) || String(a.r.fazenda).localeCompare(String(b.r.fazenda),'pt-BR') || String(a.r.talhao).localeCompare(String(b.r.talhao),'pt-BR',{numeric:true});
-  Object.values(por).forEach(p=>{ p.prox.sort(ordem); p.atras.sort(ordem); });
+  Object.values(por).forEach(p=>{ p.fora.sort(ordem); p.per.sort(ordem); p.prox.sort(ordem); });
   return { ini:cfIsoLocal(hoje), fim:cfIsoLocal(fim), por, nomes:Object.keys(por).sort((a,b)=> por[b].col-por[a].col || a.localeCompare(b,'pt-BR')),
-    ufs:Object.entries(uf).sort((a,b)=> b[1].ha-a[1].ha || a[0].localeCompare(b[0])), nSoja:lista.length, nCol, haCol, haTotal, pct: haTotal>0 ? haCol/haTotal*100 : 0, n7, ha7, nAt };
+    ufs:Object.entries(uf).sort((a,b)=> b[1].ha-a[1].ha || a[0].localeCompare(b[0])), nSoja:lista.length, nCol, haCol, haTotal, pct: haTotal>0 ? haCol/haTotal*100 : 0, n7, ha7, nFora };
 }
 function cfHtmlPainel(k){
   const E = cgEscH, cor = n=> cfCorConsultor(n, cfNomesTodos()), pt = k.pct, pctTxt = fmtNum(pt, pt>0 && pt<10 ? 1 : 0)+'%';
@@ -17696,7 +17703,9 @@ function cfHtmlPainel(k){
   const c1 = k.nomes.map(n=>`<div class="cf-l1"><span class="cf-dot" style="background:${cor(n)}"></span><span class="cf-l1n">${E(n)}</span><b>${k.por[n].col}</b></div>`).join('');
   const maxHa = Math.max(0, ...k.nomes.map(n=> k.por[n].ha));
   const c2 = k.nomes.map(n=>`<div class="cf-l2"><span class="cf-l2n">${E(n)}</span><div class="cf-bg"><div style="width:${maxHa>0 ? k.por[n].ha/maxHa*100 : 0}%;background:${cor(n)}"></div></div><span class="cf-l2v">${fmtNum(k.por[n].ha,0)}</span></div>`).join('');
-  const b7 = k.nomes.map(n=>{ const p = k.por[n]; return `<button type="button" class="cf-b7" data-cf7="${E(n)}" aria-label="${E(n)}: ${p.prox.length} talhões a coletar nos próximos 7 dias. Abrir a lista"><span class="cf-b7n"><span class="cf-dot" style="background:${cor(n)}"></span>${E(n)}</span><span class="cf-b7v">${p.prox.length}</span>${p.atras.length ? `<span class="cf-b7a">${p.atras.length} em atraso</span>` : '<span class="cf-b7s">sem atraso</span>'}</button>`; }).join('');
+  const b7 = k.nomes.map(n=>{ const p = k.por[n], tot = p.per.length + p.prox.length, chip = (sit,txt,tip)=>`<span class="cf-b7c" title="${tip}" style="background:${CF_COR_SIT[sit][0]};color:${CF_COR_SIT[sit][1]}">${txt}</span>`;
+    const linhas = (p.per.length ? chip('per', p.per.length+' no período', p.per.length+' no período de coleta (7 dias contando a data da coleta)') : '') + (p.prox.length ? chip('fut', p.prox.length+' próximos 7 dias', p.prox.length+' com a data da coleta nos próximos 7 dias') : '') + (p.fora.length ? chip('fora', p.fora.length+' fora do período', p.fora.length+' fora do período de coleta (passaram dos 7 dias)') : '');
+    return `<button type="button" class="cf-b7" data-cf7="${E(n)}" aria-label="${E(n)}: ${tot} talhões a coletar (${p.per.length} no período de coleta e ${p.prox.length} nos próximos 7 dias) e ${p.fora.length} fora do período. Abrir a lista"><span class="cf-b7n"><span class="cf-dot" style="background:${cor(n)}"></span>${E(n)}</span><span class="cf-b7v">${tot}</span>${linhas ? `<span class="cf-b7l">${linhas}</span>` : '<span class="cf-b7s">nada a coletar</span>'}</button>`; }).join('');
   const maxTot = Math.max(1, ...k.nomes.map(n=> k.por[n].etapas.reduce((s,v)=>s+v,0)+k.por[n].outros));
   const temOutros = k.nomes.some(n=> k.por[n].outros>0);
   const c4 = k.nomes.map(n=>{ const p = k.por[n], tot = p.etapas.reduce((s,v)=>s+v,0)+p.outros, segs = p.etapas.concat(temOutros ? [p.outros] : []);
@@ -17705,7 +17714,7 @@ function cfHtmlPainel(k){
   return { kpis, cards:`
       <div class="cf-card cf-c"><h4>Talhões coletados por consultor</h4>${c1}<div class="cf-l1t"><span>Total</span><span>${k.nCol} talhões</span></div></div>
       <div class="cf-card cf-c"><h4>Área coletada por consultor (ha)</h4>${c2}</div>
-      <div class="cf-card cf-c" style="min-height:250px;"><h4>A coletar nos próximos 7 dias</h4><div class="cf-g7">${b7}</div><div class="cf-dica">Clique no consultor para ver a lista de talhões</div><button type="button" class="cf-pdf" id="cfPdfBtn" ${k.n7 ? '' : 'disabled title="Nenhum talhão a coletar nos próximos 7 dias"'}>Exportar PDF</button></div>
+      <div class="cf-card cf-c" style="min-height:250px;"><h4>A coletar nos próximos 7 dias</h4><div class="cf-g7">${b7}</div><div class="cf-dica">Clique no consultor para ver a lista de talhões</div><button type="button" class="cf-pdf" id="cfPdfBtn" ${(k.n7+k.nFora) ? '' : 'disabled title="Nenhum talhão a coletar"'}>Exportar PDF</button></div>
       <div class="cf-card cf-c" style="min-height:250px;"><h4>Etapas da coleta por consultor</h4>${c4}<div class="cf-legs">${leg}</div></div>
     ` };
 }
@@ -17725,13 +17734,14 @@ function cfRenderPainel(){
 // janela com a lista de um consultor: os em atraso (vermelho) e os dos próximos 7 dias
 function cfAbrirLista7(nome){
   const k = cfCalcPainel(cfListaVisivel()), p = k.por[nome]; if(!p) return;
-  const E = cgEscH, ha7 = p.prox.reduce((s,i)=> s+i.area, 0), ant = document.getElementById('cfModal7'); if(ant) ant.remove();
+  const E = cgEscH, aColetar = p.per.length + p.prox.length, ha7 = p.per.concat(p.prox).reduce((s,i)=> s+i.area, 0), ant = document.getElementById('cfModal7'); if(ant) ant.remove();
   const th = (t,al)=> `<th${al ? ' style="text-align:right"' : ''}>${t}</th>`;
-  const linha = (it, atraso)=>`<tr class="${atraso ? 'cf-at' : ''}"><td>${cfDM(it.data)}</td><td>${atraso ? '<b>'+it.dias+' d</b>' : cfEmTxt(it.dias)}</td><td>${E(it.r.fazenda||'—')}</td><td>${E(it.r.talhao||'—')}</td><td>${E(it.r.cliente||'—')}</td><td>${E((it.r.estado||'—').toUpperCase())}</td><td style="text-align:right">${fmtNum(it.area,1)}</td><td>${E(it.r.cultivar||'—')}</td></tr>`;
+  const prazo = (it,sit)=> sit==='fora' ? '<b>fora desde '+cfDM(cfSomaDias(it.data,CF_PERIODO_DIAS))+'</b>' : sit==='per' ? 'até '+cfDM(cfSomaDias(it.data,CF_PERIODO_DIAS-1)) : 'em '+it.dias+' d';
+  const linha = (it, sit)=>`<tr class="${sit==='fora' ? 'cf-at' : sit==='per' ? 'cf-pe' : ''}"><td>${cfDM(it.data)}</td><td>${prazo(it,sit)}</td><td>${E(it.r.fazenda||'—')}</td><td>${E(it.r.talhao||'—')}</td><td>${E(it.r.cliente||'—')}</td><td>${E((it.r.estado||'—').toUpperCase())}</td><td style="text-align:right">${fmtNum(it.area,1)}</td><td>${E(it.r.cultivar||'—')}</td></tr>`;
   const sec = (t,c,n)=> n ? `<tr><td colspan="8" class="cf-sec" style="color:${c}">${t} (${n})</td></tr>` : '';
-  const ov = document.createElement('div'); ov.id = 'cfModal7'; ov.className = 'cf-modal-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Talhões a coletar nos próximos 7 dias: '+nome);
-  ov.innerHTML = `<div class="cf-modal"><div class="cf-modal-cab"><div><div class="cf-rot">A coletar nos próximos 7 dias</div><div class="cf-modal-nome">${E(nome)}</div><div class="s">${p.prox.length} talhões · ${fmtNum(ha7,0)} ha · de ${cfDM(k.ini)} a ${cfDM(k.fim)}${p.atras.length ? ', mais '+p.atras.length+' em atraso' : ''}</div></div><button type="button" class="cf-x" aria-label="Fechar a lista">✕</button></div>
-    <div style="overflow-x:auto">${(p.prox.length || p.atras.length) ? `<table class="cf-tb7"><thead><tr>${th('Data prevista')}${th('Em')}${th('Fazenda')}${th('Talhão')}${th('Cliente')}${th('UF')}${th('Área (ha)',1)}${th('Cultivar')}</tr></thead><tbody>${sec('Em atraso','#b8352a',p.atras.length)}${p.atras.map(i=>linha(i,true)).join('')}${sec('Próximos 7 dias','#35533f',p.prox.length)}${p.prox.map(i=>linha(i,false)).join('')}</tbody></table>` : '<p class="s" style="padding:12px 0;">Nenhum talhão a coletar nos próximos 7 dias.</p>'}</div></div>`;
+  const ov = document.createElement('div'); ov.id = 'cfModal7'; ov.className = 'cf-modal-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Talhões a coletar: período de coleta e próximos 7 dias: '+nome);
+  ov.innerHTML = `<div class="cf-modal"><div class="cf-modal-cab"><div><div class="cf-rot">Período de coleta e próximos 7 dias</div><div class="cf-modal-nome">${E(nome)}</div><div class="s">${aColetar} a coletar · ${fmtNum(ha7,0)} ha${p.fora.length ? ' · '+p.fora.length+' fora do período' : ''}</div></div><button type="button" class="cf-x" aria-label="Fechar a lista">✕</button></div>
+    <div style="overflow-x:auto">${(aColetar || p.fora.length) ? `<table class="cf-tb7"><thead><tr>${th('Data da coleta')}${th('Prazo')}${th('Fazenda')}${th('Talhão')}${th('Cliente')}${th('UF')}${th('Área (ha)',1)}${th('Cultivar')}</tr></thead><tbody>${sec('Fora do período de coleta','#b8352a',p.fora.length)}${p.fora.map(i=>linha(i,'fora')).join('')}${sec('No período de coleta','#8a6a00',p.per.length)}${p.per.map(i=>linha(i,'per')).join('')}${sec('Próximos 7 dias','#35533f',p.prox.length)}${p.prox.map(i=>linha(i,'fut')).join('')}</tbody></table>` : '<p class="s" style="padding:12px 0;">Nenhum talhão a coletar no momento.</p>'}</div></div>`;
   const fechar = ()=>{ ov.remove(); document.removeEventListener('keydown', esc); };
   const esc = e=>{ if(e.key==='Escape') fechar(); };
   ov.addEventListener('click', e=>{ if(e.target===ov) fechar(); }); ov.querySelector('.cf-x').addEventListener('click', fechar); document.addEventListener('keydown', esc);
@@ -17763,7 +17773,7 @@ function cfAbrirMensagem(id){
 const cfPassaFiltro = (r,f)=> (!f.consultor || (r.consultor||'Sem consultor')===f.consultor) && (!f.cliente || (r.cliente||'—')===f.cliente) && (!f.fazenda || (r.fazenda||'—')===f.fazenda);
 function cfAbrirFiltroPdf(){
   const k = cfCalcPainel(cfListaVisivel()), E = cgEscH, ant = document.getElementById('cfPdfFiltro'); if(ant) ant.remove();
-  const itens = k.nomes.flatMap(n=> k.por[n].prox); if(!itens.length){ alert('Nenhum talhão a coletar nos próximos 7 dias.'); return; }
+  const itens = k.nomes.flatMap(n=> k.por[n].per.concat(k.por[n].prox, k.por[n].fora)); if(!itens.length){ alert('Nenhum talhão a coletar.'); return; }
   const sel = { consultor:'', cliente:'', fazenda:'' }, pt = (a,b)=> String(a).localeCompare(String(b),'pt-BR',{ numeric:true }), uniq = a=> [...new Set(a)].sort(pt);
   const nomeC = r=> r.consultor || 'Sem consultor', nomeCli = r=> r.cliente || '—', nomeF = r=> r.fazenda || '—';
   const calc = ()=>{
@@ -17796,27 +17806,30 @@ function cfExportarPdf7(filtro){
   const f = (filtro && typeof filtro==='object' && !filtro.target) ? filtro : {};
   const J = window.jspdf && window.jspdf.jsPDF;
   if(!J){ alert('Não consegui carregar a biblioteca de PDF (falha de conexão). Recarregue a página e tente de novo.'); return; }
-  const k = cfCalcPainel(cfListaVisivel().filter(r=> cfPassaFiltro(r,f))); if(!k.n7){ alert('Nenhum talhão a coletar nos próximos 7 dias'+(f.rotulo ? ' com esse filtro' : '')+'.'); return; }
+  const k = cfCalcPainel(cfListaVisivel().filter(r=> cfPassaFiltro(r,f))); if(!(k.n7+k.nFora)){ alert('Nenhum talhão a coletar'+(f.rotulo ? ' com esse filtro' : '')+'.'); return; }
   const doc = new J({ unit:'pt', format:'a4' }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 40, FUNDO = H-56;
   const rgb = h=> [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
   const logo = CF_PDF_LOGO;
   const addLogo = (x,y,t)=>{ if(!logo) return; try{ doc.addImage(logo,'PNG',x,y,t,t,'cflogo','FAST'); }catch(e){ console.error(e); } };
   const periodo = cfDMA(k.ini)+' a '+cfDMA(k.fim), marcadas = new Set([1]);
-  const cabCompacta = ()=>{ addLogo(MX-2, 16, 32); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(26,32,25); doc.text('Coletas foliares - próximos 7 dias', MX+38, 36); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(77,86,72); doc.text(periodo, W-MX, 36, { align:'right' }); doc.setDrawColor(127,166,83); doc.setLineWidth(2); doc.line(MX, 54, W-MX, 54); };
+  const cabCompacta = ()=>{ addLogo(MX-2, 16, 32); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(26,32,25); doc.text('Coletas foliares: período de coleta e próximos 7 dias', MX+38, 36); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(77,86,72); doc.text(periodo, W-MX, 36, { align:'right' }); doc.setDrawColor(127,166,83); doc.setLineWidth(2); doc.line(MX, 54, W-MX, 54); };
   // cabeçalho da primeira página
   addLogo(MX-4, 24, 56);
-  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(26,32,25); doc.text('Coletas foliares - próximos 7 dias', MX+60, 50);
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(26,32,25); doc.text('Coletas foliares: período de coleta e próximos 7 dias', MX+60, 50);
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(77,86,72); doc.text('Safra 2026.27 · de '+periodo.replace(' a ',' a ')+' · por consultor', MX+60, 67);
   if(f.rotulo){ const tf = 'Filtro: '+f.rotulo.replace(/ › /g,' > '), maxF = W-2*MX-60-110; doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(26,32,25); if(doc.getTextWidth(tf)<=maxF) doc.text(tf, MX+60, 81); else { doc.setFontSize(7.5); doc.splitTextToSize(tf, maxF).slice(0,2).forEach((s,i)=> doc.text(s, MX+60, 78+i*9)); } }   // o filtro escolhido aparece sob o título
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(77,86,72); doc.text('Gerado em '+cfDMA(cfIsoLocal(new Date())), W-MX, 36, { align:'right' });
   doc.setDrawColor(127,166,83); doc.setLineWidth(2.5); doc.line(MX, 90, W-MX, 90);
-  const caixas = [[String(k.n7), 'talhões a coletar'], [fmtNum(k.ha7,0)+' ha', 'área a coletar'], [String(k.nomes.length), 'consultores']], cw = (W-2*MX-16)/3;
-  caixas.forEach(([v,t],i)=>{ const x = MX+i*(cw+8); doc.setFillColor(243,244,234); doc.roundedRect(x, 104, cw, 40, 6, 6, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(26,32,25); doc.text(v, x+10, 124); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(77,86,72); doc.text(t, x+10, 137); });
+  const caixas = [[String(k.n7), 'talhões a coletar', null], [fmtNum(k.ha7,0)+' ha', 'área a coletar', null], [String(k.nFora), 'fora do período', k.nFora ? [179,38,30] : null], [String(k.nomes.length), 'consultores', null]], cw = (W-2*MX-24)/4;
+  caixas.forEach(([v,t,corN],i)=>{ const x = MX+i*(cw+8); doc.setFillColor(243,244,234); doc.roundedRect(x, 104, cw, 40, 6, 6, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...(corN || [26,32,25])); doc.text(v, x+10, 124); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(77,86,72); doc.text(t, x+10, 137); });
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(77,86,72); doc.text('Cada talhão tem 7 dias para ser coletado, contando a data da coleta. Passado esse prazo ele aparece em vermelho (fora do período).', MX, 158);
   // larguras das 4 colunas de texto (Fazenda, Talhão, Cliente e Cultivar), calculadas UMA vez para todos os consultores (as tabelas ficam alinhadas):
   // se tudo cabe, cada coluna tem a largura do próprio texto; se não cabe, as colunas que passam da sua parte dividem o espaço e QUEBRAM LINHA. Nada é cortado com reticências.
-  const linhaPdf = it=> [cfDM(it.data), cfEmTxt(it.dias), it.r.fazenda||'-', it.r.talhao||'-', it.r.cliente||'-', (it.r.estado||'-').toUpperCase(), fmtNum(it.area,1), it.r.cultivar||'-'];
-  const COLS_TXT = [2,3,4,7], LTXT = (W-2*MX)-(36+34+24+46),   // a soma das colunas fecha EXATAMENTE a largura da página (se sobrar folga a biblioteca avisa "não coube")
-     todasLinhas = k.nomes.flatMap(n=> k.por[n].prox.map(linhaPdf)), larg = {};
+  const prazoPdf = (it,sit)=> sit==='fora' ? { content:'fora desde '+cfDM(cfSomaDias(it.data,CF_PERIODO_DIAS)), styles:{ textColor:[179,38,30], fontStyle:'bold' } } : sit==='per' ? 'até '+cfDM(cfSomaDias(it.data,CF_PERIODO_DIAS-1)) : 'em '+it.dias+' d';
+  const linhaPdf = (it,sit)=> [cfDM(it.data), prazoPdf(it,sit), it.r.fazenda||'-', it.r.talhao||'-', it.r.cliente||'-', (it.r.estado||'-').toUpperCase(), fmtNum(it.area,1), it.r.cultivar||'-'];
+  const gruposDe = p=> [['fora','Fora do período de coleta',p.fora],['per','No período de coleta',p.per],['fut','Próximos 7 dias',p.prox]].filter(g=> g[2].length);
+  const COLS_TXT = [2,3,4,7], LTXT = (W-2*MX)-(36+80+24+46),   // a soma das colunas fecha EXATAMENTE a largura da página (se sobrar folga a biblioteca avisa "não coube")
+     todasLinhas = k.nomes.flatMap(n=> gruposDe(k.por[n]).flatMap(([s,,arr])=> arr.map(it=> linhaPdf(it,s)))), larg = {};
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
   const nat = COLS_TXT.map(ci=> Math.max(20, ...todasLinhas.map(r=> doc.getTextWidth(String(r[ci]))))+10);   // +10: o respiro das bordas da célula
   { let resto = LTXT, abertos = COLS_TXT.map((_,i)=> i);
@@ -17824,23 +17837,25 @@ function cfExportarPdf7(filtro){
       if(!cabem.length){ abertos.forEach(i=>{ larg[i] = justo; }); resto = 0; break; }
       cabem.forEach(i=>{ larg[i] = nat[i]; resto -= nat[i]; }); abertos = abertos.filter(i=> !cabem.includes(i)); }
     if(resto>1){ const soma = COLS_TXT.reduce((s,_,i)=> s+larg[i], 0); COLS_TXT.forEach((_,i)=>{ larg[i] += resto*larg[i]/soma; }); } }   // sobrou espaço: reparte na proporção de cada coluna
-  let y = 172;
+  let y = 186;
   const novaPagina = ()=>{ doc.addPage(); marcadas.add(doc.internal.getNumberOfPages()); cabCompacta(); y = 78; };
+  const COR_G = { fora:{ fill:[251,238,236], txt:[138,28,19] }, per:{ fill:[255,244,204], txt:[90,68,0] }, fut:{ fill:[231,244,234], txt:[20,83,45] } };
   k.nomes.slice().sort((a,b)=> a.localeCompare(b,'pt-BR')).forEach(n=>{
-    const p = k.por[n], linhas = p.prox, est = 26 + (linhas.length ? 20+linhas.length*18 : 22) + 18;
+    const p = k.por[n], grupos = gruposDe(p), nLin = grupos.reduce((s,g)=> s+g[2].length, 0), aColetar = p.per.length + p.prox.length, est = 26 + (nLin ? 20+nLin*18+grupos.length*18 : 22) + 18;
     if(y+est > FUNDO && y > 100) novaPagina();      // o consultor não é cortado no meio da página quando cabe inteiro na seguinte
     doc.setFillColor(...rgb(cfCorConsultor(n, cfNomesTodos()))); doc.roundedRect(MX, y-9, 11, 11, 2, 2, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(12.5); doc.setTextColor(26,32,25); doc.text(n, MX+18, y);
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(77,86,72);
-    doc.text(linhas.length ? linhas.length+' talhões · '+fmtNum(linhas.reduce((s,i)=> s+i.area, 0),0)+' ha' : 'nenhum talhão', W-MX, y, { align:'right' });
-    if(!linhas.length){ doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.text('Nenhum talhão a coletar nos próximos 7 dias.', MX+18, y+16); y += 44; return; }
+    doc.text(nLin ? aColetar+' a coletar · '+fmtNum(p.per.concat(p.prox).reduce((s,i)=> s+i.area, 0),0)+' ha'+(p.fora.length ? ' · '+p.fora.length+' fora do período' : '') : 'nenhum talhão', W-MX, y, { align:'right' });
+    if(!nLin){ doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.text('Nenhum talhão a coletar no momento.', MX+18, y+16); y += 44; return; }
+    const body = []; grupos.forEach(([sit,rot,arr])=>{ body.push([{ content: rot+' ('+arr.length+')', colSpan:8, styles:{ fillColor:COR_G[sit].fill, textColor:COR_G[sit].txt, fontStyle:'bold', fontSize:8.5 } }]); arr.forEach(it=> body.push(linhaPdf(it,sit))); });
     doc.autoTable({
       startY: y+8, margin:{ left:MX, right:MX, top:66, bottom:60 }, theme:'plain',
-      head:[['Data','Em','Fazenda','Talhão','Cliente','UF','Área (ha)','Cultivar']],
-      body: linhas.map(linhaPdf),
+      head:[['Data','Prazo','Fazenda','Talhão','Cliente','UF','Área (ha)','Cultivar']],
+      body,
       styles:{ font:'helvetica', fontSize:8.5, cellPadding:{ top:4, bottom:4, left:4, right:4 }, textColor:[26,32,25], overflow:'linebreak' },
       headStyles:{ fontStyle:'bold', fontSize:7.5, textColor:[77,86,72] },
-      columnStyles:{ 0:{ cellWidth:36 }, 1:{ cellWidth:34 }, 2:{ cellWidth:larg[0] }, 3:{ cellWidth:larg[1] }, 4:{ cellWidth:larg[2] }, 5:{ cellWidth:24 }, 6:{ cellWidth:46, halign:'right' }, 7:{ cellWidth:larg[3] } },
+      columnStyles:{ 0:{ cellWidth:36 }, 1:{ cellWidth:80 }, 2:{ cellWidth:larg[0] }, 3:{ cellWidth:larg[1] }, 4:{ cellWidth:larg[2] }, 5:{ cellWidth:24 }, 6:{ cellWidth:46, halign:'right' }, 7:{ cellWidth:larg[3] } },
       didDrawCell:(d)=>{ doc.setDrawColor(...(d.section==='head' ? [26,32,25] : [227,230,216])); doc.setLineWidth(d.section==='head' ? 0.9 : 0.4); doc.line(d.cell.x, d.cell.y+d.cell.height, d.cell.x+d.cell.width, d.cell.y+d.cell.height); },
       didDrawPage:()=>{ const pg = doc.internal.getNumberOfPages(); if(!marcadas.has(pg)){ marcadas.add(pg); cabCompacta(); } },
     });
@@ -17880,8 +17895,13 @@ function renderColetaFoliar(){
     return '#2ecc71';
   }
   // depois que o talhão deixa de ser Pendente (coletado, no laboratório, laudo, dado compilado), os dias param de contar: a célula mostra "Coletado" em verde
-  function cfCelulaDias(dataPlantio, status){ return (status||'Pendente')!=='Pendente' ? { cor:CF_COR_COLETADO, txt:'Coletado' } : (d=> ({ cor:corDias(d), txt:d+' dia(s)' }))(diasAteColeta(dataPlantio)); }
-  function cfAtualizarLinha(id){ const rec = RECORDS.find(r=>r.id===id) || SEM_AREA.find(r=>r.id===id), td = document.querySelector('td.cf-dias[data-cf-id="'+id+'"]'); if(!rec || !td) return; const d = cfCelulaDias(rec.data_plantio, rec.cf_coleta_status); td.style.background = d.cor; td.textContent = d.txt; }
+  function cfCelulaDias(dataPlantio, status){
+    if((status||'Pendente')!=='Pendente') return { cor:CF_COR_COLETADO, fg:'#ffffff', txt:'Coletado', tip:'Já coletado' };
+    const d = diasAteColeta(dataPlantio), sit = cfSituacao(d), cs = CF_COR_SIT[sit], dataIso = cfDataPrevista(dataPlantio, CF_DAP_COLETA);
+    return { cor:cs[0], fg:cs[1], txt: sit==='fut' ? d+' dia(s)' : sit==='per' ? 'Dentro do período de coleta' : 'Fora do período de coleta',
+             tip: sit==='fut' ? 'Data da coleta: '+cfDM(dataIso) : 'Período de coleta: de '+cfDM(dataIso)+' a '+cfDM(cfSomaDias(dataIso,CF_PERIODO_DIAS-1))+' (7 dias contando a data)' };   // antes da data: dias positivos; depois: dentro ou fora do período
+  }
+  function cfAtualizarLinha(id){ const rec = RECORDS.find(r=>r.id===id) || SEM_AREA.find(r=>r.id===id), td = document.querySelector('td.cf-dias[data-cf-id="'+id+'"]'); if(!rec || !td) return; const d = cfCelulaDias(rec.data_plantio, rec.cf_coleta_status); td.style.background = d.cor; td.style.color = d.fg; td.title = d.tip; td.textContent = d.txt; }
   function dataPrevistaCf(dataPlantio, dap){
     const dp = new Date(dataPlantio+'T00:00:00'); dp.setDate(dp.getDate()+dap);
     return dp.toISOString().slice(0,10);
@@ -17924,6 +17944,8 @@ function renderColetaFoliar(){
 .cf-b7n{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);}
 .cf-b7v{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;line-height:1.15;color:var(--ink);}
 .cf-b7a{font-size:11px;color:var(--red);font-weight:600;}
+.cf-b7l{display:flex;flex-direction:column;gap:3px;align-items:flex-start;margin-top:5px;}
+.cf-b7c{font-size:10.5px;font-weight:600;line-height:1.25;border-radius:5px;padding:2px 7px;text-align:left;}
 .cf-b7s{font-size:11px;color:var(--ink-soft);}
 .cf-dica{font-size:11px;color:var(--ink-soft);margin-top:9px;}
 .cf-pdf{all:unset;box-sizing:border-box;cursor:pointer;width:100%;height:40px;display:flex;align-items:center;justify-content:center;background:#111;color:#fff;border-radius:9px;font-weight:700;font-size:13px;margin-top:10px;}
@@ -17944,6 +17966,7 @@ function renderColetaFoliar(){
 .cf-tb7 th{text-align:left;font-size:10.3px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap;}
 .cf-tb7 td{padding:8px 10px;font-size:12.5px;border-bottom:1px solid #eceee2;white-space:nowrap;}
 .cf-tb7 tr.cf-at td{color:var(--red);background:#fbeeec;}
+.cf-tb7 tr.cf-pe td{background:#fff6d6;}
 .cf-sec{padding:10px 10px 4px !important;font-size:11px !important;text-transform:uppercase;letter-spacing:.05em;font-weight:700;border-bottom:none !important;}
 .cf-card{background:var(--paper);border-radius:13px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px;}
 .cf-f1{left:0px;width:150px;min-width:150px;max-width:150px;}
@@ -17963,7 +17986,7 @@ function renderColetaFoliar(){
 
 <div class="cf-card full-card">
     <h3 style="margin:0 0 4px;">🗓️ Acompanhamento</h3>
-    <p class="sub-sm" style="margin:0 0 8px;">Soja com Data de Plantio informada · ${lista.length} talhão(ões). "Dias até coleta" = Plantio + ${CF_DAP_COLETA} DAP − hoje.</p>
+    <p class="sub-sm" style="margin:0 0 8px;">Soja com Data de Plantio informada · ${lista.length} talhão(ões). "Dias até coleta" = Plantio + ${CF_DAP_COLETA} DAP − hoje. Na data da coleta e nos 6 dias seguintes (7 dias, contando a data) o talhão está <b>dentro do período de coleta</b>; depois disso, <b>fora do período</b> (vermelho).</p>
     <div class="table-scroll" data-topscroll="1">
       <table data-colfilter="cf-acomp">
         <thead><tr>
@@ -17985,7 +18008,7 @@ function renderColetaFoliar(){
               <td class="mono-td">${new Date(r.data_plantio+'T00:00:00').toLocaleDateString('pt-BR')}</td>
               <td>${r.cultivar||'—'}</td>
               <td class="mono-td">${fmtNum(r.area,1)}</td>
-              <td class="cf-dias" data-cf-id="${r.id}" style="background:${celDias.cor};color:#fff;font-weight:700;text-align:center;">${celDias.txt}</td>
+              <td class="cf-dias" data-cf-id="${r.id}" style="background:${celDias.cor};color:${celDias.fg};font-weight:700;text-align:center;white-space:normal;line-height:1.2;min-width:118px;" title="${celDias.tip}">${celDias.txt}</td>
               <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg1_status" style="${cfEstiloStatus(entry.msg1_status)}">${CF_MSG_OPTIONS.map(o=>`<option value="${o}" ${entry.msg1_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
               <td><input type="date" class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg1_data" value="${entry.msg1_data||dataPrevistaCf(r.data_plantio,CF_DAP_MSG1)}"></td>
               <td><select class="cell-input cf-input" data-cf-id="${r.id}" data-cf-campo="msg2_status" style="${cfEstiloStatus(entry.msg2_status)}">${CF_MSG_OPTIONS.map(o=>`<option value="${o}" ${entry.msg2_status===o?'selected':''}>${o}</option>`).join('')}</select></td>
