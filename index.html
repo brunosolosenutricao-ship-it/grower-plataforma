@@ -12243,6 +12243,9 @@ async function cgPlanosCarregar(forcar){
 let CG_FILTROS_COL = true;   // vira false se a tabela ainda não tem a coluna "filtros" (rode o planejamentos_filtros.sql): aí o planejamento é salvo sem ela
 async function cgPlanosSalvar(reg){
   const st = cgPlanosEstado(), agora = new Date().toISOString();
+  // regra: o mesmo projeto do mesmo talhão só pode estar em UM planejamento. Confere no banco (não só na tela), porque outra pessoa pode ter salvo um planejamento no meio tempo.
+  let outros = null; try{ const r0 = await sb.from('planejamentos').select('id,regiao,responsavel,itens'); if(!r0.error) outros = r0.data || []; }catch(e0){}   // se a conferência em si falhar (rede), não trava o salvar
+  if(outros){ const conf = cgConflitosDePares(reg.itens, outros, reg.id); if(conf.length){ const err = new Error(cgTextoConflitos(conf)); err.conflito = true; throw err; } }
   const montar = comFiltros=>{
     if(reg.id){   // atualizar: só manda o que veio
       const dados = { atualizado_em:agora };
@@ -12317,7 +12320,7 @@ function cgDialogoPlano(cfg){
     if(!vals.regiao){ erro.textContent = 'Informe a região.'; inRegiao.focus(); return; }
     ok.disabled = true; cancelar.disabled = true; erro.textContent = '';
     try{ await cfg.onOk(vals); dlg.remove(); }
-    catch(e){ erro.textContent = 'Não foi possível salvar: '+(e && e.message ? e.message : e)+'. Confira se a tabela planejamentos foi criada no Supabase.'; ok.disabled = false; cancelar.disabled = false; }
+    catch(e){ erro.textContent = (e && e.conflito) ? e.message : 'Não foi possível salvar: '+(e && e.message ? e.message : e)+'. Confira se a tabela planejamentos foi criada no Supabase.'; ok.disabled = false; cancelar.disabled = false; }
   });
   inRegiao.focus();
 }
@@ -12339,61 +12342,124 @@ function cgGruposDePontos(pts){   // agrupa os pontos em pills (data + projeto +
   grupos.forEach(g=>{ g.exec = g.avaliacoes.every(a=>a.exec); g.execSemData = g.exec && g.avaliacoes.every(a=>a.semData); });
   return { pendentes:grupos.filter(g=>!g.exec), executados:grupos.filter(g=>g.exec) };   // executado fica no dia da execução, travado, fora da lista e da distribuição
 }
-// opt: { semanas (domingos do planejamento), jaNoPlano (Set de "cliente|fazenda|talhão" já no quadro que está aberto), planos (planejamentos salvos), pontos, hoje }
+// ---- REGRA DOS PLANEJAMENTOS: cada par PROJETO + TALHÃO fica em UM planejamento só. O talhão pode estar em vários planejamentos (um por projeto), mas o mesmo projeto do mesmo talhão nunca se repete.
+const cgChavePar = (projeto,c,f,t)=> [projeto,c,f,t].join('|');
+// pares já ocupados por planejamentos salvos: chave do par → { id, regiao, responsavel, dia (o primeiro dia salvo) }. "exceto" = o planejamento que está aberto (ele não conta contra ele mesmo).
+function cgParesOcupados(planos, exceto){
+  const m = new Map();
+  (planos || []).forEach(pl=>{ if(exceto && pl.id===exceto) return; (pl.itens || []).forEach(it=>{
+    const k = cgChavePar(it.projeto || '*', it.cliente, it.fazenda, it.talhao), cur = m.get(k);   // item sem projeto (muito antigo) cobre todos os projetos do talhão
+    if(!cur) m.set(k, { id:pl.id, regiao:pl.regiao || 'Planejamento', responsavel:pl.responsavel || '', dia:it.dia || '' });
+    else if(cur.id===pl.id && it.dia && (!cur.dia || it.dia < cur.dia)) cur.dia = it.dia;
+  }); });
+  return m;
+}
+const cgOcupante = (m, projeto, c, f, t)=> m.get(cgChavePar(projeto,c,f,t)) || m.get(cgChavePar('*',c,f,t)) || null;
+// itens que repetem um par que já está em OUTRO planejamento (conferido na hora de salvar)
+function cgConflitosDePares(itens, planos, exceto){
+  const oc = cgParesOcupados(planos, exceto), vistos = new Set(), out = [];
+  (itens || []).forEach(it=>{ const k = cgChavePar(it.projeto,it.cliente,it.fazenda,it.talhao); if(vistos.has(k)) return; vistos.add(k); const o = cgOcupante(oc, it.projeto, it.cliente, it.fazenda, it.talhao); if(o) out.push({ projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, plano:o }); });
+  return out;
+}
+const cgTextoConflitos = conf=> 'O mesmo projeto do mesmo talhão só pode estar em um planejamento, e estes já estão em outro: '+conf.slice(0,4).map(x=> (CG_PROJ[x.projeto] ? CG_PROJ[x.projeto].label : x.projeto)+' · '+x.fazenda+' '+x.talhao+' (em "'+x.plano.regiao+'"'+(x.plano.responsavel ? ', '+x.plano.responsavel : '')+')').join('; ')+(conf.length>4 ? ' e mais '+(conf.length-4) : '')+'. Tire do quadro (ou do outro planejamento) e salve de novo.';
+// opt: { semanas (domingos do planejamento), jaNoPlano (Set de "projeto|cliente|fazenda|talhão" que já estão no quadro aberto), planos (planejamentos salvos), planoId (o planejamento aberto: não conta contra ele), pontos, hoje }
+// Devolve UM item por talhão, com os projetos dele e a situação de cada um: livre | planejado (em outro planejamento) | neste (já no quadro) | fora (sem avaliação nas semanas) | sem
 function cgTalhoesAdicionaveis(opt){
-  const chaveT = (c,f,t)=> [c,f,t].join('|'), ints = opt.semanas.map(cgSeteDias), noInt = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
-  const cobertos = new Set(opt.jaNoPlano || []);
-  (opt.planos || []).forEach(pl=> (pl.itens||[]).forEach(it=> cobertos.add(chaveT(it.cliente,it.fazenda,it.talhao))));   // em QUALQUER planejamento salvo, não só neste
-  const porT = new Map(); (opt.pontos || cgPontosVivos()).forEach(p=>{ const k = chaveT(p.cliente,p.fazenda,p.talhao); if(!porT.has(k)) porT.set(k,[]); porT.get(k).push(p); });
-  const hoje = opt.hoje || cgHojeISO(), fmt = iso=> cgDataBr(iso).slice(0,5)+'/'+iso.slice(0,4);
-  const lista = [];
+  const ints = opt.semanas.map(cgSeteDias), noInt = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
+  const ocupados = cgParesOcupados(opt.planos, opt.planoId), naTela = opt.jaNoPlano || new Set(), ordem = CG_CONTEXTOS.geral.projetos;
+  const porP = new Map(); (opt.pontos || cgPontosVivos()).forEach(p=>{ const k = cgChavePar(p.projeto,p.cliente,p.fazenda,p.talhao); if(!porP.has(k)) porP.set(k,[]); porP.get(k).push(p); });
+  const fmt = iso=> cgDataBr(iso).slice(0,5)+'/'+iso.slice(0,4), lista = [];
   RECORDS.forEach(r=>{
-    const k = chaveT(r.cliente,r.fazenda,r.talhao); if(cobertos.has(k)) return;
-    const pts = porT.get(k) || [], noPeriodo = pts.filter(p=> noInt(p.dataStr));
-    const projs = [...new Set([...CG_CONTEXTOS.geral.projetos.filter(pk=> typeof rfParticipa==='function' && rfParticipa(r,pk)), ...pts.map(p=>p.projeto)])];
-    if(!projs.length) return;
-    const pend = pts.filter(p=>!p.exec).sort((a,b)=> a.dataStr.localeCompare(b.dataStr));
-    let motivo = '';
-    if(!noPeriodo.length) motivo = pend.length ? 'a próxima avaliação é em '+fmt(pend[0].dataStr)+', fora das semanas deste planejamento' : (!r.data_plantio ? 'sem data de plantio' : 'sem avaliações pendentes (tudo executado ou não se aplica)');
-    lista.push({ key:k, cliente:r.cliente, fazenda:r.fazenda, talhao:r.talhao, estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', parceiro:r.responsavel_parceiro || 'Em aberto', projs, nSemana:noPeriodo.length, habilitado:noPeriodo.length>0, motivo });
+    const part = new Set(ordem.filter(pk=> typeof rfParticipa==='function' && rfParticipa(r,pk)));
+    ordem.forEach(pk=>{ if(porP.has(cgChavePar(pk,r.cliente,r.fazenda,r.talhao))) part.add(pk); });
+    if(!part.size) return;
+    const projs = ordem.filter(pk=> part.has(pk)).map(pk=>{
+      const k = cgChavePar(pk,r.cliente,r.fazenda,r.talhao), pts = porP.get(k) || [], noPer = pts.filter(p=> noInt(p.dataStr)), pend = noPer.filter(p=> !p.exec), todasPend = pts.filter(p=> !p.exec).sort((a,b)=> a.dataStr.localeCompare(b.dataStr));
+      if(naTela.has(k)) return { k:pk, estado:'neste', texto:'já está neste planejamento' };
+      const oc = cgOcupante(ocupados, pk, r.cliente, r.fazenda, r.talhao);
+      if(oc) return { k:pk, estado:'planejado', plano:oc, texto:'já planejado em "'+oc.regiao+'"'+(oc.responsavel ? ' · '+oc.responsavel : '')+(oc.dia ? ' · dia '+cgDataBr(oc.dia).slice(0,5) : '') };
+      if(pend.length){ const ex = noPer.length-pend.length; return { k:pk, estado:'livre', n:pend.length, texto:pend.length+(pend.length===1?' avaliação pendente':' avaliações pendentes')+' nas semanas'+(ex ? ' · '+ex+(ex===1?' executada entra travada':' executadas entram travadas') : '') }; }
+      if(todasPend.length) return { k:pk, estado:'fora', texto:'a próxima avaliação é em '+fmt(todasPend[0].dataStr)+', fora das semanas deste planejamento' };
+      return { k:pk, estado:'sem', texto: !r.data_plantio ? 'sem data de plantio' : 'sem avaliações pendentes (tudo executado ou não se aplica)' };
+    });
+    lista.push({ key:[r.cliente,r.fazenda,r.talhao].join('|'), cliente:r.cliente, fazenda:r.fazenda, talhao:r.talhao, estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', parceiro:r.responsavel_parceiro || 'Em aberto', projs, habilitado:projs.some(p=> p.estado==='livre') });
   });
   return lista.sort((a,b)=> (b.habilitado-a.habilitado) || String(a.fazenda).localeCompare(String(b.fazenda),'pt-BR') || String(a.talhao).localeCompare(String(b.talhao),'pt-BR',{numeric:true}));
 }
-// opt: { lista, parceiroInicial, aoAdicionar(chaves) }
+// opt: { lista (de cgTalhoesAdicionaveis), parceiroInicial (opcional), soTalhoes (Set de chaves de talhão: mostra só eles), marcarLivres (abre com os projetos livres já marcados), aoAdicionar(paresMarcados) }
+// A janela abre SEM filtro e mostra TUDO: o que está livre (dá para marcar) e o que já está planejado (com o planejamento). É onde se olha o que ainda falta planejar.
+// O botão adiciona PROJETOS de um talhão (não o talhão inteiro): só o que está livre pode ser marcado.
 function cgAbrirAdicionarTalhao(opt){
   const antigo = document.getElementById('cpAddOverlay'); if(antigo) antigo.remove();
-  const lista = opt.lista || [], sel = new Set(), f = { fazenda:'', cliente:'', estado:'', parceiro:lista.some(x=>x.parceiro===opt.parceiroInicial) ? (opt.parceiroInicial||'') : '' };
+  const lista = opt.soTalhoes ? (opt.lista || []).filter(x=> opt.soTalhoes.has(x.key)) : (opt.lista || []), sel = new Set(), f = { fazenda:'', cliente:'', estado:'', parceiro:lista.some(x=>x.parceiro===opt.parceiroInicial) ? (opt.parceiroInicial||'') : '', projetos:new Set(), soLivres:false };
+  let ddAberto = false;
+  const par = (x,p)=> cgChavePar(p.k, x.cliente, x.fazenda, x.talhao), ROT = { livre:'Livre', planejado:'Já planejado', neste:'Neste planejamento', fora:'Fora das semanas', sem:'Sem avaliação' };
+  if(opt.marcarLivres) lista.forEach(x=> x.projs.filter(p=> p.estado==='livre').forEach(p=> sel.add(par(x,p))));
   const ov = document.createElement('div'); ov.id = 'cpAddOverlay';
   ov.innerHTML = `<style>
     #cpAddOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:7200;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
-    #cpAddOverlay .ad-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,860px);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+    #cpAddOverlay .ad-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,920px);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4);}
     #cpAddOverlay .ad-hd{padding:14px 18px 8px;} #cpAddOverlay .ad-tit{font-size:17px;font-weight:700;} #cpAddOverlay .ad-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
     #cpAddOverlay .ad-fl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-soft);}
     #cpAddOverlay .ad-fl select{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);margin-left:4px;max-width:150px;}
-    #cpAddOverlay .ad-lista{overflow:auto;flex:1;min-height:120px;} #cpAddOverlay .ad-todos{padding:8px 18px;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:6px;align-items:center;}
-    #cpAddOverlay .ad-rw{display:grid;grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr);gap:12px;padding:9px 18px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;} #cpAddOverlay .ad-rw.off{opacity:.55;cursor:not-allowed;}
-    #cpAddOverlay .ad-t1{font-size:14px;font-weight:700;} #cpAddOverlay .ad-t2{font-size:12px;color:var(--ink-soft);} #cpAddOverlay .ad-chip{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;margin:4px 4px 0 0;}
-    #cpAddOverlay .ad-mot{font-size:12px;color:#a32018;} #cpAddOverlay .ad-ok{font-size:12px;color:#1b5e20;font-weight:700;}
+    #cpAddOverlay .ad-ddw{position:relative;display:inline-block;} #cpAddOverlay .ad-pb{font:inherit;font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;} #cpAddOverlay .ad-pb.on{background:#111;color:#fff;border-color:#111;}
+    #cpAddOverlay .ad-dd{position:absolute;top:calc(100% + 4px);right:0;z-index:5;min-width:290px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:6px;} #cpAddOverlay .ad-dd[hidden]{display:none;}
+    #cpAddOverlay .ad-dd label{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--ink);} #cpAddOverlay .ad-dd label:hover{background:var(--bg,#f4f2ea);} #cpAddOverlay .ad-dd i{display:inline-block;width:9px;height:9px;border-radius:50%;} #cpAddOverlay .ad-dd .ad-t2{margin-left:auto;white-space:nowrap;}
+    #cpAddOverlay .ad-dd .ad-dda{display:flex;gap:12px;padding:6px 8px 2px;border-top:1px solid var(--line);margin-top:4px;}
+    #cpAddOverlay .ad-nota{padding:6px 18px;font-size:12.5px;color:var(--ink-soft);border-bottom:1px solid var(--line);} #cpAddOverlay .ad-nota:empty{display:none;}
+    #cpAddOverlay .ad-lnk{all:unset;cursor:pointer;text-decoration:underline;color:var(--ink);font-weight:700;}
+    #cpAddOverlay .ad-lista{overflow:auto;flex:1;min-height:120px;} #cpAddOverlay .ad-todos{padding:8px 18px;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;} #cpAddOverlay .ad-todos label,#cpAddOverlay .ad-dd label{text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink);font-size:13px;}
+    #cpAddOverlay .ad-gr{display:grid;grid-template-columns:auto minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:9px 18px;background:var(--bg,#f4f2ea);border-bottom:1px solid var(--line);align-items:center;} #cpAddOverlay .ad-gr.off{opacity:.65;}
+    #cpAddOverlay .ad-pr{display:grid;grid-template-columns:auto 160px minmax(0,1fr) auto;gap:10px;padding:6px 18px 6px 44px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink);} #cpAddOverlay .ad-pr.off{opacity:.78;cursor:default;}
+    #cpAddOverlay .ad-pn{font-weight:600;white-space:nowrap;} #cpAddOverlay .ad-pn i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
+    #cpAddOverlay .ad-est{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:5px;white-space:nowrap;} #cpAddOverlay .ad-livre{background:#bfe6cb;color:#14532d;} #cpAddOverlay .ad-planejado{background:#e3e3dc;color:#3d3d38;} #cpAddOverlay .ad-neste{background:#d6e6fb;color:#17488a;} #cpAddOverlay .ad-fora,#cpAddOverlay .ad-sem{border:1px solid var(--line);color:var(--ink-soft);}
+    #cpAddOverlay .ad-t1{font-size:14px;font-weight:700;} #cpAddOverlay .ad-t2{font-size:12px;color:var(--ink-soft);}
     #cpAddOverlay .ad-ft{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line);} #cpAddOverlay .ad-vz{padding:28px 18px;text-align:center;color:var(--ink-soft);font-size:13px;}
-  </style><div class="ad-box" role="dialog" aria-modal="true" aria-label="Adicionar talhão ao planejamento"><div class="ad-hd"><div class="ad-tit">➕ Adicionar talhão ao planejamento</div><div class="ad-sub">Só aparecem os talhões que ainda não estão em nenhum planejamento de viagem. Escolha os que entram: o app põe nos dias e distribui só esses, sem mexer em quem já tem dia.</div></div><div class="ad-fl" id="adFl"></div><div class="ad-todos" id="adTodos"></div><div class="ad-lista" id="adLista"></div><div class="ad-ft"><span class="ad-t2" id="adCont" style="flex:1"></span><button type="button" class="btn ghost" id="adCancelar">Cancelar</button><button type="button" class="btn btn-preto" id="adAdicionar" disabled>➕ Adicionar</button></div></div>`;
+  </style><div class="ad-box" role="dialog" aria-modal="true" aria-label="Adicionar ao planejamento"><div class="ad-hd"><div class="ad-tit">➕ Adicionar ao planejamento</div><div class="ad-sub">Aqui aparece tudo: o que está livre para marcar e o que já está em algum planejamento. O mesmo projeto de um talhão fica em um planejamento só (o talhão pode estar em vários, um por projeto). Marque os projetos que entram aqui: o app põe nos dias e distribui só esses, sem mexer em quem já tem dia.</div></div><div class="ad-fl" id="adFl"></div><div class="ad-nota" id="adNota"></div><div class="ad-todos" id="adTodos"></div><div class="ad-lista" id="adLista"></div><div class="ad-ft"><span class="ad-t2" id="adCont" style="flex:1"></span><button type="button" class="btn ghost" id="adCancelar">Cancelar</button><button type="button" class="btn btn-preto" id="adAdicionar" disabled>➕ Adicionar</button></div></div>`;
   document.body.appendChild(ov);
   const $ = s=> ov.querySelector(s), un = c=> [...new Set(lista.map(x=>x[c]).filter(Boolean))].sort((a,b)=> String(a).localeCompare(String(b),'pt-BR',{numeric:true}));
-  const visiveis = ()=> lista.filter(x=> (!f.fazenda||x.fazenda===f.fazenda) && (!f.cliente||x.cliente===f.cliente) && (!f.estado||x.estado===f.estado) && (!f.parceiro||x.parceiro===f.parceiro));
+  const passa = (x, ignora)=> (ignora==='parceiro' || !f.parceiro || x.parceiro===f.parceiro) && (!f.fazenda||x.fazenda===f.fazenda) && (!f.cliente||x.cliente===f.cliente) && (!f.estado||x.estado===f.estado) && (ignora==='projeto' || !f.projetos.size || x.projs.some(p=> f.projetos.has(p.k)));
+  const projsVis = x=> f.projetos.size ? x.projs.filter(p=> f.projetos.has(p.k)) : x.projs;   // com o filtro de projeto ligado, só as linhas dos projetos escolhidos
   const sel2 = (c,rot,todos)=> `<label>${rot} <select data-f="${c}"><option value="">${todos}</option>${un(c).map(v=> `<option value="${cgEscH(v)}"${f[c]===v?' selected':''}>${cgEscH(v)}</option>`).join('')}</select></label>`;
+  const ordem = CG_CONTEXTOS.geral.projetos.filter(pk=> lista.some(x=> x.projs.some(p=> p.k===pk)));
+  const textoProj = ()=> !f.projetos.size ? 'Projeto: Todos' : f.projetos.size===1 ? 'Projeto: '+(CG_PROJ[[...f.projetos][0]] ? CG_PROJ[[...f.projetos][0]].label : [...f.projetos][0]) : 'Projeto: '+f.projetos.size+' selec.';
+  const ddHtml = ()=>{ const outros = lista.filter(x=> passa(x,'projeto'));
+    return `<span class="ad-ddw"><button type="button" class="ad-pb${f.projetos.size?' on':''}" id="adProjBtn" aria-haspopup="true" aria-expanded="${ddAberto}">${textoProj()} ▾</button><div class="ad-dd" id="adProjDd"${ddAberto?'':' hidden'}>${ordem.map(pk=>{ const pj = CG_PROJ[pk] || { label:pk, cor:'#888' }, tem = outros.filter(x=> x.projs.some(p=> p.k===pk)), liv = tem.filter(x=> x.projs.some(p=> p.k===pk && p.estado==='livre')).length;
+      return `<label><input type="checkbox" data-proj="${pk}"${f.projetos.has(pk)?' checked':''}><i style="background:${pj.cor}"></i>${cgEscH(pj.label)}<span class="ad-t2">${liv} ${liv===1?'livre':'livres'} de ${tem.length}</span></label>`; }).join('')}<div class="ad-dda"><button type="button" class="ad-lnk" data-a="proj-todos">Marcar todos</button><button type="button" class="ad-lnk" data-a="proj-limpar">Limpar seleção</button></div></div></span>`; };
   const desenhar = ()=>{
-    const v = visiveis(), hab = v.filter(x=>x.habilitado);
-    $('#adFl').innerHTML = sel2('fazenda','Fazenda','Todas')+sel2('cliente','Cliente','Todos')+sel2('estado','Estado','Todos')+sel2('parceiro','Parceiro','Todos');
-    $('#adTodos').innerHTML = `<label><input type="checkbox" id="adTodosCk"${hab.length && hab.every(x=>sel.has(x.key))?' checked':''}${hab.length?'':' disabled'}> Marcar todos os visíveis que podem entrar (${hab.length})</label><span class="ad-t2">· ${v.length} ${v.length===1?'talhão':'talhões'} na lista</span>`;
-    $('#adLista').innerHTML = v.length ? v.map(x=> `<label class="ad-rw${x.habilitado?'':' off'}"><input type="checkbox" data-k="${cgEscH(x.key)}"${sel.has(x.key)?' checked':''}${x.habilitado?'':' disabled'}><div><div class="ad-t1">${cgEscH(x.fazenda)} · ${cgEscH(x.talhao)}</div><div class="ad-t2">${cgEscH(x.cliente)} · ${cgEscH(x.estado)}</div><div>${x.projs.map(k=> CG_PROJ[k] ? `<span class="ad-chip" style="background:${CG_PROJ[k].cor};color:${CG_PROJ[k].txt}">${CG_PROJ[k].label}</span>` : '').join('')}</div></div><div><div class="ad-t2">${cgEscH(x.parceiro)} · ${cgEscH(x.consultor)}</div>${x.habilitado ? `<div class="ad-ok">${x.nSemana} ${x.nSemana===1?'avaliação':'avaliações'} nas semanas do planejamento</div>` : `<div class="ad-mot">${cgEscH(x.motivo)}</div>`}</div></label>`).join('') : '<div class="ad-vz">Nenhum talhão sem planejamento com esses filtros.</div>';
-    $('#adCont').textContent = sel.size+(sel.size===1?' selecionado':' selecionados'); $('#adAdicionar').disabled = !sel.size; $('#adAdicionar').textContent = '➕ Adicionar'+(sel.size?' ('+sel.size+')':'');
+    const base = lista.filter(x=> passa(x)), temLivre = x=> projsVis(x).some(p=> p.estado==='livre'), v = f.soLivres ? base.filter(temLivre) : base;
+    const escondidos = f.parceiro ? lista.filter(x=> passa(x,'parceiro') && x.parceiro!==f.parceiro && (!f.soLivres || temLivre(x))).length : 0;
+    $('#adFl').innerHTML = sel2('fazenda','Fazenda','Todas')+sel2('cliente','Cliente','Todos')+sel2('estado','Estado','Todos')+sel2('parceiro','Parceiro','Todos')+ddHtml();
+    $('#adNota').innerHTML = escondidos ? `${escondidos} ${escondidos===1?'talhão de outro parceiro está escondido':'talhões de outros parceiros estão escondidos'} pelo filtro de parceiro · <button type="button" class="ad-lnk" data-a="todos-parc">Mostrar todos</button>` : '';
+    const linhasV = v.flatMap(x=> projsVis(x).map(p=> ({ x, p }))), livresV = linhasV.filter(l=> l.p.estado==='livre').map(l=> par(l.x,l.p)), nPlan = linhasV.filter(l=> l.p.estado==='planejado').length;
+    $('#adTodos').innerHTML = `<label><input type="checkbox" id="adTodosCk"${livresV.length && livresV.every(k=>sel.has(k))?' checked':''}${livresV.length?'':' disabled'}> Marcar todos os projetos livres dos visíveis (${livresV.length})</label><span class="ad-t2">· ${v.length} ${v.length===1?'talhão':'talhões'} na lista · ${livresV.length} ${livresV.length===1?'projeto livre':'projetos livres'} · ${nPlan} já ${nPlan===1?'planejado':'planejados'} em outro planejamento</span><label class="ad-t2"><input type="checkbox" id="adSoLivres"${f.soLivres?' checked':''}> Só os que têm projeto livre</label>`;
+    $('#adLista').innerHTML = v.length ? v.map(x=>{
+      const pv = projsVis(x), livres = pv.filter(p=> p.estado==='livre'), marc = livres.filter(p=> sel.has(par(x,p))).length;
+      const cab = `<div class="ad-gr${livres.length?'':' off'}"><input type="checkbox" data-g="${cgEscH(x.key)}"${marc && marc===livres.length?' checked':''}${livres.length?'':' disabled'} aria-label="Marcar os projetos livres de ${cgEscH(x.fazenda)} ${cgEscH(x.talhao)}"><div><span class="ad-t1">${cgEscH(x.fazenda)} · ${cgEscH(x.talhao)}</span> <span class="ad-t2">· ${cgEscH(x.cliente)} · ${cgEscH(x.estado)}</span></div><div class="ad-t2">${cgEscH(x.parceiro)} · ${cgEscH(x.consultor)}${livres.length ? ' · '+livres.length+' de '+pv.length+(pv.length===1?' projeto livre':' projetos livres') : ' · nenhum projeto livre'}</div></div>`;
+      return cab + pv.map(p=>{ const pj = CG_PROJ[p.k] || { label:p.k, cor:'#888' }, kk = par(x,p), liv = p.estado==='livre';
+        return `<label class="ad-pr${liv?'':' off'}"><input type="checkbox" data-k="${cgEscH(kk)}"${sel.has(kk)?' checked':''}${liv?'':' disabled'} aria-label="${cgEscH(pj.label)} em ${cgEscH(x.fazenda)} ${cgEscH(x.talhao)}"><span class="ad-pn"><i style="background:${pj.cor}"></i>${cgEscH(pj.label)}</span><span class="ad-t2">${cgEscH(p.texto)}</span><span class="ad-est ad-${p.estado}">${ROT[p.estado]}</span></label>`; }).join('');
+    }).join('') : '<div class="ad-vz">Nenhum talhão com esses filtros.</div>';
+    ov.querySelectorAll('input[data-g]').forEach(g=>{ const x = lista.find(y=> y.key===g.dataset.g); if(!x) return; const livres = projsVis(x).filter(p=> p.estado==='livre'), m = livres.filter(p=> sel.has(par(x,p))).length; g.indeterminate = m>0 && m<livres.length; });
+    const visPares = new Set(linhasV.map(l=> par(l.x,l.p))), fora = [...sel].filter(k=> !visPares.has(k)).length, nTal = new Set([...sel].map(k=> k.split('|').slice(1).join('|'))).size;
+    $('#adCont').textContent = sel.size+(sel.size===1?' projeto':' projetos')+' em '+nTal+(nTal===1?' talhão marcado':' talhões marcados')+(fora ? ' · '+fora+(fora===1?' fora do filtro atual':' fora do filtro atual') : ''); $('#adAdicionar').disabled = !sel.size; $('#adAdicionar').textContent = '➕ Adicionar'+(sel.size?' ('+sel.size+')':'');
   };
   const fechar = ()=>{ ov.remove(); document.removeEventListener('keydown', esc, true); };
-  const esc = e=>{ if(e.key==='Escape'){ e.stopImmediatePropagation(); fechar(); } };   // Esc fecha só esta janela, não o Planejar por baixo
+  const esc = e=>{ if(e.key==='Escape'){ e.stopImmediatePropagation(); if(ddAberto){ ddAberto = false; desenhar(); } else fechar(); } };   // Esc fecha primeiro o dropdown de projeto, depois só esta janela (não o Planejar por baixo)
   document.addEventListener('keydown', esc, true);
-  ov.addEventListener('mousedown', e=>{ if(e.target===ov) fechar(); });
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov){ fechar(); return; } if(ddAberto && !e.target.closest('.ad-ddw')){ ddAberto = false; desenhar(); } });
+  ov.addEventListener('click', e=>{
+    if(e.target.closest('#adProjBtn')){ ddAberto = !ddAberto; desenhar(); return; }
+    const a = e.target.closest('[data-a]'); if(!a) return;
+    if(a.dataset.a==='todos-parc'){ f.parceiro = ''; desenhar(); }
+    else if(a.dataset.a==='proj-todos'){ ordem.forEach(pk=> f.projetos.add(pk)); desenhar(); }
+    else if(a.dataset.a==='proj-limpar'){ f.projetos.clear(); desenhar(); }
+  });
   ov.addEventListener('change', e=>{
     const s = e.target.closest('select[data-f]'); if(s){ f[s.dataset.f] = s.value; desenhar(); return; }
-    if(e.target.id==='adTodosCk'){ const hab = visiveis().filter(x=>x.habilitado); hab.forEach(x=> e.target.checked ? sel.add(x.key) : sel.delete(x.key)); desenhar(); return; }
+    const pj = e.target.closest('input[data-proj]'); if(pj){ pj.checked ? f.projetos.add(pj.dataset.proj) : f.projetos.delete(pj.dataset.proj); desenhar(); return; }
+    if(e.target.id==='adSoLivres'){ f.soLivres = e.target.checked; desenhar(); return; }
+    if(e.target.id==='adTodosCk'){ lista.filter(x=> passa(x) && (!f.soLivres || projsVis(x).some(p=> p.estado==='livre'))).forEach(x=> projsVis(x).filter(p=> p.estado==='livre').forEach(p=> e.target.checked ? sel.add(par(x,p)) : sel.delete(par(x,p)))); desenhar(); return; }
+    const g = e.target.closest('input[data-g]'); if(g){ const x = lista.find(y=> y.key===g.dataset.g); if(x) projsVis(x).filter(p=> p.estado==='livre').forEach(p=> g.checked ? sel.add(par(x,p)) : sel.delete(par(x,p))); desenhar(); return; }
     const ck = e.target.closest('input[data-k]'); if(ck){ ck.checked ? sel.add(ck.dataset.k) : sel.delete(ck.dataset.k); desenhar(); }
   });
   ov.querySelector('#adCancelar').addEventListener('click', fechar);
@@ -12795,7 +12861,7 @@ function cgAbrirPlanejador(cfg){
         <div class="cp-sub" id="cpSub"></div>
         <div class="cp-resumo" id="cpResumo"></div></div>
         <div class="cp-acoes"><span class="cp-cont" id="cpCont"></span>
-          <button type="button" class="btn ghost" id="cpAddTalhao" title="Adiciona ao planejamento um talhão que ainda não está em nenhum planejamento (por exemplo, um talhão novo). O app põe nos dias e distribui só os adicionados.">➕ Adicionar talhão</button>
+          <button type="button" class="btn ghost" id="cpAddTalhao" title="Adiciona ao planejamento projetos de talhões que ainda não estão em nenhum planejamento (por exemplo, um talhão novo, ou outro projeto de um talhão que já tem viagem). O app põe nos dias e distribui só o que for adicionado.">➕ Adicionar projetos</button>
           <button type="button" class="btn btn-preto" id="cpDistribuir" title="Distribui os talhões nos dias das semanas marcadas: um estado por dia, até ${CG_PLANO_MAX_POR_PROJETO_DIA} por projeto em cada dia, dentro da tolerância de cada estádio. O Óxido de Magnésio não tem esses limites: só respeita a tolerância (pode ser quantos forem, de vários estados no mesmo dia). Mexe também nos que você já arrastou (dá pra desfazer).">Distribuição inteligente</button>
           <button type="button" class="btn ghost" id="cpDistLista" title="Distribui só os talhões que estão na lista e deixa os que já têm dia onde estão.">Distribuir só os da lista</button>
           <label class="cp-fds" title="Por padrão a Distribuição inteligente usa só segunda a sexta. Marque pra ela usar também sábado e domingo. Arrastar à mão pro sábado ou domingo vale sempre."><input type="checkbox" id="cpFds"> Usar sáb. e dom. na distribuição</label>
@@ -12829,6 +12895,14 @@ function cgAbrirPlanejador(cfg){
     const leg = g.planejadoPara && g.planejadoPara!==g.dataStr ? `<div class="cp-leg">planejado pra ${cgDataBr(g.planejadoPara).slice(0,5)}</div>` : '';
     return `<div class="cp-item"><div class="cg-pill cp-lock ex" style="${cgEstiloPill(g,pj)}" title="${cgEscH(pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+'\nJá executado'+(g.execSemData?' (sem data: fica na prevista)':' em '+cgDataBr(g.dataStr))+'. Não dá pra mover.')}"><span class="s">✓ Já executado${g.execSemData?' · sem data':''}</span>${cgEscH(txt)}</div>${leg}</div>`;
   };
+  const listaAdicionar = ()=> cgTalhoesAdicionaveis({ semanas:cfg.semanas, jaNoPlano:new Set([...grupos, ...executados].map(chaveG)), planos:cgPlanosEstado().lista, planoId: plano ? plano.id : null });
+  let sugMemo = { k:null, v:null }, sugOculta = false;
+  const sugestao = ()=>{   // talhões que já estão neste quadro e têm OUTROS projetos livres nas semanas (sem viagem em nenhum planejamento)
+    const k = grupos.length+'/'+executados.length+'/'+(plano ? plano.id : '')+'/'+cgPlanosEstado().lista.length; if(sugMemo.k===k) return sugMemo.v;
+    const noQuadro = new Set([...grupos, ...executados].map(g=> [g.cliente,g.fazenda,g.talhao].join('|'))), por = {}, chaves = new Set(); let n = 0;
+    if(noQuadro.size) listaAdicionar().filter(x=> noQuadro.has(x.key)).forEach(x=>{ const l = x.projs.filter(p=> p.estado==='livre'); if(!l.length) return; n++; chaves.add(x.key); l.forEach(p=>{ por[p.k] = (por[p.k]||0)+1; }); });
+    sugMemo = { k, v: n ? { n, por, chaves } : null }; return sugMemo.v;
+  };
   const avisoHtml = ()=>{
     let h = '';
     const disp = new Set(todosDias), fora = executados.filter(g=> !disp.has(g.dataStr));
@@ -12837,6 +12911,8 @@ function cgAbrirPlanejador(cfg){
       const partes = []; if(revisao.mudaram) partes.push(revisao.mudaram+(revisao.mudaram===1?' talhão mudou de data':' talhões mudaram de data')); partes.push(...cgExtrasPartes(revisao.extras)); if(revisao.saiu.length) partes.push(revisao.saiu.length+(revisao.saiu.length===1?' saiu':' saíram'));
       h += `<div class="cp-av am"><span>Há mudanças desde que você salvou: ${partes.join(' · ')}.</span><button type="button" class="btn ghost" id="cpRever">Rever mudanças</button></div>`;
     }
+    const sg = sugOculta ? null : sugestao();
+    if(sg) h += `<div class="cp-av am"><span>${sg.n} ${sg.n===1?'talhão deste planejamento tem':'talhões deste planejamento têm'} outros projetos com avaliação nas semanas e sem viagem: ${Object.keys(sg.por).map(k=> '<b>'+(CG_PROJ[k] ? CG_PROJ[k].label : k)+' '+sg.por[k]+'</b>').join(' · ')}.</span><button type="button" class="btn ghost" id="cpVerSug">Ver e adicionar</button><button type="button" class="btn ghost" id="cpSugX" title="Dispensar este aviso">Dispensar</button></div>`;
     if(info) h += `<div class="cp-av inf"><span>${cgEscH(info)}</span></div>`;
     return h;
   };
@@ -12901,10 +12977,10 @@ function cgAbrirPlanejador(cfg){
     resumoTxt = novos+(novos===1?' da lista distribuído':' da lista distribuídos')+' · '+(daLista.length-novos)+' sem dia possível · os que já tinham dia ficaram onde estavam';
     desenhar();
   });
-  const chaveG = g=> [g.cliente,g.fazenda,g.talhao].join('|');
+  const chaveG = g=> cgChavePar(g.projeto,g.cliente,g.fazenda,g.talhao);   // a unidade é o par projeto + talhão
   const adicionarTalhoes = chaves=>{   // põe os talhões escolhidos nas semanas do planejamento e distribui SÓ eles (quem já tinha dia e quem já estava na lista ficam como estão)
     const set = new Set(chaves), ints = intervalos.map(it=> it.dias), noInt = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
-    const { pendentes, executados:exec } = cgGruposDePontos(cgPontosVivos().filter(p=> set.has([p.cliente,p.fazenda,p.talhao].join('|')) && noInt(p.dataStr)));
+    const { pendentes, executados:exec } = cgGruposDePontos(cgPontosVivos().filter(p=> set.has(cgChavePar(p.projeto,p.cliente,p.fazenda,p.talhao)) && noInt(p.dataStr)));
     const num = id=> parseInt(String(id).replace(/\D/g,''),10);
     let prox = Math.max(-1, ...grupos.map(g=> num(g.id)).filter(Number.isFinite)) + 1, proxX = Math.max(-1, ...executados.map(g=> num(g.id)).filter(Number.isFinite)) + 1;
     pendentes.forEach(g=> g.id = prox++); exec.forEach(g=> g.id = 'x'+(proxX++));
@@ -12913,14 +12989,17 @@ function cgAbrirPlanejador(cfg){
     grupos = grupos.concat(pendentes); executados.push(...exec);
     const r = cgDistribuirPlano(grupos.filter(g=> (g.id in antes) || novos.has(g.id)), diasDist(), { fixos:antes, apartirDe:hojeISO });
     aplicarResultado(r); motivos = { ...motivosAntes, ...r.motivos };
-    const colocados = pendentes.filter(g=> g.id in colocado).length, semDia = pendentes.length - colocados, nTal = set.size;
-    resumoTxt = nTal+(nTal===1?' talhão adicionado':' talhões adicionados')+' · '+colocados+(colocados===1?' distribuído':' distribuídos')+' · '+semDia+' sem dia possível'+(semDia?' (ficam na lista pra você arrastar)':'')+(exec.length?' · '+exec.length+(exec.length===1?' já executado entrou travado no dia':' já executados entraram travados no dia'):'')+' · quem já tinha dia ficou onde estava';
+    const colocados = pendentes.filter(g=> g.id in colocado).length, semDia = pendentes.length - colocados, nPar = set.size, nTal = new Set([...set].map(k=> k.split('|').slice(1).join('|'))).size;
+    resumoTxt = nPar+(nPar===1?' projeto':' projetos')+' em '+nTal+(nTal===1?' talhão adicionado':' talhões adicionados')+' · '+colocados+(colocados===1?' distribuído':' distribuídos')+' · '+semDia+' sem dia possível'+(semDia?' (ficam na lista pra você arrastar)':'')+(exec.length?' · '+exec.length+(exec.length===1?' já executado entrou travado no dia':' já executados entraram travados no dia'):'')+' · quem já tinha dia ficou onde estava';
     desenhar();
   };
-  $('#cpAddTalhao').addEventListener('click', ()=>{
-    const jaNoPlano = new Set([...grupos, ...executados].map(chaveG));
-    const parc = cfg.filtros && Array.isArray(cfg.filtros.parceiro) && cfg.filtros.parceiro.length===1 ? cfg.filtros.parceiro[0] : '';   // abre já filtrado pelo parceiro do planejamento
-    cgAbrirAdicionarTalhao({ lista:cgTalhoesAdicionaveis({ semanas:cfg.semanas, jaNoPlano, planos:cgPlanosEstado().lista }), parceiroInicial:parc, aoAdicionar:adicionarTalhoes });
+  const abrirAdicionar = extra=>{
+    cgAbrirAdicionarTalhao({ lista:listaAdicionar(), aoAdicionar:adicionarTalhoes, ...extra });   // abre sem nenhum filtro: mostra tudo, o livre e o que já está planejado
+  };
+  $('#cpAddTalhao').addEventListener('click', ()=> abrirAdicionar({}));
+  ov.addEventListener('click', e=>{
+    if(e.target.closest('#cpVerSug')){ const sg = sugestao(); if(sg) abrirAdicionar({ soTalhoes:sg.chaves, marcarLivres:true, parceiroInicial:'' }); }   // abre só com esses talhões e os projetos livres já marcados
+    else if(e.target.closest('#cpSugX')){ sugOculta = true; desenhar(); }
   });
   btnDesf.addEventListener('click', ()=>{
     if(!snapshot) return;
@@ -13582,13 +13661,16 @@ function abrirCronogramaGeral(ctxKey){
     const info = document.getElementById('cgSemInfo'); if(info) info.textContent = n ? n+(n===1?' semana marcada':' semanas marcadas') : 'Marque as semanas no quadradinho ao lado do calendário pra planejar';
   }
   function fecharPlano(){ cgFecharPlanejador(); }
-  function abrirPlano(){
+  async function abrirPlano(){
     if(!semSel.size) return;
+    try{ await cgPlanosCarregar(); }catch(e){}   // precisa dos planejamentos salvos para deixar de fora o que já está em outro
     const semanas = [...semSel].sort(), ints = semanas.map(cgSeteDias);
     const noIntervalo = ds=> ints.some(d=> d[0]<=ds && ds<=d[6]);
-    const { pendentes, executados } = cgGruposDePontos(pontos.filter(p=> passa(p,null) && noIntervalo(p.dataStr)));   // mesmos filtros do calendário; só as semanas marcadas
+    const ocup = cgParesOcupados(cgPlanosEstado().lista), jaTem = p=> !!cgOcupante(ocup, p.projeto, p.cliente, p.fazenda, p.talhao);   // o mesmo projeto do mesmo talhão não entra em dois planejamentos
+    const doQuadro = pontos.filter(p=> passa(p,null) && noIntervalo(p.dataStr)), foraN = new Set(doQuadro.filter(jaTem).map(p=> cgChavePar(p.projeto,p.cliente,p.fazenda,p.talhao))).size;   // mesmos filtros do calendário; só as semanas marcadas
+    const { pendentes, executados } = cgGruposDePontos(doQuadro.filter(p=> !jaTem(p)));
     pendentes.forEach((g,i)=> g.id = i); executados.forEach((g,i)=> g.id = 'x'+i);
-    cgAbrirPlanejador({ semanas, grupos:pendentes, executados, filtros:Object.fromEntries(FILTROS.map(f=> [f.k,[...F[f.k]]])) });   // os filtros usados ficam guardados no planejamento (pra avisar de talhão novo nas semanas)
+    cgAbrirPlanejador({ semanas, grupos:pendentes, executados, filtros:Object.fromEntries(FILTROS.map(f=> [f.k,[...F[f.k]]])), info: foraN ? (foraN===1 ? '1 projeto de talhão que já está em outro planejamento ficou de fora deste quadro.' : foraN+' projetos de talhões que já estão em outro planejamento ficaram de fora deste quadro.') : '' });   // os filtros usados ficam guardados no planejamento (pra avisar de talhão novo nas semanas)
   }
   const btnPlanejar = document.getElementById('cgPlanejarBtn');
   if(btnPlanejar) btnPlanejar.addEventListener('click', abrirPlano);
@@ -13614,8 +13696,8 @@ function alertasCalcular(opt){
   const somaDias = (iso,n)=>{ const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return cgIsoLocal(d); };
   const chaveT = (c,fz,t)=> [c,fz,t].join('|');
   // o que já está em planejamento salvo: por talhão, por projeto+talhão e por projeto+talhão+estádio
-  const cobTal = new Set(), cobProj = new Set(), cobEst = new Set(), cobPlano = new Map();   // cobPlano: projeto|talhão|estádio → planejamentos que o cobrem (na ordem da lista: do mais recente ao mais antigo), com o dia salvo
-  planos.forEach(pl=> (pl.itens||[]).forEach(it=>{ const k = chaveT(it.cliente,it.fazenda,it.talhao); cobTal.add(k); cobProj.add(it.projeto+'|'+k); (it.avaliacoes||[]).forEach(a=>{ const kk = it.projeto+'|'+k+'|'+a.estagio; cobEst.add(kk); if(!cobPlano.has(kk)) cobPlano.set(kk,[]); const arr = cobPlano.get(kk); if(!arr.some(x=> x.id===pl.id && x.dia===it.dia)) arr.push({ id:pl.id, regiao:pl.regiao || 'Planejamento', dia:it.dia }); }); }));
+  const cobTal = new Set(), cobProj = new Set(), cobEst = new Set(), cobPlano = new Map(), cobParPlano = new Map();   // cobParPlano: projeto|talhão → o planejamento que o cobre (regiao, responsavel, dia). cobPlano: projeto|talhão|estádio → planejamentos que o cobrem (na ordem da lista: do mais recente ao mais antigo), com o dia salvo
+  planos.forEach(pl=> (pl.itens||[]).forEach(it=>{ const k = chaveT(it.cliente,it.fazenda,it.talhao); cobTal.add(k); cobProj.add(it.projeto+'|'+k); { const kp = it.projeto+'|'+k, cp = cobParPlano.get(kp); if(!cp) cobParPlano.set(kp, { id:pl.id, regiao:pl.regiao || 'Planejamento', responsavel:pl.responsavel || '', dia:it.dia || '' }); else if(cp.id===pl.id && it.dia && (!cp.dia || it.dia<cp.dia)) cp.dia = it.dia; } (it.avaliacoes||[]).forEach(a=>{ const kk = it.projeto+'|'+k+'|'+a.estagio; cobEst.add(kk); if(!cobPlano.has(kk)) cobPlano.set(kk,[]); const arr = cobPlano.get(kk); if(!arr.some(x=> x.id===pl.id && x.dia===it.dia)) arr.push({ id:pl.id, regiao:pl.regiao || 'Planejamento', dia:it.dia }); }); }));
   const passaRec = r=> (!f.estado || (r.estado||'').toUpperCase()===f.estado) && (!f.consultor || (r.consultor||'')===f.consultor) && (!f.parceiro || (r.responsavel_parceiro||'Em aberto')===f.parceiro) && (!f.projeto || rfParticipa(r,f.projeto));
   const projsDe = r=> PROJ.filter(k=> rfParticipa(r,k) && (!f.projeto || k===f.projeto));
   const recs = RECORDS.filter(r=> passaRec(r) && projsDe(r).length);
@@ -13640,18 +13722,20 @@ function alertasCalcular(opt){
   };
   const lAtr = [...atr.values()].map(fecha).sort((a,b)=> b.dias-a.dias || a.prev.localeCompare(b.prev));
   const lProx = [...prox.values()].map(fecha).sort((a,b)=> a.dias-b.dias || a.prev.localeCompare(b.prev));
-  // sem planejamento: talhões que não aparecem em NENHUM planejamento salvo, com a próxima avaliação pendente de cada um
+  // sem planejamento: talhões com pelo menos um PROJETO que não está em nenhum planejamento salvo (o projeto já planejado aparece como "já planejado"), com a próxima avaliação pendente dos que faltam
   const proximo = new Map();
-  pts.forEach(p=>{ const k = chaveT(p.cliente,p.fazenda,p.talhao), cur = proximo.get(k); if(!cur || p.dataStr < cur.dataStr) proximo.set(k,p); });
-  const sem = recs.filter(r=> !cobTal.has(chaveT(r.cliente,r.fazenda,r.talhao))).map(r=>{
-    const k = chaveT(r.cliente,r.fazenda,r.talhao), p = proximo.get(k); let px = null, urgente = false;
+  pts.forEach(p=>{ const k = chaveT(p.cliente,p.fazenda,p.talhao); if(cobProj.has(p.projeto+'|'+k)) return; const cur = proximo.get(k); if(!cur || p.dataStr < cur.dataStr) proximo.set(k,p); });   // a próxima avaliação só vale para os projetos que ainda NÃO têm viagem
+  const sem = recs.map(r=>{
+    const k = chaveT(r.cliente,r.fazenda,r.talhao), ps = projsDe(r), livres = ps.filter(pk=> !cobProj.has(pk+'|'+k));
+    if(!livres.length) return null;   // todos os projetos deste talhão já têm viagem planejada
+    const planejados = ps.filter(pk=> cobProj.has(pk+'|'+k)).map(pk=> ({ projeto:pk, ...(cobParPlano.get(pk+'|'+k) || {}) })), p = proximo.get(k); let px = null, urgente = false;
     if(p){
       const c = dia(p.dataStr), ini = c-p.faixa, fim = c+p.faixa, atraso = h > fim;
       px = { estagio:p.estagio, projeto:p.projeto, prev:p.dataStr, faixa:p.faixa, ini:somaDias(p.dataStr,-p.faixa), fim:somaDias(p.dataStr,p.faixa), atraso, dias: atraso ? h-fim : c-h };
       urgente = atraso || (ini-h) <= hor;
     }
-    return { cliente:r.cliente, fazenda:r.fazenda, talhao:r.talhao, estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', parceiro:r.responsavel_parceiro || 'Em aberto', projs:projsDe(r), prox:px, urgente, semPlantio:!r.data_plantio };
-  }).sort((a,b)=> (b.urgente-a.urgente) || (altOrdem(a)-altOrdem(b)) || String(a.fazenda).localeCompare(String(b.fazenda),'pt-BR') || String(a.talhao).localeCompare(String(b.talhao),'pt-BR',{numeric:true}));
+    return { cliente:r.cliente, fazenda:r.fazenda, talhao:r.talhao, estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', parceiro:r.responsavel_parceiro || 'Em aberto', projs:livres, planejados, prox:px, urgente, semPlantio:!r.data_plantio };
+  }).filter(Boolean).sort((a,b)=> (b.urgente-a.urgente) || (altOrdem(a)-altOrdem(b)) || String(a.fazenda).localeCompare(String(b.fazenda),'pt-BR') || String(a.talhao).localeCompare(String(b.talhao),'pt-BR',{numeric:true}));
   // cobertura (todos os talhões do filtro, qualquer data) e por projeto
   const com = recs.length - sem.length;
   const porProjeto = VG_VISIVEIS.filter(p=> !f.projeto || p.key===f.projeto).map(p=>{
@@ -13685,10 +13769,10 @@ function alertasLinhaSem(g){
   else {
     const x = g.prox; data = x.prev;
     pill = x.atraso ? altPill(altPl(x.dias,'dia','dias')+' de atraso','dan') : g.urgente ? altPill('urgente · em '+altPl(x.dias,'dia','dias'),'war') : altPill('sem planejamento','neu');
-    meio = `<div class="alt-t1s">Próxima: ${cgEscH(x.estagio)} · ${altDM(x.prev)} ${x.atraso ? '(atrasada)' : '(em '+altPl(x.dias,'dia','dias')+')'}</div><div class="alt-t2">janela ${altDM(x.ini)} a ${altDM(x.fim)} (±${x.faixa}) · nunca planejado</div>`;
+    meio = `<div class="alt-t1s">Próxima: ${cgEscH(x.estagio)} · ${altDM(x.prev)} ${x.atraso ? '(atrasada)' : '(em '+altPl(x.dias,'dia','dias')+')'}</div><div class="alt-t2">janela ${altDM(x.ini)} a ${altDM(x.fim)} (±${x.faixa}) · ${g.planejados.length ? 'este projeto ainda sem viagem' : 'nunca planejado'}</div>`;
   }
   return `<div class="alt-rw"><div>${pill}<div class="alt-t1">${cgEscH(g.fazenda)} · ${cgEscH(g.talhao)}</div><div class="alt-t2">${cgEscH(g.cliente)} · ${cgEscH(g.estado)}</div></div>`
-    + `<div>${meio}${g.projs.map(altChip).join(' ')}</div>`
+    + `<div>${meio}${g.projs.map(altChip).join(' ')}${g.planejados.length ? `<div class="alt-t2">Já planejado: ${g.planejados.map(x=> cgEscH((CG_PROJ[x.projeto] ? CG_PROJ[x.projeto].label : x.projeto)+(x.regiao ? ' — '+x.regiao+(x.dia ? ' · '+altDM(x.dia) : '') : ''))).join('; ')}</div>` : ''}</div>`
     + `<div class="alt-dir"><div class="alt-t2">${cgEscH(g.parceiro)} · ${cgEscH(g.consultor)}</div>${data ? `<button type="button" class="alt-go" data-alt="ir" data-data="${data}">📅 Ver no cronograma</button>` : ''}</div></div>`;
 }
 function alertasHtml(r){
@@ -13707,15 +13791,15 @@ function alertasHtml(r){
   return `<div class="alt-hd"><b class="alt-tit">🔔 Alertas da coordenação</b><span class="alt-t2">Hoje: ${altDMA(r.hoje)}</span><button type="button" class="alt-x" data-alt="fechar" aria-label="Fechar">✕</button></div>`
     + (pls.erro ? `<div class="alt-aviso">Não consegui ler os planejamentos salvos agora: os números de cobertura podem estar incompletos.</div>` : '')
     + `<div class="alt-cob"><div class="alt-cobt">Cobertura de planejamento de viagem · todos os talhões</div><div class="alt-t2">Talhões com avaliação em algum projeto, e se estão em pelo menos um planejamento salvo (vale para todas as datas, não só as urgentes)</div>`
-    + `<div class="alt-cobg"><div><div class="alt-cards"><div class="alt-card alt-neu"><b>${cob.total}</b><span>talhões no total</span></div><div class="alt-card alt-ok"><b>${cob.com}</b><i>${pc(cob.com)}%</i><span>com planejamento salvo</span></div><div class="alt-card alt-dan"><b>${cob.sem}</b><i>${pc(cob.sem)}%</i><span>sem planejamento</span></div></div>`
-    + `<div class="alt-barra"><i style="width:${pc(cob.com)}%"></i></div><div class="alt-t2">${cob.com} de ${cob.total} talhões (${pc(cob.com)}%) já estão em algum planejamento de viagem</div><button type="button" class="alt-ver" data-alt="aba" data-k="sem">Ver os ${cob.sem} sem planejamento ›</button></div>`
+    + `<div class="alt-cobg"><div><div class="alt-cards"><div class="alt-card alt-neu"><b>${cob.total}</b><span>talhões no total</span></div><div class="alt-card alt-ok"><b>${cob.com}</b><i>${pc(cob.com)}%</i><span>com todos os projetos planejados</span></div><div class="alt-card alt-dan"><b>${cob.sem}</b><i>${pc(cob.sem)}%</i><span>com projeto sem planejamento</span></div></div>`
+    + `<div class="alt-barra"><i style="width:${pc(cob.com)}%"></i></div><div class="alt-t2">${cob.com} de ${cob.total} talhões (${pc(cob.com)}%) já têm todos os projetos em algum planejamento de viagem</div><button type="button" class="alt-ver" data-alt="aba" data-k="sem">Ver os ${cob.sem} sem planejamento ›</button></div>`
     + `<div><div class="alt-t1s">Por projeto</div>${proj || '<div class="alt-t2">Nenhum talhão com esses filtros.</div>'}<div class="alt-t2" style="margin-top:6px">Um talhão em mais de um projeto conta em cada um deles.</div></div></div></div>`
     + `<div class="alt-fl"><label>Projeto <select data-alt="f" data-c="projeto">${opcoes(VG_VISIVEIS.map(p=>({v:p.key,t:p.label})), st.f.projeto, 'Todos')}</select></label><label>Estado <select data-alt="f" data-c="estado">${opcoes(un(x=> (x.estado||'').toUpperCase()), st.f.estado, 'Todos')}</select></label>`
     + `<label>Consultor <select data-alt="f" data-c="consultor">${opcoes(un(x=>x.consultor), st.f.consultor, 'Todos')}</select></label><label>Parceiro <select data-alt="f" data-c="parceiro">${opcoes([...VG_PARCEIROS.map(p=>({v:p.v,t:p.v})), ...[...new Set(RECORDS.map(x=> x.responsavel_parceiro).filter(v=> v && !VG_PARCEIROS.some(p=> p.v===v)))].sort((a,b)=> a.localeCompare(b,'pt-BR')).map(v=>({v,t:v+' (fora da lista)'}))], st.f.parceiro, 'Todos')}</select></label>`
     + `<span style="flex:1"></span><span class="alt-t2">Olhar à frente</span><span class="alt-segs">${ALT_HORIZONTES.map(d=> `<button type="button" class="alt-seg${st.hor===d?' on':''}" data-alt="hor" data-v="${d}">${d} dias</button>`).join('')}</span></div>`
     + `<div class="alt-tabs">${tab('atr','⚠️','Atrasadas',r.atr.length,'dan')}${tab('prox','⏰','Próximas',r.prox.length,'war')}${tab('sem','🧭','Sem planejamento',r.sem.length,'dan')}</div>`
     + `<div class="alt-desc">${desc}</div>${toggle}<div class="alt-lista">${corpo}</div>`
-    + `<div class="alt-ft"><span class="alt-t2" style="flex:1">${r.atr.length} atrasadas · ${r.prox.length} próximas · ${r.sem.length} sem planejamento (${r.semUrg} urgentes)</span><button type="button" class="alt-go" data-alt="excel">📊 Exportar Excel</button></div>`;
+    + `<div class="alt-ft"><span class="alt-t2" style="flex:1">${r.atr.length} atrasadas · ${r.prox.length} próximas · ${r.sem.length} sem planejamento (${r.semUrg} urgentes)</span><button type="button" class="alt-go" data-alt="mapa" title="Imagem (PNG) com todos os talhões e, em cada projeto, se está planejado e onde">🧠 Mapa de planejamento</button> <button type="button" class="alt-go" data-alt="excel">📊 Exportar Excel</button></div>`;
 }
 const ALT_HORIZONTES = [7,14,30];
 const ALT_CSS = `
@@ -13766,10 +13850,10 @@ function alertasExcel(){
   if(!window.XLSX){ alert('A biblioteca de Excel ainda não carregou. Recarregue a página e tente de novo.'); return; }
   const st = alertasEstado(), r = alertasCalcular({ horizonte:st.hor, filtros:st.f, planos:cgPlanosEstado().lista }), nome = k=> (CG_PROJ[k]||{label:k}).label, wb = XLSX.utils.book_new();
   const base = g=> [nome(g.projeto),g.cliente,g.fazenda,g.talhao,g.estado,g.estagio,g.n,altDMA(g.prev),g.faixa], sv = g=> g.semViagem ? 'Sim' : 'Não', cab = ['Projeto','Cliente','Fazenda','Talhão','Estado','Estádio','Avaliações pendentes','Data prevista','Tolerância (±dias)'];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Indicador','Valor'],['Talhões no total',r.cobertura.total],['Com planejamento salvo',r.cobertura.com],['Sem planejamento',r.cobertura.sem],[],['Projeto','Talhões','Com planejamento','Sem planejamento'],...r.cobertura.porProjeto.map(p=>[p.label,p.total,p.com,p.total-p.com])]), 'Cobertura');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Indicador','Valor'],['Talhões no total',r.cobertura.total],['Com todos os projetos planejados',r.cobertura.com],['Com projeto sem planejamento',r.cobertura.sem],[],['Projeto','Talhões','Com planejamento','Sem planejamento'],...r.cobertura.porProjeto.map(p=>[p.label,p.total,p.com,p.total-p.com])]), 'Cobertura');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Venceu em','Dias de atraso','Planejado para','Planejamento','Sem viagem planejada','Parceiro','Consultor'],...r.atr.map(g=>[...base(g),altDMA(g.fim),g.dias,g.plano?altDMA(g.plano.dia):'',g.plano?g.plano.regiao+(g.maisPlanos?' (+'+g.maisPlanos+')':''):'',sv(g),g.parceiro,g.consultor])]), 'Atrasadas');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...cab,'Janela começa','Janela termina','Faltam (dias)','Planejado para','Planejamento','Sem viagem planejada','Parceiro','Consultor'],...r.prox.map(g=>[...base(g),altDMA(g.ini),altDMA(g.fim),g.dias,g.plano?altDMA(g.plano.dia):'',g.plano?g.plano.regiao+(g.maisPlanos?' (+'+g.maisPlanos+')':''):'',sv(g),g.parceiro,g.consultor])]), 'Próximas');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Cliente','Fazenda','Talhão','Estado','Projetos','Próxima avaliação','Data prevista','Dias (negativo = atrasada)','Urgente','Observação','Parceiro','Consultor'],...r.sem.map(g=>[g.cliente,g.fazenda,g.talhao,g.estado,g.projs.map(nome).join(', '),g.prox?g.prox.estagio:'',g.prox?altDMA(g.prox.prev):'',g.prox?(g.prox.atraso?-g.prox.dias:g.prox.dias):'',g.urgente?'Sim':'Não',g.semPlantio?'Sem data de plantio':(g.prox?'':'Nada pendente'),g.parceiro,g.consultor])]), 'Sem planejamento');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Cliente','Fazenda','Talhão','Estado','Projetos sem planejamento','Próxima avaliação','Data prevista','Dias (negativo = atrasada)','Urgente','Observação','Já planejados','Parceiro','Consultor'],...r.sem.map(g=>[g.cliente,g.fazenda,g.talhao,g.estado,g.projs.map(nome).join(', '),g.prox?g.prox.estagio:'',g.prox?altDMA(g.prox.prev):'',g.prox?(g.prox.atraso?-g.prox.dias:g.prox.dias):'',g.urgente?'Sim':'Não',g.semPlantio?'Sem data de plantio':(g.prox?'':'Nada pendente'),g.planejados.map(x=>nome(x.projeto)+(x.regiao?' ('+x.regiao+')':'')).join('; '),g.parceiro,g.consultor])]), 'Sem planejamento');
   try{ XLSX.writeFile(wb, 'Alertas_'+r.hoje+'.xlsx', { cellDates:true }); }catch(e){ console.error(e); alert('Não foi possível gerar o Excel dos alertas: '+(e.message||e)); }
 }
 async function abrirAlertas(){
@@ -13789,10 +13873,243 @@ async function abrirAlertas(){
     else if(a==='ir'){ fecha(); alertasIr(b.dataset.data); }
     else if(a==='plano'){ fecha(); alertasIrPlano(b.dataset); }
     else if(a==='excel') alertasExcel();
+    else if(a==='mapa') alertasMapaAbrir();
   });
   ov.addEventListener('change', e=>{ const s = e.target.closest('select[data-alt="f"]'); if(!s) return; alertasEstado().f[s.dataset.c] = s.value; alertasDesenhar(); });
   try{ await cgPlanosCarregar(); }catch(e){ console.error(e); }
   alertasDesenhar();
+}
+/* ===== MAPA DE PLANEJAMENTO (PNG) — botão 🧠 da aba Alertas =====
+   Uma imagem em RETRATO com TODOS os talhões (planejados e não planejados, para ver a dimensão). Cada talhão é uma lista: uma linha por projeto,
+   com "Planejado" (e em qual planejamento está) ou "Não planejado". Antes de gerar, abre uma janelinha só para escolher os projetos.
+   Respeita os filtros que estão ligados na aba de Alertas (estado, consultor, parceiro). Regra de "planejado": o par projeto + talhão está em algum planejamento salvo. */
+const MAPA_EST = { planejado:{ rot:'Planejado', bg:'#bfe6cb', fg:'#14532d' }, nao:{ rot:'Não planejado', bg:'#f6b8b0', fg:'#8a1c13' }, sem:{ rot:'Sem pendência', bg:'#e3e3dc', fg:'#4a4a45' }, plantio:{ rot:'Sem data de plantio', bg:'#fff3b0', fg:'#6b5200' } };
+const mapaN = (n,s,p)=> n+' '+(n===1?s:p);
+function alertasMapaDados(projSel, f){
+  f = f || {}; const planos = cgPlanosEstado().lista || [], oc = cgParesOcupados(planos), PROJ = RF_PROJ_ORDEM.filter(k=> !projSel || projSel.includes(k));
+  const pend = new Set(cgColetarPontos(PROJ, new Date(2000,0,1), new Date(2100,0,1)).filter(p=> !p.exec).map(p=> cgChavePar(p.projeto,p.cliente,p.fazenda,p.talhao)));   // pares com alguma avaliação ainda pendente
+  const passaRec = r=> (!f.estado || (r.estado||'').toUpperCase()===f.estado) && (!f.consultor || (r.consultor||'')===f.consultor) && (!f.parceiro || (r.responsavel_parceiro||'Em aberto')===f.parceiro);
+  const talhoes = [];
+  RECORDS.forEach(r=>{
+    if(!passaRec(r)) return;
+    const linhas = PROJ.filter(k=> rfParticipa(r,k)).map(k=>{
+      const o = cgOcupante(oc, k, r.cliente, r.fazenda, r.talhao);
+      return { k, estado: o ? 'planejado' : !r.data_plantio ? 'plantio' : pend.has(cgChavePar(k,r.cliente,r.fazenda,r.talhao)) ? 'nao' : 'sem', plano:o };
+    });
+    if(linhas.length) talhoes.push({ cliente:r.cliente||'—', fazenda:r.fazenda||'—', talhao:r.talhao||'—', estado:(r.estado||'').toUpperCase(), consultor:r.consultor||'', parceiro:r.responsavel_parceiro||'Em aberto', linhas });
+  });
+  const nat = (a,b)=> String(a).localeCompare(String(b),'pt-BR',{numeric:true});
+  talhoes.sort((a,b)=> nat(a.cliente,b.cliente) || nat(a.fazenda,b.fazenda) || nat(a.talhao,b.talhao));
+  const por = PROJ.map(k=>{ const ls = talhoes.flatMap(t=> t.linhas.filter(l=> l.k===k)); return { k, total:ls.length, planejado:ls.filter(l=> l.estado==='planejado').length, nao:ls.filter(l=> l.estado==='nao').length, outros:ls.filter(l=> l.estado==='sem' || l.estado==='plantio').length }; }).filter(x=> x.total);
+  return { talhoes, por, projetos:PROJ, filtros:f, hoje:cgHojeISO(), nPlanos:planos.length };
+}
+// desenha o(s) PNG(s) (retrato, 2000 px de largura, duas colunas). Se ficar altíssimo, divide em partes.
+async function alertasMapaDesenhar(d){
+  try{ if(document.fonts && document.fonts.load) await Promise.all([ document.fonts.load('700 30px "Space Grotesk"'), document.fonts.load('600 22px "IBM Plex Sans"'), document.fonts.load('400 20px "IBM Plex Sans"') ]); }catch(e){}
+  const W = 2000, M = 56, GAP = 44, CW = (W-2*M-GAP)/2, FS = '"IBM Plex Sans","Segoe UI",Arial,sans-serif', FH = '"Space Grotesk","IBM Plex Sans",Arial,sans-serif', fonte = (peso,px,fam)=> peso+' '+px+'px '+(fam||FS);
+  const med = document.createElement('canvas').getContext('2d');
+  const cortar = (ctx, txt, larg)=>{ txt = String(txt); if(ctx.measureText(txt).width<=larg) return txt; let t = txt; while(t.length>1 && ctx.measureText(t+'…').width>larg) t = t.slice(0,-1); return t+'…'; };
+  const pj = k=> CG_PROJ[k] || { label:k, cor:'#888', s:k }, dmy = iso=> iso ? cgDataBr(iso) : '', dm = iso=> iso ? cgDataBr(iso).slice(0,5) : '';
+  // ----- blocos: cada talhão é uma unidade; a fazenda ganha um cabeçalho no começo de cada coluna -----
+  const H_FAZ = 56, H_TIT = 42, H_LIN = 34, H_PAD = 16, H_ENTRE = 20;
+  const altTal = t=> H_TIT + H_LIN*t.linhas.length + H_PAD;
+  const grupos = []; d.talhoes.forEach(t=>{ const g = grupos[grupos.length-1]; if(g && g.cliente===t.cliente && g.fazenda===t.fazenda) g.tals.push(t); else grupos.push({ cliente:t.cliente, fazenda:t.fazenda, estado:t.estado, tals:[t] }); });
+  const unidades = []; grupos.forEach(g=>{ const nPl = g.tals.reduce((s,t)=> s+t.linhas.filter(l=> l.estado==='planejado').length, 0), nTot = g.tals.reduce((s,t)=> s+t.linhas.length, 0); g.tals.forEach((t,i)=> unidades.push({ g, t, primeira:i===0, nPl, nTot })); });
+  // ----- páginas e colunas -----
+  const BODY_MAX = 13000, H_TOPO = 200, H_TOPO_PAG = 110, H_RES = 150 + 58*Math.max(1, d.por.length);
+  const totalH = unidades.reduce((s,u)=> s+altTal(u.t)+(u.primeira?H_FAZ+H_ENTRE:0), 0) + grupos.length*H_FAZ*0;
+  const alvoCol = Math.min(BODY_MAX, Math.ceil(totalH/2)+60);
+  const paginas = []; let pag = { cols:[[],[]], hs:[0,0] }, col = 0, ultG = null;
+  const novaPag = ()=>{ paginas.push(pag); pag = { cols:[[],[]], hs:[0,0] }; col = 0; ultG = null; };
+  unidades.forEach(u=>{
+    const precisaCab = u.primeira || ultG!==u.g, hU = altTal(u.t)+(precisaCab ? H_FAZ+(u.primeira?H_ENTRE:0) : 0);
+    if(pag.hs[col]+hU > alvoCol && pag.hs[col]>0){ if(col===0){ col = 1; ultG = null; } else { novaPag(); } }
+    const cab = (u.primeira || ultG!==u.g); const h = altTal(u.t)+(cab ? H_FAZ+(u.primeira?H_ENTRE:0) : 0);
+    pag.cols[col].push({ u, cab, continua: cab && !u.primeira }); pag.hs[col] += h; ultG = u.g;
+  });
+  paginas.push(pag);
+  const dataBr = dmy(d.hoje), geradoEm = new Date().toLocaleString('pt-BR',{ day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  const totPl = d.por.reduce((s,x)=> s+x.planejado, 0), totAll = d.por.reduce((s,x)=> s+x.total, 0), pct = totAll ? Math.round(100*totPl/totAll) : 0;
+  const filtrosTxt = [d.filtros.estado && 'Estado '+d.filtros.estado, d.filtros.consultor && 'Consultor '+d.filtros.consultor, d.filtros.parceiro && 'Parceiro '+d.filtros.parceiro].filter(Boolean).join(' · ');
+  let logo = null; try{ const im = document.querySelector('#loginScreen .lg-logo'); if(im && im.src){ const x = new Image(); x.src = im.src; if(x.decode) await x.decode(); if(x.naturalWidth) logo = x; } }catch(e){ logo = null; }
+  const canvases = [];
+  paginas.forEach((pg, ip)=>{
+    const primeira = ip===0, hCorpo = Math.max(pg.hs[0], pg.hs[1]), hTopo = primeira ? H_TOPO+H_RES : H_TOPO_PAG, H = hTopo + hCorpo + 90;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d'); ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#fbfaf4'; ctx.fillRect(0,0,W,H);
+    // cabeçalho escuro
+    ctx.fillStyle = '#06180e'; ctx.fillRect(0,0,W,primeira ? H_TOPO : H_TOPO_PAG);
+    if(logo && primeira){ const lh = 46, lw = lh*logo.naturalWidth/logo.naturalHeight; ctx.drawImage(logo, M, 30, lw, lh); }
+    ctx.fillStyle = '#ffffff'; ctx.font = fonte(700, primeira?50:38, FH); ctx.fillText('Mapa de planejamento de viagem', M, primeira ? 150 : 62);
+    ctx.fillStyle = '#9fe3b0'; ctx.font = fonte(400, 22); const sub = 'Projetos: '+d.projetos.filter(k=> d.por.some(x=> x.k===k)).map(k=> pj(k).label).join(', ')+' · '+dataBr+(filtrosTxt ? ' · '+filtrosTxt : '')+(paginas.length>1 ? ' · parte '+(ip+1)+' de '+paginas.length : '');
+    ctx.fillText(cortar(ctx, sub, W-2*M-(primeira?560:0)), M, primeira ? 188 : 94);
+    if(primeira){ ctx.textAlign = 'right'; ctx.fillStyle = '#ffffff'; ctx.font = fonte(700, 64, FH); ctx.fillText(pct+'%', W-M, 128); ctx.fillStyle = '#9fe3b0'; ctx.font = fonte(400, 22); ctx.fillText(totPl+' de '+totAll+' projetos de talhão já estão em planejamento', W-M, 166); ctx.textAlign = 'left'; }
+    let y = primeira ? H_TOPO : H_TOPO_PAG;
+    // resumo por projeto (só na primeira parte): barra empilhada planejado / não planejado / sem pendência
+    if(primeira){
+      ctx.fillStyle = '#1c2a21'; ctx.font = fonte(700, 28, FH); ctx.fillText('Cobertura por projeto', M, y+54);
+      const L0 = M+270, LB = W-2*M-270-640; let yy = y+82;
+      d.por.forEach(x=>{
+        ctx.fillStyle = pj(x.k).cor; ctx.beginPath(); ctx.arc(M+10, yy+20, 8, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = '#1c2a21'; ctx.font = fonte(600, 24); ctx.fillText(pj(x.k).label, M+30, yy+28);
+        let xb = L0; [['planejado','#2e7d32'],['nao','#e57373'],['outros','#c9c9c0']].forEach(([k,cor])=>{ const w = x.total ? LB*x[k]/x.total : 0; if(w>0){ ctx.fillStyle = cor; ctx.fillRect(xb, yy+6, w, 28); xb += w; } });
+        ctx.fillStyle = '#1c2a21'; ctx.font = fonte(400, 21); ctx.fillText(mapaN(x.planejado,'planejado','planejados')+' · '+mapaN(x.nao,'não planejado','não planejados')+(x.outros ? ' · '+x.outros+' sem pendência' : '')+' · de '+x.total, L0+LB+24, yy+28);
+        yy += 58;
+      });
+      // legenda dos estados
+      let xl = M; Object.values(MAPA_EST).forEach(e=>{ ctx.fillStyle = e.bg; const w = 150; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(xl, yy+4, w, 28, 8) : ctx.rect(xl, yy+4, w, 28); ctx.fill(); ctx.fillStyle = e.fg; ctx.font = fonte(700, 15); ctx.textAlign = 'center'; ctx.fillText(e.rot, xl+w/2, yy+24); ctx.textAlign = 'left'; xl += w+14; });
+      y = yy+60;
+    }
+    // corpo: duas colunas
+    pg.cols.forEach((itens, ci)=>{
+      let cy = y, cx = M+ci*(CW+GAP);
+      itens.forEach(({ u, cab, continua })=>{
+        if(cab){
+          if(u.primeira && cy>y) cy += H_ENTRE;
+          ctx.fillStyle = '#e9efe3'; ctx.fillRect(cx, cy, CW, H_FAZ-6); ctx.fillStyle = '#2d4a1f'; ctx.fillRect(cx, cy, 8, H_FAZ-6);
+          ctx.fillStyle = '#1c2a21'; ctx.font = fonte(700, 26, FH); const nome = cortar(ctx, u.g.fazenda+(continua?' (continuação)':''), CW-400), w1 = ctx.measureText(nome).width; ctx.fillText(nome, cx+24, cy+34);
+          ctx.font = fonte(400, 19); ctx.fillStyle = '#5a6b60'; ctx.fillText(cortar(ctx, u.g.cliente+' · '+u.g.estado, CW-24-w1-14-200), cx+24+w1+14, cy+34);
+          ctx.textAlign = 'right'; ctx.fillStyle = u.nPl===u.nTot ? '#14532d' : '#5a6b60'; ctx.font = fonte(700, 19); ctx.fillText(u.nPl+' de '+u.nTot+' planejados', cx+CW-14, cy+34); ctx.textAlign = 'left';
+          cy += H_FAZ;
+        }
+        // talhão
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(cx, cy, CW, altTal(u.t)-4); ctx.strokeStyle = '#e1e5d8'; ctx.lineWidth = 1; ctx.strokeRect(cx+0.5, cy+0.5, CW-1, altTal(u.t)-5);
+        ctx.fillStyle = '#1c2a21'; ctx.font = fonte(700, 24, FH); ctx.fillText('Talhão '+u.t.talhao, cx+20, cy+30);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#7a8a80'; ctx.font = fonte(400, 17); ctx.fillText(cortar(ctx, [u.t.consultor, u.t.parceiro].filter(Boolean).join(' · '), CW*0.55), cx+CW-16, cy+29); ctx.textAlign = 'left';
+        u.t.linhas.forEach((l, li)=>{
+          const ly = cy+H_TIT+li*H_LIN, e = MAPA_EST[l.estado];
+          ctx.fillStyle = pj(l.k).cor; ctx.beginPath(); ctx.arc(cx+30, ly+13, 7, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = '#1c2a21'; ctx.font = fonte(600, 20); ctx.fillText(cortar(ctx, pj(l.k).label, 200), cx+46, ly+20);
+          ctx.fillStyle = e.bg; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx+256, ly, 150, 26, 7) : ctx.rect(cx+256, ly, 150, 26); ctx.fill();
+          ctx.fillStyle = e.fg; ctx.font = fonte(700, 15); ctx.textAlign = 'center'; ctx.fillText(e.rot, cx+256+75, ly+18); ctx.textAlign = 'left';
+          const larg = CW-424-16; ctx.font = fonte(400, 19); let det = '';
+          if(l.estado==='planejado'){ const cheio = l.plano.regiao+(l.plano.responsavel ? ' · '+l.plano.responsavel : ''); det = ctx.measureText(cheio).width<=larg ? cheio : l.plano.regiao; }   // o nome do planejamento (e o responsável, quando couber)
+          else det = l.estado==='sem' ? 'avaliações executadas ou não se aplicam' : l.estado==='plantio' ? 'cadastre a data de plantio' : '';
+          if(det){ ctx.fillStyle = l.estado==='planejado' ? '#1c2a21' : '#7a8a80'; ctx.fillText(cortar(ctx, det, larg), cx+424, ly+20); }
+        });
+        cy += altTal(u.t);
+      });
+    });
+    ctx.fillStyle = '#7a8a80'; ctx.font = fonte(400, 18); ctx.fillText('Grower Consultoria Agronômica · Central de Projetos · gerado em '+geradoEm, M, H-34);
+    canvases.push(cv);
+  });
+  return canvases;
+}
+function alertasMapaBaixar(cv, nome){ return new Promise(res=>{ cv.toBlob(blob=>{ const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=> URL.revokeObjectURL(url), 4000); res(); }, 'image/png'); }); }
+// PDF A4 em retrato: resumo na primeira folha e, depois, a LISTA de talhões (por cliente e fazenda). Cada talhão traz uma linha por projeto:
+// bolinha e nome do projeto, o estado (Planejado / Não planejado...) e, quando planejado, o nome do planejamento onde está.
+function alertasMapaPdf(d, opc){
+  opc = opc || {};
+  const J = window.jspdf && window.jspdf.jsPDF; if(!J) throw new Error('Não consegui carregar a biblioteca de PDF (falha de conexão). Recarregue a página e tente de novo.');
+  const doc = new J({ unit:'pt', format:'a4' }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 40, FUNDO = H-56, LARG = W-2*MX;
+  const rgb = h=> [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)], pj = k=> CG_PROJ[k] || { label:k, cor:'#888888' };
+  const projs = d.por.map(x=> x.k);
+  const logo = CF_PDF_LOGO, addLogo = (x,y,t)=>{ if(!logo) return; try{ doc.addImage(logo,'PNG',x,y,t,t,'cflogo','FAST'); }catch(e){ console.error(e); } };
+  const dmy = cgDataBr(d.hoje), filtrosTxt = [d.filtros.estado && 'Estado '+d.filtros.estado, d.filtros.consultor && 'Consultor '+d.filtros.consultor, d.filtros.parceiro && 'Parceiro '+d.filtros.parceiro].filter(Boolean).join(' · ');
+  const CORES = { planejado:{ f:[191,230,203], t:[20,83,45] }, nao:{ f:[246,184,176], t:[138,28,19] }, sem:{ f:[227,227,220], t:[74,74,69] }, plantio:{ f:[255,243,176], t:[107,82,0] } };
+  const ROT = { planejado:'Planejado', nao:'Não planejado', sem:'Sem pendência', plantio:'Sem plantio' };
+  const mn = (n,s,p)=> n+' '+(n===1?s:p);
+  const um = (txt, larg)=>{ txt = String(txt); if(doc.getTextWidth(txt)<=larg) return txt; let t = txt; while(t.length>1 && doc.getTextWidth(t+'...')>larg) t = t.slice(0,-1); return t+'...'; };   // uma linha, com reticências se não couber (a fonte já tem que estar definida)
+  // ----- cabeçalhos -----
+  const cabCompacta = ()=>{ addLogo(MX-2, 16, 32); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(26,32,25); doc.text('Mapa de planejamento de viagem', MX+38, 36); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(77,86,72); doc.text('Gerado em '+dmy, W-MX, 36, { align:'right' }); doc.setDrawColor(127,166,83); doc.setLineWidth(1.2); doc.line(MX, 48, W-MX, 48); };
+  addLogo(MX-4, 24, 56);
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(26,32,25); doc.text('Mapa de planejamento de viagem', MX+60, 50);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(77,86,72); doc.text(um('Projetos: '+projs.map(k=> pj(k).label).join(', '), LARG-60-120), MX+60, 67);
+  doc.setFontSize(8.5); doc.text('Gerado em '+dmy, W-MX, 36, { align:'right' }); if(filtrosTxt){ doc.setFont('helvetica','bold'); doc.setTextColor(26,32,25); doc.text(um('Filtros: '+filtrosTxt, LARG-60), MX+60, 81); }
+  doc.setDrawColor(127,166,83); doc.setLineWidth(2.5); doc.line(MX, 90, W-MX, 90);
+  // ----- resumo: cobertura por projeto (barra: planejado, não planejado, sem pendência) -----
+  const totPl = d.por.reduce((s,x)=> s+x.planejado, 0), totAll = d.por.reduce((s,x)=> s+x.total, 0), pct = totAll ? Math.round(100*totPl/totAll) : 0;
+  let y = 112; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(26,32,25); doc.text('Cobertura por projeto', MX, y);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text(pct+'%', W-MX, y+1, { align:'right' }); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(77,86,72); doc.text(totPl+' de '+totAll+' projetos de talhão em planejamento', W-MX-52, y+1, { align:'right' });
+  y += 18; const xB = MX+104, wB = 150;
+  d.por.forEach(x=>{
+    doc.setFillColor(...rgb(pj(x.k).cor)); doc.circle(MX+4, y-3, 3.4, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,32,25); doc.text(um(pj(x.k).label, 92), MX+13, y);
+    let xb = xB; [['planejado',[46,125,50]],['nao',[229,115,115]],['outros',[201,201,192]]].forEach(([k,cor])=>{ const w = x.total ? wB*x[k]/x.total : 0; if(w>0){ doc.setFillColor(...cor); doc.rect(xb, y-8, w, 11, 'F'); xb += w; } });
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,68,62); doc.text(um(mn(x.planejado,'planejado','planejados')+' · '+mn(x.nao,'não planejado','não planejados')+(x.outros ? ' · '+x.outros+' sem pendência' : '')+' · de '+x.total, W-MX-xB-wB-10), xB+wB+10, y);
+    y += 17;
+  });
+  y += 4; { let xl = MX; [['planejado','Planejado',64],['nao','Não planejado',78],['sem','Sem pendência',78],['plantio','Sem plantio (sem data de plantio)',150]].forEach(([k,r,w])=>{ doc.setFillColor(...CORES[k].f); doc.roundedRect(xl, y, w, 13, 3, 3, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...CORES[k].t); doc.text(r, xl+w/2, y+9, { align:'center' }); xl += w+8; }); }
+  y += 24; doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(110,122,115);
+  doc.splitTextToSize('Cada talhão lista os projetos de que participa, uma linha por projeto. A pílula mostra se o projeto está planejado e, quando está, o nome do planejamento onde ele está.', LARG).forEach((s,i)=> doc.text(s, MX, y+i*9)); y += 28;
+  // ----- lista: cliente > fazenda > talhão -----
+  const novaPagina = ()=>{ doc.addPage(); cabCompacta(); y = 62; };
+  const garantir = (h, refaz)=>{ if(y+h <= FUNDO) return; novaPagina(); if(refaz) refaz(); };
+  const alt = t=> 15+t.linhas.length*13.5+6;
+  const bandaCliente = g=>{ doc.setFillColor(45,74,31); doc.roundedRect(MX, y, LARG, 20, 4, 4, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255,255,255); doc.text(um(g.cliente, LARG-210), MX+10, y+13.5); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.text(mn(g.nTal,'talhão','talhões')+' · '+g.nPl+' de '+g.nTot+' planejados', W-MX-10, y+13.5, { align:'right' }); y += 25; };
+  const bandaFazenda = (f, cont)=>{ doc.setFillColor(233,239,227); doc.rect(MX, y, LARG, 18, 'F'); doc.setFillColor(127,166,83); doc.rect(MX, y, 3, 18, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,32,25); const nome = um(f.fazenda+(cont ? ' (continuação)' : ''), LARG-230); doc.text(nome, MX+10, y+12.5);
+    const w1 = doc.getTextWidth(nome); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(77,86,72); doc.text(um(f.cliente+' · '+f.estado, LARG-230-w1-12), MX+10+w1+8, y+12.5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(f.nPl===f.nTot ? 20 : 77, f.nPl===f.nTot ? 83 : 86, f.nPl===f.nTot ? 45 : 72); doc.text(f.nPl+' de '+f.nTot+' planejados', W-MX-8, y+12.5, { align:'right' }); y += 22; };
+  const bloco = t=>{
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,32,25); doc.text('Talhão '+t.talhao, MX+4, y+10);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(110,122,115); doc.text(um([t.consultor, t.parceiro].filter(Boolean).join(' · '), 220), W-MX-4, y+10, { align:'right' });
+    t.linhas.forEach((l,i)=>{
+      const ly = y+15+i*13.5, col = CORES[l.estado];
+      doc.setFillColor(...rgb(pj(l.k).cor)); doc.circle(MX+14, ly+4.6, 3, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(26,32,25); doc.text(um(pj(l.k).label, 94), MX+23, ly+7.4);
+      doc.setFillColor(...col.f); doc.roundedRect(MX+124, ly, 74, 11, 3, 3, 'F'); doc.setFontSize(6.8); doc.setTextColor(...col.t); doc.text(ROT[l.estado], MX+124+37, ly+7.9, { align:'center' });
+      const det = l.estado==='planejado' ? l.plano.regiao+(l.plano.responsavel ? ' · '+l.plano.responsavel : '') : l.estado==='sem' ? 'avaliações executadas ou não se aplicam' : l.estado==='plantio' ? 'cadastre a data de plantio' : '';
+      if(det){ doc.setFont('helvetica', l.estado==='planejado' ? 'normal' : 'italic'); doc.setFontSize(7.8); doc.setTextColor(...(l.estado==='planejado' ? [26,32,25] : [120,130,124])); doc.text(um(det, LARG-210), MX+206, ly+7.6); }
+    });
+    const h = alt(t); doc.setDrawColor(227,230,216); doc.setLineWidth(0.4); doc.line(MX, y+h-2, W-MX, y+h-2); y += h;
+  };
+  // agrupa: cliente > fazenda > talhão
+  const clientes = []; d.talhoes.forEach(t=>{ let g = clientes[clientes.length-1]; if(!g || g.cliente!==t.cliente){ g = { cliente:t.cliente, fazendas:[], nTal:0, nPl:0, nTot:0 }; clientes.push(g); } let f = g.fazendas[g.fazendas.length-1]; if(!f || f.fazenda!==t.fazenda){ f = { fazenda:t.fazenda, cliente:t.cliente, estado:t.estado, tals:[], nPl:0, nTot:0 }; g.fazendas.push(f); }
+    f.tals.push(t); const pl = t.linhas.filter(l=> l.estado==='planejado').length; f.nPl += pl; f.nTot += t.linhas.length; g.nTal++; g.nPl += pl; g.nTot += t.linhas.length; });
+  clientes.forEach((g, gi)=>{
+    if(opc.clientePorFolha && gi>0) novaPagina();
+    garantir(25+22+alt(g.fazendas[0].tals[0])); bandaCliente(g);   // a faixa do cliente nunca fica sozinha no fim da folha
+    g.fazendas.forEach(f=>{
+      garantir(22+alt(f.tals[0])); bandaFazenda(f, false);   // nem a da fazenda: ela vai junto com o primeiro talhão
+      f.tals.forEach(t=>{ garantir(alt(t), ()=> bandaFazenda(f, true)); bloco(t); });   // o talhão não é cortado no meio da folha
+      y += 4;
+    });
+    y += 6;
+  });
+  const total = doc.internal.getNumberOfPages();
+  for(let i=1; i<=total; i++){ doc.setPage(i); doc.setDrawColor(216,220,203); doc.setLineWidth(0.6); doc.line(MX, H-40, W-MX, H-40); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(77,86,72); doc.text('Grower Consultoria Agronômica · Central de Projetos', MX, H-27); doc.text('Página '+i+' de '+total, W-MX, H-27, { align:'right' }); }
+  return doc;
+}
+function alertasMapaAbrir(){
+  const antigo = document.getElementById('alertasMapaOv'); if(antigo) antigo.remove();
+  const f = (alertasEstado().f) || {}, base = alertasMapaDados(null, f), disp = RF_PROJ_ORDEM.filter(k=> base.por.some(x=> x.k===k)), sel = new Set(f.projeto && disp.includes(f.projeto) ? [f.projeto] : disp);
+  const filtrosTxt = [f.projeto && 'Projeto '+(CG_PROJ[f.projeto] ? CG_PROJ[f.projeto].label : f.projeto), f.estado && 'Estado '+f.estado, f.consultor && 'Consultor '+f.consultor, f.parceiro && 'Parceiro '+f.parceiro].filter(Boolean).join(' · ');
+  const ov = document.createElement('div'); ov.id = 'alertasMapaOv';
+  ov.innerHTML = `<style>#alertasMapaOv{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:7300;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
+    #alertasMapaOv .mp-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,520px);box-shadow:0 10px 40px rgba(0,0,0,.4);padding:18px 20px;}
+    #alertasMapaOv .mp-tit{font-size:18px;font-weight:700;} #alertasMapaOv .mp-sub{font-size:12.5px;color:var(--ink-soft);margin:4px 0 12px;}
+    #alertasMapaOv .mp-li{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink);} #alertasMapaOv .mp-li i{width:11px;height:11px;border-radius:50%;flex:none;} #alertasMapaOv .mp-li b{font-weight:700;} #alertasMapaOv .mp-li span{margin-left:auto;font-size:12.5px;color:var(--ink-soft);}
+    #alertasMapaOv .mp-acoes{display:flex;gap:14px;margin:4px 0 12px;font-size:13px;} #alertasMapaOv .mp-lnk{all:unset;cursor:pointer;text-decoration:underline;color:var(--ink);font-weight:700;}
+    #alertasMapaOv .mp-r{display:flex;gap:8px;align-items:baseline;padding:4px 2px;cursor:pointer;font-size:13.5px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink);} #alertasMapaOv .mp-r span{color:var(--ink-soft);font-size:12px;} #alertasMapaOv .mp-fmt{border-top:1px solid var(--line);padding-top:10px;margin-top:2px;} #alertasMapaOv .mp-r.off{opacity:.5;cursor:default;}
+    #alertasMapaOv .mp-ft{display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:14px;} #alertasMapaOv .mp-msg{flex:1;font-size:12.5px;color:var(--ink-soft);}</style>
+    <div class="mp-box" role="dialog" aria-modal="true" aria-label="Mapa de planejamento"><div class="mp-tit">🧠 Mapa de planejamento</div><div class="mp-sub">Escolha os projetos que entram na imagem. Ele traz todos os talhões desses projetos, planejados e não planejados.${filtrosTxt ? ' Filtros da tela aplicados: '+cgEscH(filtrosTxt)+'.' : ''}</div>
+    <div id="mpLista"></div><div class="mp-acoes"><button type="button" class="mp-lnk" data-m="todos">Marcar todos</button><button type="button" class="mp-lnk" data-m="limpar">Limpar seleção</button></div>
+    <div class="mp-fmt"><label class="mp-r"><input type="radio" name="mpFmt" value="pdf" checked><b>PDF A4</b><span>folhas bem diagramadas, uma lista por fazenda (recomendado)</span></label><label class="mp-r"><input type="radio" name="mpFmt" value="png"><b>PNG</b><span>uma imagem em retrato (em partes, se for muito grande)</span></label><label class="mp-r" id="mpCliL"><input type="checkbox" id="mpCli"><span style="color:var(--ink)">Começar cada cliente em uma folha nova</span></label></div>
+    <div class="mp-ft"><span class="mp-msg" id="mpMsg"></span><button type="button" class="btn ghost" id="mpCancelar">Cancelar</button><button type="button" class="btn btn-preto" id="mpGerar">🧠 Gerar PDF</button></div></div>`;
+  document.body.appendChild(ov);
+  const desenhar = ()=>{ ov.querySelector('#mpLista').innerHTML = disp.map(k=>{ const x = base.por.find(y=> y.k===k), p = CG_PROJ[k] || { label:k, cor:'#888' };
+    return `<label class="mp-li"><input type="checkbox" data-p="${k}"${sel.has(k)?' checked':''}><i style="background:${p.cor}"></i><b>${cgEscH(p.label)}</b><span>${mapaN(x.planejado,'planejado','planejados')} · ${mapaN(x.nao,'não planejado','não planejados')} · de ${x.total}</span></label>`; }).join('') || '<div class="mp-sub">Nenhum talhão com esses filtros.</div>';
+    ov.querySelector('#mpGerar').disabled = !sel.size; };
+  const fechar = ()=>{ ov.remove(); document.removeEventListener('keydown', esc, true); };
+  const esc = e=>{ if(e.key==='Escape'){ e.stopImmediatePropagation(); fechar(); } };   // Esc fecha só esta janelinha, não os Alertas por baixo
+  document.addEventListener('keydown', esc, true);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) fechar(); });
+  const fmtAtual = ()=> (ov.querySelector('input[name="mpFmt"]:checked') || {}).value || 'pdf';
+  const ajustaFmt = ()=>{ const pdf = fmtAtual()==='pdf'; ov.querySelector('#mpGerar').textContent = pdf ? '🧠 Gerar PDF' : '🧠 Gerar PNG'; ov.querySelector('#mpCli').disabled = !pdf; ov.querySelector('#mpCliL').classList.toggle('off', !pdf); };
+  ov.addEventListener('change', e=>{ const ck = e.target.closest('input[data-p]'); if(ck){ ck.checked ? sel.add(ck.dataset.p) : sel.delete(ck.dataset.p); desenhar(); } if(e.target.name==='mpFmt') ajustaFmt(); });
+  ov.addEventListener('click', e=>{ const b = e.target.closest('[data-m]'); if(!b) return; if(b.dataset.m==='todos') disp.forEach(k=> sel.add(k)); else sel.clear(); desenhar(); });
+  ov.querySelector('#mpCancelar').addEventListener('click', fechar);
+  ov.querySelector('#mpGerar').addEventListener('click', async ()=>{
+    const g = ov.querySelector('#mpGerar'), msg = ov.querySelector('#mpMsg'); g.disabled = true; msg.textContent = 'Gerando a imagem…';
+    try{
+      const d = alertasMapaDados([...sel], f);
+      if(fmtAtual()==='pdf'){ const pdf = alertasMapaPdf(d, { clientePorFolha: ov.querySelector('#mpCli').checked }); window.__alertasMapaUltimo = { dados:d, pdf }; pdf.save('mapa-de-planejamento-'+d.hoje+'.pdf'); fechar(); return; }   // (o window.__… só existe para os testes)
+      const cvs = await alertasMapaDesenhar(d); window.__alertasMapaUltimo = { dados:d, canvases:cvs };
+      const dia = d.hoje;
+      for(let i=0;i<cvs.length;i++){ await alertasMapaBaixar(cvs[i], 'mapa-de-planejamento-'+dia+(cvs.length>1 ? '-parte-'+(i+1)+'-de-'+cvs.length : '')+'.png'); if(i<cvs.length-1) await new Promise(r=> setTimeout(r, 500)); }
+      fechar();
+    }catch(err){ console.error(err); msg.textContent = 'Não consegui gerar a imagem: '+((err && err.message) || err); msg.style.color = 'var(--red)'; g.disabled = false; }
+  });
+  desenhar(); ajustaFmt();
 }
 async function atualizarBadgeAlertas(){   // o número vermelho do botão: quantos talhões pedem atenção (atrasadas + próximas + sem planejamento urgentes)
   const b = document.getElementById('alertasBadge'); if(!b) return;
