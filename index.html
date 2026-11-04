@@ -11969,7 +11969,7 @@ const CG_CONTEXTOS = {
   estr:  { titulo:'Cronograma — Estruturação', projetos:['estr'] },
   oxc:   { titulo:'Cronograma — Óxido de Magnésio', projetos:['oxc'] },
   cf:    { titulo:'Cronograma — Coleta Foliar 2026.27', projetos:['cf'] },
-  geral: { titulo:'Cronograma Geral — todos os projetos', projetos:['vns','estr','oxc','cf','ladroes','maximas'] },
+  geral: { titulo:'Cronograma Geral — todos os projetos', projetos:['vns','estr','oxc','ladroes','maximas'] },   // a Coleta Foliar NÃO entra aqui (nem no Planejar, na distribuição, no Adicionar projetos): ela tem aba e cronograma próprios (contexto 'cf')
 };
 // ---------- Distribuição inteligente do Planejar ----------
 const CG_PLANO_UM_ESTADO_POR_DIA = true;     // regra inicial: um estado por dia (pra permitir mais de um, é só trocar aqui)
@@ -12152,7 +12152,7 @@ function cgPlanoResumo(itens, semanas){
     talhoes: new Set(itens.map(i=>[i.cliente,i.fazenda,i.talhao].join('|'))).size,
     produtores: new Set(itens.map(i=>i.cliente)).size,
     dias: dias.length, ini: dias[0] || null, fim: dias[dias.length-1] || null,
-    projetos: ['maximas','ladroes','estr','vns','oxc','cf'].filter(k=> CG_PROJ[k] && itens.some(i=>i.projeto===k)),   // mesma ordem do PDF
+    projetos: ['maximas','ladroes','estr','vns','oxc'].filter(k=> CG_PROJ[k] && itens.some(i=>i.projeto===k)),   // mesma ordem do PDF
     semanas: (semanas || []).length,
   };
 }
@@ -12227,6 +12227,9 @@ const cgExisteTalhao = it=> RECORDS.some(r=> r.cliente===it.cliente && r.fazenda
 
 // ---------- Supabase (tabela planejamentos) ----------
 function cgPlanosEstado(){ return state.planos || (state.planos = { carregado:false, carregando:false, lista:[], erro:null }); }
+// A Coleta Foliar não faz parte da Visão Geral (tem aba própria). Itens dela que ainda existam em planejamentos antigos são descartados na LEITURA (o banco não é mexido);
+// na próxima vez que o planejamento for salvo, eles saem de vez.
+const cgSemColetaFoliar = pl=> (pl.itens || []).some(i=> i.projeto==='cf') ? { ...pl, itens:pl.itens.filter(i=> i.projeto!=='cf') } : pl;
 async function cgPlanosCarregar(forcar){
   const st = cgPlanosEstado(); if(st.carregando) return st.promessa;   // já está buscando: quem chama espera a MESMA busca (e depois redesenha), em vez de desistir
   if(st.carregado && !forcar) return;
@@ -12234,7 +12237,7 @@ async function cgPlanosCarregar(forcar){
   st.promessa = (async()=>{
     try{
       const { data, error } = await sb.from('planejamentos').select('*').order('criado_em',{ascending:false}).order('atualizado_em',{ascending:false});
-      st.lista = error ? [] : (data || []); st.erro = error ? (error.message || String(error)) : null;
+      st.lista = error ? [] : (data || []).map(cgSemColetaFoliar); st.erro = error ? (error.message || String(error)) : null;
     }catch(e){ st.lista = []; st.erro = e.message || String(e); }
     st.carregado = true; st.carregando = false;
   })();
