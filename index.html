@@ -5922,9 +5922,9 @@ const CF_DAP_MSG1 = CF_DAP_COLETA - 7;
 const CF_DAP_MSG2 = 45 + DAP_DESLOCAMENTO;
 const CF_DAP_COLETA_PREVISTA = 45 + DAP_DESLOCAMENTO;
 const CF_MSG_OPTIONS = ['Pendente','Enviado'];
-const CF_COLETA_STATUS_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente'];
+const CF_COLETA_STATUS_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente','Não coletado'];   // "Não coletado" é uma saída fora do processo: não conta como coletado nem como a coletar
 // cores dos status (mensagem 1, mensagem 2 e coleta): pendente vermelho; enviado e coletado verde; no laboratório amarelo; laudo recebido verde mais escuro; dado compilado no crop do cliente azul
-const CF_COR_STATUS = { 'Pendente':['#f6b8b0','#8a1c13'], 'Enviado':['#bfe6cb','#14532d'], 'Coletado':['#bfe6cb','#14532d'], 'No laboratório':['#ffe27a','#5a4400'], 'Laudo recebido':['#6dbb88','#06361a'], 'Dado compilado no crop do Cliente':['#a8c8f0','#0f3b78'] };   // UMA paleta só: [fundo, texto]. A tabela (status), as faixas do gráfico "Etapas da coleta por consultor" e a legenda leem esta mesma lista
+const CF_COR_STATUS = { 'Pendente':['#f6b8b0','#8a1c13'], 'Enviado':['#bfe6cb','#14532d'], 'Coletado':['#bfe6cb','#14532d'], 'No laboratório':['#ffe27a','#5a4400'], 'Laudo recebido':['#6dbb88','#06361a'], 'Dado compilado no crop do Cliente':['#a8c8f0','#0f3b78'], 'Não coletado':['#111111','#ffffff'] };   // UMA paleta só: [fundo, texto]. A tabela (status), as faixas do gráfico "Etapas da coleta por consultor" e a legenda leem esta mesma lista
 const cfEstiloStatus = v=>{ const k = CF_COR_STATUS[v]; return k ? 'background:'+k[0]+';color:'+k[1]+';font-weight:500;' : ''; };
 const CF_COR_COLETADO = '#2e8b57';   // célula "dias até coleta" depois que a coleta aconteceu
 function getCfEntry(key){
@@ -12158,13 +12158,13 @@ function cgPlanoResumo(itens, semanas){
 }
 // Compara o planejamento salvo com os dados de hoje. Um planejamento é uma FOTO: talhões novos não entram sozinhos.
 // - o dia escolhido continua valendo se ainda está dentro da tolerância do estádio (só o desvio muda)
-// - se a data prevista andou e o dia ficou fora da tolerância, o talhão vai pra lista, com o motivo
+// - se a data prevista andou e o dia ficou fora da tolerância, o talhão FICA no dia salvo, com alerta (o pino mostra o desvio)
 // - se não há mais avaliação pendente (feita, não se aplica, saiu do projeto), o talhão sai do planejamento
 function cgReconciliarPlano(plano, pontos, existeTalhao){
   const itens = plano.itens || [], vivos = new Map();
   pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
   const listas = { mudaram:[], atrasados:[], status:[], dataDentro:[] };   // quais talhões entraram em cada situação (pro texto do aviso)
-  const comoSalvo = { grupos:[], colocado:{}, executados:[] }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[] };
+  const comoSalvo = { grupos:[], colocado:{}, executados:[], diaOrig:{} }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[], diaOrig:{} };   // diaOrig: o dia em que cada item estava salvo (pra rede de segurança do Atualizar)
   let mudaram = 0, atrasados = 0, statusMud = 0, dataDentro = 0; const hojeISO = cgHojeISO();
   itens.forEach(it=>{
     const tudo = (vivos.get([it.projeto,it.cliente,it.fazenda,it.talhao].join('|')) || []).filter(p=> it.avaliacoes.some(a=> a.avaliacao===p.avaliacao && a.estagio===p.estagio));
@@ -12177,7 +12177,7 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     // "como salvo": a foto do que foi planejado (inclusive o que depois saiu); só os executados vão pra parte travada
     const idS = comoSalvo.grupos.length;
     comoSalvo.grupos.push({ id:idS, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:it.estado, consultor:it.consultor, dataStr:it.dataPrev, faixa:it.faixa, statusPlantio:it.statusPlantio, avaliacoes:it.avaliacoes });
-    comoSalvo.colocado[idS] = it.dia;
+    comoSalvo.colocado[idS] = it.dia; comoSalvo.diaOrig[idS] = it.dia;
     if(!tudo.length){
       revisado.saiu.push({ rot, motivo: existeTalhao(it) ? 'não há mais avaliação pendente: não se aplica ou saiu do projeto' : 'o talhão não está mais no cadastro' });
       return;
@@ -12186,9 +12186,9 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     const novaData = pend.map(p=>p.dataStr).sort()[0], faixa = Math.min(...pend.map(p=> p.faixa ?? 4)), id = revisado.grupos.length;
     revisado.grupos.push({ id, projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:pend[0].estado, consultor:pend[0].consultor, dataStr:novaData, faixa, statusPlantio:pend[0].statusPlantio, avaliacoes:pend.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio })) });
     const dentro = Math.abs(cgNumDia(it.dia)-cgNumDia(novaData)) <= faixa, passou = it.dia < hojeISO;
-    if(dentro && !passou) revisado.colocado[id] = it.dia;   // continua no dia salvo (o pill já vem com o status de hoje)
-    if(!dentro){ mudaram++; listas.mudaram.push({ rot, dia:it.dia }); revisado.motivos[id] = 'data prevista mudou: era '+cgDataBr(it.dataPrev).slice(0,5)+', agora '+cgDataBr(novaData).slice(0,5); }   // foi pra lista: a Distribuição inteligente reposiciona
-    else if(passou){ atrasados++; listas.atrasados.push({ rot, dia:it.dia }); revisado.motivos[id] = 'o dia planejado ('+cgDataBr(it.dia).slice(0,5)+') já passou e ainda tem avaliação pendente'; }
+    revisado.colocado[id] = it.dia; revisado.diaOrig[id] = it.dia;   // SEMPRE fica no dia salvo: vencido ou com a data prevista mudada, o pino continua lá, com alerta (atrasado / fora da tolerância), até a pessoa escolher outro dia
+    if(!dentro){ mudaram++; listas.mudaram.push({ rot, dia:it.dia }); }   // fica no dia salvo: o pino mostra "+5d · prev. 05/11 · fora da tolerância"
+    else if(passou){ atrasados++; listas.atrasados.push({ rot, dia:it.dia }); }   // fica no dia salvo: o pino mostra "atrasado há N d"
     else if((it.statusPlantio==='Estimativa') !== (pend[0].statusPlantio==='Estimativa')){ statusMud++; listas.status.push({ rot, dia:it.dia }); }   // estimativa ↔ plantado: avisa e atualiza a cor
     else if(novaData !== it.dataPrev){ dataDentro++; listas.dataDentro.push({ rot, dia:it.dia }); }   // a data prevista mudou, mas o dia salvo continua dentro da tolerância: só avisa
   });
@@ -12197,7 +12197,7 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
 }
 function cgDicaAvisos(x){   // texto da dica (passar o mouse) do aviso amarelo do card: quais talhões e em que situação
   const ls = x.listas || {}, p = [];
-  [['mudaram','Mudaram de data (vão pra lista)'],['atrasados','Dia já passou (vão pra lista)'],['status','Status do plantio mudou (ficam no dia)'],['dataDentro','Data prevista nova, dentro da tolerância (ficam no dia)']].forEach(([k,t])=>{ if(ls[k] && ls[k].length) p.push(t+': '+cgListaNomes(ls[k])); });
+  [['mudaram','Mudaram de data (ficam no dia, com alerta)'],['atrasados','Dia já passou (ficam no dia, com alerta de atraso)'],['status','Status do plantio mudou (ficam no dia)'],['dataDentro','Data prevista nova, dentro da tolerância (ficam no dia)']].forEach(([k,t])=>{ if(ls[k] && ls[k].length) p.push(t+': '+cgListaNomes(ls[k])); });
   if(x.revisado && x.revisado.saiu && x.revisado.saiu.length) p.push('Saíram: '+x.revisado.saiu.map(s=>s.rot).join('; '));
   return (p.join('\n') || 'Abre o planejamento com os dados de hoje')+'\nClique pra rever e escolher um dia novo.';
 }
@@ -12215,8 +12215,8 @@ function cgListaNomes(arr){   // [{rot,dia}] → "Est · Jacuba 19-CV (13/10 e 0
 }
 function cgTextoRevisao(mudaram, saiu, x){
   const p = [], ls = (x && x.listas) || {}, nm = k=> (ls[k] && ls[k].length) ? ': '+cgListaNomes(ls[k]) : '';   // ": Máx · Fazenda T1; Est · Fazenda T4"
-  if(mudaram) p.push(mudaram+(mudaram===1?' talhão foi pra lista':' talhões foram pra lista')+' (a data prevista mudou e o dia escolhido ficou fora da tolerância)'+nm('mudaram'));
-  if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão foi pra lista':' talhões foram pra lista')+' (o dia planejado já passou e ainda há avaliação pendente)'+nm('atrasados'));
+  if(mudaram) p.push(mudaram+(mudaram===1?' talhão ficou no dia salvo, com alerta':' talhões ficaram no dia salvo, com alerta')+' (a data prevista mudou e o dia ficou fora da tolerância: escolha um dia novo)'+nm('mudaram'));
+  if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão ficou no dia salvo, com alerta de atraso':' talhões ficaram no dia salvo, com alerta de atraso')+' (o dia planejado já passou e ainda há avaliação pendente: arraste para um dia novo)'+nm('atrasados'));
   if(x && x.status) p.push(x.status+(x.status===1?' talhão ficou no dia, com o status do plantio de hoje':' talhões ficaram no dia, com o status do plantio de hoje')+nm('status'));
   if(x && x.dataDentro) p.push(x.dataDentro+(x.dataDentro===1?' talhão ficou no dia (a data prevista mudou, mas o dia continua dentro da tolerância)':' talhões ficaram no dia (a data prevista mudou, mas o dia continua dentro da tolerância)')+nm('dataDentro'));
   if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
@@ -12274,6 +12274,28 @@ async function cgPlanosExcluir(id){
 }
 
 // ---------- caixinha de Salvar / Editar ----------
+// Rede de segurança do Atualizar: lista os talhões que estavam no planejamento e ficaram sem dia; a pessoa escolhe voltar, manter no dia original ou tirar do planejamento.
+function cgConfirmarSaida(lista, cb){
+  const antigo = document.getElementById('cpSaidaOv'); if(antigo) antigo.remove();
+  const ov = document.createElement('div'), n = lista.length; ov.id = 'cpSaidaOv';
+  const itens = lista.slice(0,8).map(x=> '<li>'+cgEscH(x.rot)+(x.dia ? ' <span>(dia '+cgDataBr(x.dia).slice(0,5)+')</span>' : '')+'</li>').join('')+(n>8 ? '<li>e mais '+(n-8)+'…</li>' : '');
+  ov.innerHTML = `<style>#cpSaidaOv{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:7500;display:flex;align-items:center;justify-content:center;padding:3vh 3vw;}
+    #cpSaidaOv .sd-box{background:var(--paper,#fff);border-radius:14px;width:min(94vw,520px);box-shadow:0 10px 40px rgba(0,0,0,.4);padding:20px 22px;}
+    #cpSaidaOv .sd-tit{font-size:18px;font-weight:700;color:#c62828;} #cpSaidaOv .sd-txt{font-size:13.5px;margin:8px 0 10px;color:var(--ink);}
+    #cpSaidaOv ul{margin:0 0 14px 18px;font-size:13.5px;line-height:1.55;color:var(--ink);} #cpSaidaOv li span{color:var(--ink-soft);}
+    #cpSaidaOv .sd-ft{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}</style>
+    <div class="sd-box" role="alertdialog" aria-modal="true" aria-label="Talhões que vão sair do planejamento"><div class="sd-tit">⚠ ${n===1?'1 talhão vai SAIR':n+' talhões vão SAIR'} do planejamento</div>
+    <div class="sd-txt">${n===1?'Ele estava':'Eles estavam'} neste planejamento e agora ${n===1?'está':'estão'} sem dia, na lista "A planejar". Se você atualizar assim, ${n===1?'ele sai':'eles saem'} daqui.</div><ul>${itens}</ul>
+    <div class="sd-ft"><button type="button" class="btn ghost" id="cpSaidaVoltar">Voltar</button><button type="button" class="btn ghost" id="cpSaidaTirar">Tirar do planejamento</button><button type="button" class="btn btn-preto" id="cpSaidaManter">Manter no dia original</button></div></div>`;
+  document.body.appendChild(ov);
+  const esc = e=>{ if(e.key==='Escape'){ e.stopImmediatePropagation(); fechar('voltar'); } };   // Esc = voltar, sem fechar o Planejar por baixo
+  const fechar = r=>{ ov.remove(); document.removeEventListener('keydown', esc, true); cb(r); };
+  document.addEventListener('keydown', esc, true);
+  ov.querySelector('#cpSaidaVoltar').addEventListener('click', ()=> fechar('voltar'));
+  ov.querySelector('#cpSaidaTirar').addEventListener('click', ()=> fechar('tirar'));
+  ov.querySelector('#cpSaidaManter').addEventListener('click', ()=> fechar('manter'));
+  ov.querySelector('#cpSaidaManter').focus();
+}
 function cgDialogoPlano(cfg){
   const antigo = document.getElementById('cpDlg'); if(antigo) antigo.remove();
   const v = cfg.valores || {}, r = cfg.resumo;
@@ -12807,7 +12829,7 @@ function cgAbrirPlanejador(cfg){
   let usarFds = false; const diasDist = ()=> usarFds ? todosDias : diasUteis;
   let grupos = cfg.grupos, plano = cfg.plano || null, revisao = cfg.revisao || null, info = cfg.info || '';
   const executados = cfg.executados || [], hojeISO = cgHojeISO();   // executados: ficam travados no dia da execução (não entram na lista, na distribuição nem nas regras)
-  const colocado = Object.assign({}, cfg.colocado || {});
+  const colocado = Object.assign({}, cfg.colocado || {}); let diaOrig = Object.assign({}, cfg.diaOrig || {});   // dia salvo de cada item que veio do planejamento (rede de segurança do Atualizar)
   let motivos = Object.assign({}, cfg.motivos || {}), snapshot = null, resumoTxt = '';   // nada é gravado até clicar em Salvar/Atualizar
   const nDia = cgNumDia;
   const itensAtuais = ()=> grupos.filter(g=> g.id in colocado).map(g=>({ dia:colocado[g.id], projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado||'', consultor:g.consultor||'', dataPrev:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:g.statusPlantio||'', avaliacoes:g.avaliacoes }))
@@ -12841,6 +12863,7 @@ function cgAbrirPlanejador(cfg){
       .cp-pill{cursor:grab;user-select:none;}
       .cp-pill.arrastando{opacity:.4;}
       .cp-leg{font-size:10.5px;color:var(--ink-soft);margin:2px 0 0 3px;}
+    .cp-pill.atr{box-shadow:0 0 0 2px #c62828;} .cp-atr{color:#c62828;font-weight:700;}
       .cp-vazio{font-size:12px;color:var(--ink-soft);padding:8px 2px;}
       .cp-semanas{overflow:auto;min-width:0;min-height:0;}
       .cp-semtit{font-size:12.5px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px;}
@@ -12887,11 +12910,11 @@ function cgAbrirPlanejador(cfg){
     const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
     const dt = new Date(g.dataStr+'T00:00:00');
     const dia = colocado[g.id], dev = dia ? nDia(dia)-nDia(g.dataStr) : 0, fora = Math.abs(dev) > (g.faixa ?? 4);
-    const leg = comLegenda
+    const atras = !comLegenda && !!dia && dia < hojeISO, nAtr = atras ? nDia(hojeISO)-nDia(dia) : 0; const leg = comLegenda
       ? `<div class="cp-leg">prev. ${(dt.getDay()===0||dt.getDay()===6) ? NOMES[dt.getDay()]+' ' : ''}${cgDataBr(g.dataStr).slice(0,5)}</div>` + (motivos[g.id] ? `<div class="cp-mot">${cgEscH(String(motivos[g.id]).startsWith('data prevista') ? motivos[g.id] : 'sem dia possível: '+motivos[g.id])}</div>` : '')
       : (dia && dev!==0 ? `<div class="cp-leg cp-dev${fora?' fora':''}" title="tolerância deste estádio: ±${g.faixa ?? 4} dias">${dev>0?'+':'−'}${Math.abs(dev)}d · prev. ${cgDataBr(g.dataStr).slice(0,5)}${fora?' · fora da tolerância':''}</div>` : '');
     const dica = pj.label+' — '+g.cliente+' / '+g.fazenda+' / '+g.talhao+(cgEmEst(g)?' (plantio em estimativa)':'')+'\n'+g.avaliacoes.map(a=>a.avaliacao+' ('+a.estagio+')').join(', ');
-    return `<div class="cp-item"><div class="cg-pill cp-pill${cgEmEst(g)?' est':''}" draggable="true" data-id="${g.id}" data-chave="${cgEscH([g.projeto,g.cliente,g.fazenda,g.talhao].join('|'))}" style="${cgEstiloPill(g,pj)}" title="${cgEscH(dica)}">${cgEscH(txt)}</div>${leg}</div>`;
+    return `<div class="cp-item"><div class="cg-pill cp-pill${cgEmEst(g)?' est':''}${atras?' atr':''}" draggable="true" data-id="${g.id}" data-chave="${cgEscH([g.projeto,g.cliente,g.fazenda,g.talhao].join('|'))}" style="${cgEstiloPill(g,pj)}" title="${cgEscH(dica)}">${cgEscH(txt)}</div>${leg}${atras ? `<div class="cp-leg cp-atr" title="O dia planejado já passou e a avaliação ainda está pendente: arraste o pino para um dia novo e clique em Atualizar">⚠ atrasado há ${nAtr}d</div>` : ''}</div>`;
   };
   const exHtml = g=>{
     const pj = CG_PROJ[g.projeto], txt = pj.s+' · '+g.fazenda+' '+g.talhao;
@@ -13012,16 +13035,27 @@ function cgAbrirPlanejador(cfg){
   });
   const aplicarRevisao = ()=>{
     if(!revisao) return;
-    grupos = revisao.grupos; aplicarResultado(revisao);
+    grupos = revisao.grupos; aplicarResultado(revisao); diaOrig = Object.assign({}, revisao.diaOrig || {});
     info = cgTextoRevisao(revisao.mudaram, revisao.saiu, revisao.extras); revisao = null; snapshot = null; resumoTxt = ''; desenhar();
   };
   // salvar / atualizar / salvar como novo: abre a caixinha
-  const abrirSalvar = modo=>{
+  const abrirSalvar = (modo, forca)=>{
     const pendentes = itensAtuais();
     const execNovos = executados.filter(g=>!g.itemOriginal).map(g=>({ dia:g.dataStr, projeto:g.projeto, cliente:g.cliente, fazenda:g.fazenda, talhao:g.talhao, estado:g.estado||'', consultor:g.consultor||'', dataPrev:g.dataStr, faixa:g.faixa ?? 4, statusPlantio:'', avaliacoes:(g.avaliacoes||[]).map(a=>({ avaliacao:a.avaliacao, estagio:a.estagio })), jaExecutado:true }));   // já estava executado quando você salvou: entra no planejamento, no dia da execução
     const itens = [...pendentes, ...executados.map(g=>g.itemOriginal).filter(Boolean), ...execNovos].sort((a,b)=> a.dia.localeCompare(b.dia) || a.projeto.localeCompare(b.projeto) || (a.fazenda+' '+a.talhao).localeCompare(b.fazenda+' '+b.talhao,'pt-BR',{numeric:true}));   // os já executados continuam no planejamento salvo
     if(!itens.length) return;
-    const base = plano || {}, naLista = grupos.filter(g=> !(g.id in colocado)).length;
+    // REDE DE SEGURANÇA: talhão que ESTAVA no planejamento e ficou sem dia (na lista "A planejar") só sai se a pessoa decidir; nunca some como efeito colateral do Atualizar
+if(modo==='atualizar' && plano && forca!=='saida'){
+const sairiam = grupos.filter(g=> !(g.id in colocado) && (g.id in diaOrig));
+if(sairiam.length){
+cgConfirmarSaida(sairiam.map(g=>({ rot:(CG_PROJ[g.projeto] ? CG_PROJ[g.projeto].s : g.projeto)+' · '+g.fazenda+' '+g.talhao, dia:diaOrig[g.id] })), esc=>{
+if(esc==='manter'){ sairiam.forEach(g=>{ if(diaOrig[g.id]) colocado[g.id] = diaOrig[g.id]; }); resumoTxt = ''; desenhar(); abrirSalvar(modo); }
+else if(esc==='tirar') abrirSalvar(modo, 'saida');
+});
+return;
+}
+}
+const base = plano || {}, naLista = grupos.filter(g=> !(g.id in colocado)).length;
     cgDialogoPlano({
       titulo: modo==='atualizar' ? 'Atualizar planejamento' : 'Salvar planejamento',
       valores: { regiao:base.regiao||'', responsavel:base.responsavel||'', subtitulo:base.subtitulo||'', criado_em: modo==='atualizar' ? base.criado_em : cgIsoLocal(new Date()) },
@@ -13053,7 +13087,7 @@ function cgPlanosAbrir(id, revisar, destaque){
   cfg.executados = revisar ? rec.revisado.executados : rec.comoSalvo.executados;
   if(revisar){ cfg.grupos = rec.revisado.grupos; cfg.colocado = rec.revisado.colocado; cfg.motivos = rec.revisado.motivos; cfg.info = cgTextoRevisao(rec.mudaram, rec.revisado.saiu, rec); }
   else { cfg.grupos = rec.comoSalvo.grupos; cfg.colocado = rec.comoSalvo.colocado; cfg.motivos = {}; cfg.revisao = mudou ? { ...rec.revisado, mudaram:rec.mudaram, extras:rec } : null; }
-  cfg.destaque = destaque || null;   // vem do modal de Alertas ("Ver no planejamento"): o pill do talhão fica realçado e no meio da tela
+  cfg.diaOrig = revisar ? rec.revisado.diaOrig : rec.comoSalvo.diaOrig; cfg.destaque = destaque || null;   // vem do modal de Alertas ("Ver no planejamento"): o pill do talhão fica realçado e no meio da tela
   cgAbrirPlanejador(cfg);
 }
 /* ===== EXPORTAÇÃO DO PLANEJAMENTO (PDF e Excel) =====
@@ -17964,7 +17998,7 @@ const CF_COR_CONSULTOR = { paula:'#0b4f8a', igor:'#f2a900', felipe:'#1e9e6a', ra
 const CF_COR_EXTRA = ['#6a4c93','#00838f','#8d6e63','#546e7a','#7cb342','#ad1457'];                 // para qualquer outro consultor que apareça
 const CF_ETAPA_COR = CF_COLETA_STATUS_OPTIONS.map(s=> CF_COR_STATUS[s][0]);   // fundo de cada faixa do gráfico, na ordem dos status da coleta (Pendente ... Dado compilado): igual ao da tabela
 const CF_ETAPA_FG = CF_COLETA_STATUS_OPTIONS.map(s=> CF_COR_STATUS[s][1]);    // cor do número dentro da faixa: igual ao texto do status na tabela
-const CF_ETAPA_ROT = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado'];   // o último é "Dado compilado no crop do Cliente", encurtado para caber
+const CF_ETAPA_ROT = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado','Não coletado'];   // o último é "Dado compilado no crop do Cliente", encurtado para caber
 const cfPrimeiroNome = n=> String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(/\s+/)[0];
 const cfNomesTodos = ()=> [...new Set(cfListaBase().map(r=> r.consultor||'Sem consultor'))];   // todos os consultores, mesmo com filtro: a cor de cada um não muda
 function cfCorConsultor(nome, todos){
@@ -17996,7 +18030,7 @@ function cfCalcPainel(lista){
     const p = por[nome] = por[nome] || { nome, col:0, ha:0, etapas:CF_COLETA_STATUS_OPTIONS.map(()=>0), outros:0, prox:[], per:[], fora:[] };
     haTotal += area;
     const i = CF_COLETA_STATUS_OPTIONS.indexOf(st); if(i>=0) p.etapas[i]++; else p.outros++;   // status fora da lista (não deveria existir): conta à parte, só para o total fechar
-    if(st!=='Pendente'){
+    if(st==='Não coletado'){ /* fica só na faixa preta do gráfico: não é coletado nem está a coletar */ } else if(st!=='Pendente'){
       p.col++; p.ha += area; haCol += area; nCol++;
       const u = (r.estado||'').toUpperCase(); if(u){ uf[u] = uf[u] || { n:0, ha:0 }; uf[u].n++; uf[u].ha += area; }
     } else {
@@ -18216,6 +18250,7 @@ function renderColetaFoliar(){
   }
   // depois que o talhão deixa de ser Pendente (coletado, no laboratório, laudo, dado compilado), os dias param de contar: a célula mostra "Coletado" em verde
   function cfCelulaDias(dataPlantio, status){
+if(status==='Não coletado') return { cor:'#111111', fg:'#ffffff', txt:'Não coletado', tip:'Não foi coletado' };
     if((status||'Pendente')!=='Pendente') return { cor:CF_COR_COLETADO, fg:'#ffffff', txt:'Coletado', tip:'Já coletado' };
     const d = diasAteColeta(dataPlantio), sit = cfSituacao(d), cs = CF_COR_SIT[sit], dataIso = cfDataPrevista(dataPlantio, CF_DAP_COLETA);
     return { cor:cs[0], fg:cs[1], txt: sit==='fut' ? d+' dia(s)' : sit==='per' ? 'Dentro do período de coleta' : 'Fora do período de coleta',
