@@ -5922,9 +5922,11 @@ const CF_DAP_MSG1 = CF_DAP_COLETA - 7;
 const CF_DAP_MSG2 = 45 + DAP_DESLOCAMENTO;
 const CF_DAP_COLETA_PREVISTA = 45 + DAP_DESLOCAMENTO;
 const CF_MSG_OPTIONS = ['Pendente','Enviado'];
-const CF_COLETA_STATUS_OPTIONS = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente','Não coletado'];   // "Não coletado" é uma saída fora do processo: não conta como coletado nem como a coletar
+const CF_STATUS_SINALIZADA = 'Coleta Sinalizada com Cliente - Aguardando retorno';   // a coleta ainda NÃO aconteceu: só foi sinalizada ao cliente, que vai dar retorno. Continua "a coletar" (não conta como coletada)
+const cfAindaPendente = st=> !st || st==='Pendente' || st===CF_STATUS_SINALIZADA;   // pendentes de verdade: Pendente e Sinalizada com cliente
+const CF_COLETA_STATUS_OPTIONS = ['Pendente',CF_STATUS_SINALIZADA,'Coletado','No laboratório','Laudo recebido','Dado compilado no crop do Cliente','Não coletado'];   // "Não coletado" é uma saída fora do processo: não conta como coletado nem como a coletar
 // cores dos status (mensagem 1, mensagem 2 e coleta): pendente vermelho; enviado e coletado verde; no laboratório amarelo; laudo recebido verde mais escuro; dado compilado no crop do cliente azul
-const CF_COR_STATUS = { 'Pendente':['#f6b8b0','#8a1c13'], 'Enviado':['#bfe6cb','#14532d'], 'Coletado':['#bfe6cb','#14532d'], 'No laboratório':['#ffe27a','#5a4400'], 'Laudo recebido':['#6dbb88','#06361a'], 'Dado compilado no crop do Cliente':['#a8c8f0','#0f3b78'], 'Não coletado':['#111111','#ffffff'] };   // UMA paleta só: [fundo, texto]. A tabela (status), as faixas do gráfico "Etapas da coleta por consultor" e a legenda leem esta mesma lista
+const CF_COR_STATUS = { 'Pendente':['#f6b8b0','#8a1c13'], 'Enviado':['#bfe6cb','#14532d'], 'Coletado':['#bfe6cb','#14532d'], 'No laboratório':['#ffe27a','#5a4400'], [CF_STATUS_SINALIZADA]:['#ffe27a','#5a4400'], 'Laudo recebido':['#6dbb88','#06361a'], 'Dado compilado no crop do Cliente':['#a8c8f0','#0f3b78'], 'Não coletado':['#111111','#ffffff'] };   // UMA paleta só: [fundo, texto]. A tabela (status), as faixas do gráfico "Etapas da coleta por consultor" e a legenda leem esta mesma lista
 const cfEstiloStatus = v=>{ const k = CF_COR_STATUS[v]; return k ? 'background:'+k[0]+';color:'+k[1]+';font-weight:500;' : ''; };
 const CF_COR_COLETADO = '#2e8b57';   // célula "dias até coleta" depois que a coleta aconteceu
 function getCfEntry(key){
@@ -17998,7 +18000,7 @@ const CF_COR_CONSULTOR = { paula:'#0b4f8a', igor:'#f2a900', felipe:'#1e9e6a', ra
 const CF_COR_EXTRA = ['#6a4c93','#00838f','#8d6e63','#546e7a','#7cb342','#ad1457'];                 // para qualquer outro consultor que apareça
 const CF_ETAPA_COR = CF_COLETA_STATUS_OPTIONS.map(s=> CF_COR_STATUS[s][0]);   // fundo de cada faixa do gráfico, na ordem dos status da coleta (Pendente ... Dado compilado): igual ao da tabela
 const CF_ETAPA_FG = CF_COLETA_STATUS_OPTIONS.map(s=> CF_COR_STATUS[s][1]);    // cor do número dentro da faixa: igual ao texto do status na tabela
-const CF_ETAPA_ROT = ['Pendente','Coletado','No laboratório','Laudo recebido','Dado compilado','Não coletado'];   // o último é "Dado compilado no crop do Cliente", encurtado para caber
+const CF_ETAPA_ROT = ['Pendente','Sinalizada c/ cliente','Coletado','No laboratório','Laudo recebido','Dado compilado','Não coletado'];   // o último é "Dado compilado no crop do Cliente", encurtado para caber
 const cfPrimeiroNome = n=> String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(/\s+/)[0];
 const cfNomesTodos = ()=> [...new Set(cfListaBase().map(r=> r.consultor||'Sem consultor'))];   // todos os consultores, mesmo com filtro: a cor de cada um não muda
 function cfCorConsultor(nome, todos){
@@ -18030,7 +18032,7 @@ function cfCalcPainel(lista){
     const p = por[nome] = por[nome] || { nome, col:0, ha:0, etapas:CF_COLETA_STATUS_OPTIONS.map(()=>0), outros:0, prox:[], per:[], fora:[] };
     haTotal += area;
     const i = CF_COLETA_STATUS_OPTIONS.indexOf(st); if(i>=0) p.etapas[i]++; else p.outros++;   // status fora da lista (não deveria existir): conta à parte, só para o total fechar
-    if(st==='Não coletado'){ /* fica só na faixa preta do gráfico: não é coletado nem está a coletar */ } else if(st!=='Pendente'){
+    if(st==='Não coletado'){ /* fica só na faixa preta do gráfico: não é coletado nem está a coletar */ } else if(!cfAindaPendente(st)){
       p.col++; p.ha += area; haCol += area; nCol++;
       const u = (r.estado||'').toUpperCase(); if(u){ uf[u] = uf[u] || { n:0, ha:0 }; uf[u].n++; uf[u].ha += area; }
     } else {
@@ -18106,7 +18108,7 @@ const CF_PDF_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAA
 function cfAbrirMensagem(id){
   const rec = RECORDS.find(r=> r.id===id) || SEM_AREA.find(r=> r.id===id); if(!rec) return;
   const E = cgEscH, hoje = new Date(); hoje.setHours(0,0,0,0); const ant = document.getElementById('cfMsgModal'); if(ant) ant.remove();
-  const itens = cfListaVisivel().filter(r=> r.cliente===rec.cliente && r.fazenda===rec.fazenda && (r.cf_coleta_status||'Pendente')==='Pendente').map(r=>{ const data = r.cf_coleta_data || cfDataPrevista(r.data_plantio, CF_DAP_COLETA_PREVISTA); return { r, data, dias:Math.round((new Date(data+'T00:00:00')-hoje)/86400000) }; })
+  const itens = cfListaVisivel().filter(r=> r.cliente===rec.cliente && r.fazenda===rec.fazenda && cfAindaPendente(r.cf_coleta_status)).map(r=>{ const data = r.cf_coleta_data || cfDataPrevista(r.data_plantio, CF_DAP_COLETA_PREVISTA); return { r, data, dias:Math.round((new Date(data+'T00:00:00')-hoje)/86400000) }; })
     .filter(i=> i.dias<=7 || i.r.id===id).sort((a,b)=> a.data.localeCompare(b.data) || String(a.r.talhao).localeCompare(String(b.r.talhao),'pt-BR',{ numeric:true }));   // pendentes da mesma fazenda: os desta semana (ou atrasados) e o talhão clicado
   const texto = itens.length ? ['Olá, pessoal! Para esta semana, os talhões da fazenda '+rec.fazenda+' que devem ser coletados são:', '', ...itens.map(i=> '• '+i.r.talhao+' — previsto para '+cfDM(i.data)), '', 'A data prevista é a indicada ao lado de cada talhão, mas o período de coleta pode se estender em até 7 dias.', '', 'Os cuidados com a coleta são os mesmos do material e do vídeo que já enviamos.'].join('\n') : '';
   const ov = document.createElement('div'); ov.id = 'cfMsgModal'; ov.className = 'cf-modal-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Mensagem de coleta: '+rec.fazenda);
@@ -18251,7 +18253,7 @@ function renderColetaFoliar(){
   // depois que o talhão deixa de ser Pendente (coletado, no laboratório, laudo, dado compilado), os dias param de contar: a célula mostra "Coletado" em verde
   function cfCelulaDias(dataPlantio, status){
 if(status==='Não coletado') return { cor:'#111111', fg:'#ffffff', txt:'Não coletado', tip:'Não foi coletado' };
-    if((status||'Pendente')!=='Pendente') return { cor:CF_COR_COLETADO, fg:'#ffffff', txt:'Coletado', tip:'Já coletado' };
+    if(!cfAindaPendente(status)) return { cor:CF_COR_COLETADO, fg:'#ffffff', txt:'Coletado', tip:'Já coletado' };
     const d = diasAteColeta(dataPlantio), sit = cfSituacao(d), cs = CF_COR_SIT[sit], dataIso = cfDataPrevista(dataPlantio, CF_DAP_COLETA);
     return { cor:cs[0], fg:cs[1], txt: sit==='fut' ? d+' dia(s)' : sit==='per' ? 'Dentro do período de coleta' : 'Fora do período de coleta',
              tip: sit==='fut' ? 'Data da coleta: '+cfDM(dataIso) : 'Período de coleta: de '+cfDM(dataIso)+' a '+cfDM(cfSomaDias(dataIso,CF_PERIODO_DIAS-1))+' (7 dias contando a data)' };   // antes da data: dias positivos; depois: dentro ou fora do período
