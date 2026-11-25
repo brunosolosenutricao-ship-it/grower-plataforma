@@ -6533,6 +6533,7 @@ window.__cargaPct = pct; document.querySelectorAll('.labs-carga').forEach(el=> e
         oxc_acomp_etapa1: d.oxc_acomp_etapa1 ?? null,
         oxc_acomp_etapa2: d.oxc_acomp_etapa2 ?? null,
         oxc_acomp_etapa3: d.oxc_acomp_etapa3 ?? null,
+        oxc_acomp_etapa3_data: d.oxc_acomp_etapa3_data ?? null,
         oxc_acomp_etapa4: d.oxc_acomp_etapa4 ?? null,
         oxc_acomp_modo_aplicacao: d.oxc_acomp_modo_aplicacao ?? null,
         oxc_acomp_status_plantio: d.oxc_acomp_status_plantio ?? null,
@@ -6746,14 +6747,14 @@ window.__cargaPct = pct; document.querySelectorAll('.labs-carga').forEach(el=> e
     });
     state.oxcAcomp = {};
     RECORDS.forEach(r=>{
-      const temAlgo = r.oxc_acomp_participacao!=null || r.oxc_acomp_etapa1!=null || r.oxc_acomp_etapa2!=null || r.oxc_acomp_etapa3!=null || r.oxc_acomp_etapa4!=null || r.oxc_acomp_modo_aplicacao!=null || r.oxc_acomp_status_plantio!=null;
+      const temAlgo = r.oxc_acomp_participacao!=null || r.oxc_acomp_etapa1!=null || r.oxc_acomp_etapa2!=null || r.oxc_acomp_etapa3!=null || r.oxc_acomp_etapa3_data!=null || r.oxc_acomp_etapa4!=null || r.oxc_acomp_modo_aplicacao!=null || r.oxc_acomp_status_plantio!=null;
       if(!temAlgo) return;
       const key = cronogramaKey(r);
       state.oxcAcomp[key] = {
         participacao: r.oxc_acomp_participacao || 'Pendente',
         etapa1: r.oxc_acomp_etapa1 || 'Pendente',
         etapa2: r.oxc_acomp_etapa2 || 'Pendente',
-        etapa3: r.oxc_acomp_etapa3 || 'Pendente',
+        etapa3: r.oxc_acomp_etapa3 || 'Pendente', etapa3_data: r.oxc_acomp_etapa3_data || '',
         etapa4: r.oxc_acomp_etapa4 || 'Pendente',
         modo_aplicacao: r.oxc_acomp_modo_aplicacao || '',
         status_plantio: r.oxc_acomp_status_plantio || '',
@@ -11273,7 +11274,7 @@ function renderOxidoConsumo(){
       <table data-colfilter="oxc-acomp">
         <thead><tr>
           <th class="lm-freeze lm-freeze-1">Cliente</th><th class="lm-freeze lm-freeze-2">Fazenda</th><th class="lm-freeze lm-freeze-3">Talhão</th><th>Dose Óxido</th><th>Status</th><th>Participação</th><th>Data plantio</th><th>Data coleta (prevista)</th><th>Modo de aplicação</th><th>Status do Plantio</th>
-          ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : `<th>${l}</th>`).join('')}
+          ${ETAPA_LABELS.map((l,i)=> i===1 ? `<th>${l}<br><span style="font-weight:400;font-size:9px;">(= Status da Alimentação)</span></th>` : i===2 ? `<th>${l}</th><th>Data real da Etapa 3<br><span style="font-weight:400;font-size:9px;">(dia da coleta)</span></th>` : `<th>${l}</th>`).join('')}
           <th class="lm-freeze-right" style="width:230px;min-width:230px;max-width:230px;">Salvar</th>
         </tr></thead>
         <tbody>
@@ -11293,14 +11294,14 @@ function renderOxidoConsumo(){
               <td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="status_plantio" style="background:${entry.status_plantio==='Plantado'?'#c8e6c9':entry.status_plantio==='Estimativa'?'#fff3b0':'#fff'};font-weight:700;"><option value="" ${!entry.status_plantio?'selected':''}>—</option><option value="Plantado" ${entry.status_plantio==='Plantado'?'selected':''}>Plantado</option><option value="Estimativa" ${entry.status_plantio==='Estimativa'?'selected':''}>Estimativa</option></select></td>
               ${ETAPA_KEYS.map(k=> k==='etapa2'
                 ? `<td style="background:${oxcCorFundo('etapa2', r.status)};font-weight:700;text-align:center;">${r.status||'—'}</td>`
-                : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>`
+                : `<td><select class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="${k}" style="background:${oxcCorFundo(k,entry[k])};font-weight:700;">${OXC_ETAPA_OPCOES[k].map(o=>`<option value="${o}" ${entry[k]===o?'selected':''}>${o}</option>`).join('')}</select></td>${k==='etapa3' ? `<td><input type="date" class="cell-input oxc-acomp-input" data-oxc-key="${encodeURIComponent(key)}" data-oxc-campo="etapa3_data" value="${entry.etapa3_data||''}" title="Dia em que a coleta foi feita. Vale quando a Etapa 3 está em Coletado, No laboratório ou Laudo recebido: o Cronograma de viagem mostra o Óxido executado nesse dia."></td>` : ''}`
               ).join('')}
               <td class="lm-freeze-right" style="white-space:nowrap;width:230px;min-width:230px;max-width:230px;">
                 <button class="row-save oxc-acomp-save-btn" data-oxc-key="${encodeURIComponent(key)}">💾 Salvar</button>${anxCelula(ANX_OXC, r.id)}
                 <span class="oxc-acomp-msg" data-oxc-msg-key="${encodeURIComponent(key)}"></span>
               </td>
             </tr>`;
-          }).join('') || `<tr><td colspan="${10+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
+          }).join('') || `<tr><td colspan="${11+ETAPA_KEYS.length}">Nenhum talhão encontrado.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -11336,9 +11337,9 @@ function renderOxidoConsumo(){
       const key = decodeURIComponent(el.dataset.oxcKey);
       const campo = el.dataset.oxcCampo;
       const valor = el.value;
-      if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente', modo_aplicacao:'', status_plantio:'' };
+      if(!state.oxcAcomp[key]) state.oxcAcomp[key] = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa3_data:'', etapa4:'Pendente', modo_aplicacao:'', status_plantio:'' };
       state.oxcAcomp[key][campo] = valor;
-      if(campo==='status_plantio') el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff'; else if(campo!=='modo_aplicacao') el.style.background = oxcCorFundo(campo, valor);
+      if(campo==='status_plantio') el.style.background = valor==='Plantado' ? '#c8e6c9' : valor==='Estimativa' ? '#fff3b0' : '#fff'; else if(campo!=='modo_aplicacao' && campo!=='etapa3_data') el.style.background = oxcCorFundo(campo, valor);
       salvarOxcAcompCampo(key, campo, valor, el);
     });
   });
@@ -12086,7 +12087,10 @@ function cgColetarPontos(projetos, ini, fim){
       const entEstr = getEstrAcompEntry(cronogramaKey(r));   // mesma fonte da tabela de acompanhamento: a data escolhida lá vale também aqui
       ESTR_ETAPAS.forEach(e=>{ const info = ESTR_BLOCO_DAP[e.bloco]; if(info && entEstr[e.key+'_exec']!==STATUS_NAO_SE_APLICA) add(r,'estr',info.dap,e.label,e.bloco, entEstr[e.key+'_mes'], entEstr[e.key+'_exec']==='Feito'); });
     }
-    if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0) add(r,'oxc',OXC_DAP_COLETA,'Coleta foliar prevista (Etapa 3)',OXC_DAP_COLETA+' DAP');
+    if(projetos.includes('oxc') && r.dose_oxido!=null && Number(r.dose_oxido)>0 && r.oxc_acomp_etapa3!=='Não coletou'){   // "Não coletou" sai das pendências
+      const feitoOxc = ((typeof RF_OXC_FEITO!=='undefined') ? RF_OXC_FEITO : ['Coletado','No laboratório','Laudo recebido']).includes(r.oxc_acomp_etapa3);   // Coletado / No laboratório / Laudo recebido = executada (a mesma conta do Resumo da fazenda)
+      add(r,'oxc',OXC_DAP_COLETA,'Coleta foliar prevista (Etapa 3)',OXC_DAP_COLETA+' DAP', feitoOxc ? r.oxc_acomp_etapa3_data : null, feitoOxc);   // executada: fica no dia da "Data real"; sem data, na prevista
+    }
     if(projetos.includes('cf') && r.cultura==='Soja'){
       add(r,'cf',CF_DAP_MSG1,'Mensagem de lembrete 1',CF_DAP_MSG1+' DAP');
       add(r,'cf',CF_DAP_MSG2,'Mensagem de lembrete 2',CF_DAP_MSG2+' DAP');
@@ -12165,7 +12169,7 @@ function cgPlanoResumo(itens, semanas){
 function cgReconciliarPlano(plano, pontos, existeTalhao){
   const itens = plano.itens || [], vivos = new Map();
   pontos.forEach(p=>{ const k = [p.projeto,p.cliente,p.fazenda,p.talhao].join('|'); if(!vivos.has(k)) vivos.set(k,[]); vivos.get(k).push(p); });
-  const listas = { mudaram:[], atrasados:[], status:[], dataDentro:[] };   // quais talhões entraram em cada situação (pro texto do aviso)
+  const listas = { mudaram:[], atrasados:[], status:[], dataDentro:[], execOutroDia:[] };   // quais talhões entraram em cada situação (pro texto do aviso)
   const comoSalvo = { grupos:[], colocado:{}, executados:[], diaOrig:{} }, revisado = { grupos:[], colocado:{}, motivos:{}, saiu:[], executados:[], diaOrig:{} };   // diaOrig: o dia em que cada item estava salvo (pra rede de segurança do Atualizar)
   let mudaram = 0, atrasados = 0, statusMud = 0, dataDentro = 0; const hojeISO = cgHojeISO();
   itens.forEach(it=>{
@@ -12174,6 +12178,7 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     if(tudo.length && tudo.every(p=>p.exec)){   // todas as avaliações dele foram executadas: fica travado no dia da execução e não conta como mudança nem como saída
       const ex = { projeto:it.projeto, cliente:it.cliente, fazenda:it.fazenda, talhao:it.talhao, estado:tudo[0].estado, consultor:tudo[0].consultor, dataStr:tudo.map(p=>p.dataStr).sort()[0], faixa:it.faixa, statusPlantio:'', exec:true, execSemData:tudo.every(p=>p.execSemData), planejadoPara:it.dia, itemOriginal:it, avaliacoes:tudo.map(p=>({ avaliacao:p.avaliacao, estagio:p.estagio, exec:true, semData:p.execSemData })) };
       comoSalvo.executados.push({ ...ex, id:'x'+comoSalvo.executados.length }); revisado.executados.push({ ...ex, id:'x'+revisado.executados.length });
+if(!ex.execSemData && ex.dataStr !== it.dia) listas.execOutroDia.push({ rot, dia:it.dia });   // executada com data real diferente do dia planejado: só avisa (o pino já mostra "planejado pra dd/mm")
       return;
     }
     // "como salvo": a foto do que foi planejado (inclusive o que depois saiu); só os executados vão pra parte travada
@@ -12195,20 +12200,20 @@ function cgReconciliarPlano(plano, pontos, existeTalhao){
     else if(novaData !== it.dataPrev){ dataDentro++; listas.dataDentro.push({ rot, dia:it.dia }); }   // a data prevista mudou, mas o dia salvo continua dentro da tolerância: só avisa
   });
   const por = k=> new Set(listas[k].map(x=>x.rot)).size;   // um talhão com mais de um pill (dias diferentes) conta uma vez só
-  return { comoSalvo, revisado, mudaram:por('mudaram'), saiu:revisado.saiu.length, atrasados:por('atrasados'), status:por('status'), dataDentro:por('dataDentro'), listas };
+  return { comoSalvo, revisado, mudaram:por('mudaram'), saiu:revisado.saiu.length, atrasados:por('atrasados'), status:por('status'), dataDentro:por('dataDentro'), execOutroDia:por('execOutroDia'), listas };
 }
 function cgDicaAvisos(x){   // texto da dica (passar o mouse) do aviso amarelo do card: quais talhões e em que situação
   const ls = x.listas || {}, p = [];
-  [['mudaram','Mudaram de data (ficam no dia, com alerta)'],['atrasados','Dia já passou (ficam no dia, com alerta de atraso)'],['status','Status do plantio mudou (ficam no dia)'],['dataDentro','Data prevista nova, dentro da tolerância (ficam no dia)']].forEach(([k,t])=>{ if(ls[k] && ls[k].length) p.push(t+': '+cgListaNomes(ls[k])); });
+  [['mudaram','Mudaram de data (ficam no dia, com alerta)'],['atrasados','Dia já passou (ficam no dia, com alerta de atraso)'],['status','Status do plantio mudou (ficam no dia)'],['dataDentro','Data prevista nova, dentro da tolerância (ficam no dia)'],['execOutroDia','Avaliados em outro dia (já executados: ficam travados na data real)']].forEach(([k,t])=>{ if(ls[k] && ls[k].length) p.push(t+': '+cgListaNomes(ls[k])); });
   if(x.revisado && x.revisado.saiu && x.revisado.saiu.length) p.push('Saíram: '+x.revisado.saiu.map(s=>s.rot).join('; '));
   return (p.join('\n') || 'Abre o planejamento com os dados de hoje')+'\nClique pra rever e escolher um dia novo.';
 }
-function cgTemAvisos(x){ return !!(x && (x.mudaram || x.saiu || x.atrasados || x.status || x.dataDentro)); }
+function cgTemAvisos(x){ return !!(x && (x.mudaram || x.saiu || x.atrasados || x.status || x.dataDentro || x.execOutroDia)); }
 function cgExtrasPartes(x){   // frases do aviso amarelo para as situações novas (as de "mudou de data" e "saiu" seguem como antes)
   const p = [], n = (k,a,b)=> x[k] ? p.push(x[k]+(x[k]===1?a:b)) : 0;
   if(!x) return p;
   n('atrasados',' talhão com o dia já passado',' talhões com o dia já passado'); n('status',' talhão mudou o status do plantio',' talhões mudaram o status do plantio');
-  n('dataDentro',' talhão com data prevista nova',' talhões com data prevista nova');
+  n('dataDentro',' talhão com data prevista nova',' talhões com data prevista nova'); n('execOutroDia',' talhão foi avaliado em outro dia',' talhões foram avaliados em outro dia');
   return p;
 }
 function cgListaNomes(arr){   // [{rot,dia}] → "Est · Jacuba 19-CV (13/10 e 02/11); Máx · Alfa T2 (13/10)"
@@ -12221,7 +12226,8 @@ function cgTextoRevisao(mudaram, saiu, x){
   if(x && x.atrasados) p.push(x.atrasados+(x.atrasados===1?' talhão ficou no dia salvo, com alerta de atraso':' talhões ficaram no dia salvo, com alerta de atraso')+' (o dia planejado já passou e ainda há avaliação pendente: arraste para um dia novo)'+nm('atrasados'));
   if(x && x.status) p.push(x.status+(x.status===1?' talhão ficou no dia, com o status do plantio de hoje':' talhões ficaram no dia, com o status do plantio de hoje')+nm('status'));
   if(x && x.dataDentro) p.push(x.dataDentro+(x.dataDentro===1?' talhão ficou no dia (a data prevista mudou, mas o dia continua dentro da tolerância)':' talhões ficaram no dia (a data prevista mudou, mas o dia continua dentro da tolerância)')+nm('dataDentro'));
-  if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
+  if(x && x.execOutroDia) p.push(x.execOutroDia+(x.execOutroDia===1?' talhão foi avaliado em outro dia (já executado: fica travado na data real)':' talhões foram avaliados em outro dia (já executados: ficam travados na data real)')+nm('execOutroDia'));
+if(saiu.length) p.push((saiu.length===1?'1 saiu':saiu.length+' saíram')+' do planejamento: '+saiu.map(s=>s.rot+' ('+s.motivo+')').join('; '));
   return p.length ? 'Revisão aplicada: '+p.join('. ')+'. Nada foi gravado ainda: use Atualizar planejamento pra salvar.' : '';
 }
 function cgPontosVivos(){ return cgColetarPontos(CG_CONTEXTOS.geral.projetos, new Date(2026,8,1), new Date(2027,4,0)); }
@@ -17357,6 +17363,7 @@ function montarDadosOxidoBase(rec){
     oxc_acomp_etapa1: rec.oxc_acomp_etapa1 ?? null,
     oxc_acomp_etapa2: rec.oxc_acomp_etapa2 ?? null,
     oxc_acomp_etapa3: rec.oxc_acomp_etapa3 ?? null,
+    oxc_acomp_etapa3_data: rec.oxc_acomp_etapa3_data ?? null,   // sem isto, salvar qualquer outro campo do Óxido apagaria a data (o upsert regrava o bloco inteiro)
     oxc_acomp_etapa4: rec.oxc_acomp_etapa4 ?? null,
     oxc_acomp_modo_aplicacao: rec.oxc_acomp_modo_aplicacao ?? null,
     oxc_acomp_status_plantio: rec.oxc_acomp_status_plantio ?? null,
@@ -17415,7 +17422,7 @@ async function salvarCronogramaEntradaCompleta(rec, entry, user){
 
 // Acompanhamento próprio da aba Óxido de Magnésio — desvinculado do Cronograma (campos oxc_acomp_*)
 function getOxcAcompEntry(key){
-  const defaults = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa4:'Pendente', modo_aplicacao:'', status_plantio:'' };
+  const defaults = { participacao:'Pendente', etapa1:'Pendente', etapa2:'Pendente', etapa3:'Pendente', etapa3_data:'', etapa4:'Pendente', modo_aplicacao:'', status_plantio:'' };
   const found = state.oxcAcomp[key];
   return found ? {...defaults, ...found} : defaults;
 }
@@ -17447,6 +17454,7 @@ async function salvarOxcAcompEntradaCompleta(rec, entry, user){
   dados.oxc_acomp_etapa1 = entry.etapa1 ?? null;
   dados.oxc_acomp_etapa2 = entry.etapa2 ?? null;
   dados.oxc_acomp_etapa3 = entry.etapa3 ?? null;
+  dados.oxc_acomp_etapa3_data = entry.etapa3_data || null;
   dados.oxc_acomp_etapa4 = entry.etapa4 ?? null;
   dados.oxc_acomp_modo_aplicacao = entry.modo_aplicacao || null;
   dados.oxc_acomp_status_plantio = entry.status_plantio || null;
@@ -17459,6 +17467,7 @@ async function salvarOxcAcompEntradaCompleta(rec, entry, user){
     rec.oxc_acomp_etapa1 = entry.etapa1 ?? null;
     rec.oxc_acomp_etapa2 = entry.etapa2 ?? null;
     rec.oxc_acomp_etapa3 = entry.etapa3 ?? null;
+    rec.oxc_acomp_etapa3_data = entry.etapa3_data || null;
     rec.oxc_acomp_etapa4 = entry.etapa4 ?? null;
     rec.oxc_acomp_modo_aplicacao = entry.modo_aplicacao || null;
     rec.oxc_acomp_status_plantio = entry.status_plantio || null;
